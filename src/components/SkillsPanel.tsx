@@ -1,10 +1,13 @@
+import { useDraggable } from "@dnd-kit/core";
 import { Skill, SkillCategory } from "@/types/routine";
 import { SkillCard } from "./SkillCard";
+import { AddSkillDialog } from "./AddSkillDialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface SkillsPanelProps {
   skills: Skill[];
+  onAddCustomSkill: (skill: any) => void;
 }
 
 const categoryLabels: Record<SkillCategory, string> = {
@@ -17,7 +20,7 @@ const categoryLabels: Record<SkillCategory, string> = {
   transitions: "Transitions",
 };
 
-export const SkillsPanel = ({ skills }: SkillsPanelProps) => {
+export const SkillsPanel = ({ skills, onAddCustomSkill }: SkillsPanelProps) => {
   const categories: SkillCategory[] = [
     "mounts",
     "dismounts",
@@ -36,7 +39,8 @@ export const SkillsPanel = ({ skills }: SkillsPanelProps) => {
     <div className="h-full flex flex-col border-r bg-card">
       <div className="p-4 border-b">
         <h2 className="text-lg font-semibold">Skills Library</h2>
-        <p className="text-sm text-muted-foreground">Drag skills to the count sheet</p>
+        <p className="text-xs text-muted-foreground mb-3">Drag skills to count sheet</p>
+        <AddSkillDialog onAddSkill={onAddCustomSkill} />
       </div>
       
       <ScrollArea className="flex-1">

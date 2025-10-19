@@ -6,27 +6,35 @@ export const defaultSkills: Skill[] = [
   // Mounts
   {
     id: "mount-1",
-    name: "Liberty",
+    name: "Toss Hands",
     category: "mounts",
     level: "premier",
-    counts: 1,
-    description: "Single leg stunt"
+    counts: 8,
+    description: "Toss hands"
   },
   {
     id: "mount-2",
-    name: "Heel Stretch",
+    name: "Purdue Up",
     category: "mounts",
     level: "premier",
-    counts: 1,
-    description: "Extended heel stretch"
+    counts: 8,
+    description: "Purdue up"
   },
   {
     id: "mount-3",
-    name: "Scale",
+    name: "Rewind",
     category: "mounts",
     level: "premier",
-    counts: 1,
-    description: "Arabesque scale position"
+    counts: 8,
+    description: "Rewind"
+  },
+  {
+    id: "mount-4",
+    name: "FHS",
+    category: "mounts",
+    level: "premier",
+    counts: 8,
+    description: "Front handspring"
   },
   
   // Dismounts

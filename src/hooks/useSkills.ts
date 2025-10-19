@@ -1,29 +1,22 @@
-import { useState, useEffect } from "react";
-import { Skill } from "@/types/routine";
+import { useState } from "react";
+import { Skill, SkillCategory, SkillLevel } from "@/types/routine";
 import { defaultSkills } from "@/data/skillsData";
 
-const SKILLS_STORAGE_KEY = "cheerleading-skills";
-
 export const useSkills = () => {
-  const [skills, setSkills] = useState<Skill[]>([]);
+  const [skills, setSkills] = useState<Skill[]>(defaultSkills);
 
-  useEffect(() => {
-    // Load skills from localStorage or use default
-    const stored = localStorage.getItem(SKILLS_STORAGE_KEY);
-    if (stored) {
-      try {
-        setSkills(JSON.parse(stored));
-      } catch {
-        setSkills(defaultSkills);
-      }
-    } else {
-      setSkills(defaultSkills);
-    }
-  }, []);
-
-  const saveSkills = (newSkills: Skill[]) => {
-    setSkills(newSkills);
-    localStorage.setItem(SKILLS_STORAGE_KEY, JSON.stringify(newSkills));
+  const addCustomSkill = (skillData: {
+    name: string;
+    category: SkillCategory;
+    level: SkillLevel;
+    counts: number;
+    description?: string;
+  }) => {
+    const newSkill: Skill = {
+      id: `custom-${Date.now()}-${Math.random()}`,
+      ...skillData,
+    };
+    setSkills([...skills, newSkill]);
   };
 
   const importFromCSV = (csvText: string) => {
@@ -43,7 +36,7 @@ export const useSkills = () => {
       };
     });
 
-    saveSkills(newSkills);
+    setSkills(newSkills);
   };
 
   const exportToCSV = () => {
@@ -63,8 +56,8 @@ export const useSkills = () => {
 
   return {
     skills,
-    saveSkills,
     importFromCSV,
     exportToCSV,
+    addCustomSkill,
   };
 };

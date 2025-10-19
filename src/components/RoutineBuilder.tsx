@@ -13,12 +13,12 @@ import { Button } from "@/components/ui/button";
 import { Download, Upload } from "lucide-react";
 
 export const RoutineBuilder = () => {
-  const { skills, importFromCSV, exportToCSV } = useSkills();
+  const { skills, importFromCSV, exportToCSV, addCustomSkill } = useSkills();
   const [config, setConfig] = useState<RoutineConfig>({
     length: 90,
     category: "partner-stunts",
     level: "premier",
-    bpm: 155,
+    bpm: 154,
   });
   
   const [placedSkills, setPlacedSkills] = useState<PlacedSkill[]>([]);
@@ -50,15 +50,16 @@ export const RoutineBuilder = () => {
     const skill = skills.find((s) => s.id === active.id);
     if (!skill) return;
 
-    // Handle dropping on count line
-    if (over.id.toString().startsWith("line-")) {
+    // Handle dropping on specific count cell
+    if (over.id.toString().startsWith("cell-")) {
       const lineIndex = over.data?.current?.lineIndex;
-      if (typeof lineIndex === "number") {
+      const count = over.data?.current?.count;
+      if (typeof lineIndex === "number" && typeof count === "number") {
         const newPlacedSkill: PlacedSkill = {
           id: `placed-${Date.now()}-${Math.random()}`,
           skillId: skill.id,
           lineIndex,
-          startCount: 1, // Default to count 1
+          startCount: count,
         };
         setPlacedSkills([...placedSkills, newPlacedSkill]);
       }
@@ -113,6 +114,38 @@ export const RoutineBuilder = () => {
     reader.readAsText(file);
   };
 
+  const handleExportPDF = async () => {
+    const jsPDF = (await import("jspdf")).default;
+    const html2canvas = (await import("html2canvas")).default;
+
+    const pdf = new jsPDF("l", "mm", "a4");
+    
+    // Export Count Sheet
+    const countSheetElement = document.getElementById("count-sheet-table");
+    if (countSheetElement) {
+      const canvas = await html2canvas(countSheetElement);
+      const imgData = canvas.toDataURL("image/png");
+      const imgWidth = 280;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      pdf.addImage(imgData, "PNG", 10, 10, imgWidth, imgHeight);
+    }
+
+    // Export Position Sheet if team category
+    if (config.category === "team-16" || config.category === "team-24") {
+      const positionSheetElement = document.getElementById("position-sheet");
+      if (positionSheetElement) {
+        pdf.addPage();
+        const canvas = await html2canvas(positionSheetElement);
+        const imgData = canvas.toDataURL("image/png");
+        const imgWidth = 280;
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+        pdf.addImage(imgData, "PNG", 10, 10, imgWidth, imgHeight);
+      }
+    }
+
+    pdf.save("routine.pdf");
+  };
+
   return (
     <div className="h-screen flex flex-col">
       {/* Header */}
@@ -120,6 +153,10 @@ export const RoutineBuilder = () => {
         <div className="flex items-center justify-between mb-4">
           <h1 className="text-2xl font-bold">Cheerleading Routine Builder</h1>
           <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={handleExportPDF}>
+              <Download className="h-4 w-4 mr-2" />
+              Export PDF
+            </Button>
             <Button variant="outline" size="sm" onClick={handleExportCSV}>
               <Download className="h-4 w-4 mr-2" />
               Export Skills
@@ -153,7 +190,9 @@ export const RoutineBuilder = () => {
                 <SelectItem value="60">1:00</SelectItem>
                 <SelectItem value="90">1:30</SelectItem>
                 <SelectItem value="120">2:00</SelectItem>
+                <SelectItem value="135">2:15</SelectItem>
                 <SelectItem value="150">2:30</SelectItem>
+                <SelectItem value="custom">Custom</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -200,32 +239,36 @@ export const RoutineBuilder = () => {
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         <div className="flex-1 grid grid-cols-12 gap-0 overflow-hidden">
           {/* Skills Panel - Left */}
-          <div className="col-span-3 overflow-hidden">
-            <SkillsPanel skills={skills} />
+          <div className={config.category === "team-16" || config.category === "team-24" ? "col-span-4 overflow-hidden" : "col-span-4 overflow-hidden"}>
+            <SkillsPanel skills={skills} onAddCustomSkill={addCustomSkill} />
           </div>
 
-          {/* Count Sheet - Center */}
-          <div className="col-span-6 overflow-hidden">
-            <CountSheet
-              routineLength={config.length}
-              bpm={config.bpm}
-              placedSkills={placedSkills}
-              skills={skills}
-              onRemoveSkill={handleRemoveSkill}
-              onLineClick={setSelectedLine}
-              selectedLine={selectedLine}
-            />
-          </div>
+          {/* Count Sheet - Center/Right */}
+          <div className={config.category === "team-16" || config.category === "team-24" ? "col-span-8 flex flex-col" : "col-span-8 overflow-hidden"}>
+            <div className={config.category === "team-16" || config.category === "team-24" ? "flex-1 overflow-hidden" : "h-full overflow-hidden"}>
+              <CountSheet
+                routineLength={config.length}
+                bpm={config.bpm}
+                placedSkills={placedSkills}
+                skills={skills}
+                onRemoveSkill={handleRemoveSkill}
+                onLineClick={setSelectedLine}
+                selectedLine={selectedLine}
+              />
+            </div>
 
-          {/* Position Sheet - Right */}
-          <div className="col-span-3 overflow-hidden p-4">
-            <PositionSheet
-              positions={positions}
-              selectedLine={selectedLine}
-              onUpdatePosition={handleUpdatePosition}
-              onAddPosition={handleAddPosition}
-              onRemovePosition={handleRemovePosition}
-            />
+            {/* Position Sheet - Bottom Right (only for team categories) */}
+            {(config.category === "team-16" || config.category === "team-24") && (
+              <div className="h-[400px] border-t p-4">
+                <PositionSheet
+                  positions={positions}
+                  selectedLine={selectedLine}
+                  onUpdatePosition={handleUpdatePosition}
+                  onAddPosition={handleAddPosition}
+                  onRemovePosition={handleRemovePosition}
+                />
+              </div>
+            )}
           </div>
         </div>
 

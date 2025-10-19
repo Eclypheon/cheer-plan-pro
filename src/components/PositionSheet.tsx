@@ -69,7 +69,7 @@ export const PositionSheet = ({
   const linePositions = positions.filter((p) => p.lineIndex === selectedLine);
 
   return (
-    <Card className="h-full flex flex-col">
+    <Card className="h-full flex flex-col" id="position-sheet">
       <div className="p-4 border-b flex items-center justify-between">
         <div>
           <h3 className="text-lg font-semibold">Positions - Line {selectedLine + 1}</h3>
