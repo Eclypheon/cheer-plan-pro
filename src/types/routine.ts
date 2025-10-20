@@ -42,6 +42,15 @@ export interface Position {
   lineIndex: number;
 }
 
+export interface PositionIcon {
+  id: string;
+  type: "square" | "circle" | "x";
+  x: number;
+  y: number;
+  lineIndex: number;
+  name?: string;
+}
+
 export interface RoutineConfig {
   length: number; // in seconds (60-150)
   category: RoutineCategory;

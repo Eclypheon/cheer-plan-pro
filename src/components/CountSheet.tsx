@@ -1,7 +1,6 @@
-import { useDroppable } from "@dnd-kit/core";
+import { useDroppable, useDraggable } from "@dnd-kit/core";
 import type { PlacedSkill, Skill } from "@/types/routine";
 import { X } from "lucide-react";
-import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface CountSheetProps {
   routineLength: number;
@@ -98,14 +97,25 @@ export const CountSheet = ({
       >
         {isFirstCountOfSkill.map((sp) => {
           const cellsToSpan = Math.min(sp.endCount - sp.startCount + 1, 9 - count);
+          const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+            id: `placed-${sp.placedSkill.id}`,
+            data: { type: "placed-skill", placedSkill: sp.placedSkill },
+          });
+
+          const style = transform
+            ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` }
+            : undefined;
+
           return (
             <div 
-              key={sp.placedSkill.id} 
-              className="absolute inset-0 p-1 text-xs flex items-start gap-1 bg-primary/20 border-l-2 border-primary"
-              style={{ 
-                width: `${cellsToSpan * 100}%`,
-                zIndex: 10
-              }}
+              key={sp.placedSkill.id}
+              ref={setNodeRef}
+              {...listeners}
+              {...attributes}
+              style={style}
+              className={`absolute inset-0 p-1 text-xs flex items-start gap-1 bg-primary/20 border-l-2 border-primary cursor-grab active:cursor-grabbing ${
+                isDragging ? "opacity-50" : ""
+              }`}
             >
               <span className="flex-1 font-medium">{sp.skill.name}</span>
               <button

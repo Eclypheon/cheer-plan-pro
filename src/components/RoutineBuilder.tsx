@@ -1,18 +1,22 @@
 import { useState } from "react";
-import { DndContext, DragEndEvent, DragOverlay, useSensor, useSensors, PointerSensor } from "@dnd-kit/core";
-import type { PlacedSkill, Position, RoutineConfig, Skill } from "@/types/routine";
+import { DndContext, DragEndEvent, DragOverlay, useSensor, useSensors, PointerSensor, DragStartEvent } from "@dnd-kit/core";
+import type { PlacedSkill, Position, RoutineConfig, Skill, PositionIcon } from "@/types/routine";
 import { useSkills } from "@/hooks/useSkills";
 import { SkillsPanel } from "./SkillsPanel";
 import { CountSheet } from "./CountSheet";
 import { PositionSheet } from "./PositionSheet";
 import { SkillCard } from "./SkillCard";
+import { TrashDropZone } from "./TrashDropZone";
+import { ThemeToggle } from "./ThemeToggle";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Download, Upload } from "lucide-react";
+import { Download, Info, Library } from "lucide-react";
+import { Link } from "react-router-dom";
 
 export const RoutineBuilder = () => {
-  const { skills, importFromCSV, exportToCSV, addCustomSkill, deleteSkill, updateSkillCounts } = useSkills();
+  const { skills, exportToCSV, addCustomSkill, deleteSkill, updateSkillCounts } = useSkills();
   const [config, setConfig] = useState<RoutineConfig>({
     length: 90,
     category: "partner-stunts",
@@ -21,9 +25,10 @@ export const RoutineBuilder = () => {
   });
   
   const [placedSkills, setPlacedSkills] = useState<PlacedSkill[]>([]);
-  const [positions, setPositions] = useState<Position[]>([]);
+  const [positionIcons, setPositionIcons] = useState<PositionIcon[]>([]);
   const [selectedLine, setSelectedLine] = useState<number | null>(null);
   const [draggedSkill, setDraggedSkill] = useState<Skill | null>(null);
+  const [isDraggingPlacedSkill, setIsDraggingPlacedSkill] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -33,24 +38,38 @@ export const RoutineBuilder = () => {
     })
   );
 
-  const handleDragStart = (event: any) => {
+  const handleDragStart = (event: DragStartEvent) => {
     const skill = skills.find((s) => s.id === event.active.id);
     if (skill) {
       setDraggedSkill(skill);
+      return;
+    }
+    
+    // Check if dragging a placed skill
+    if (event.active.data?.current?.type === "placed-skill") {
+      setIsDraggingPlacedSkill(true);
     }
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
     setDraggedSkill(null);
+    setIsDraggingPlacedSkill(false);
     
     const { active, over } = event;
     if (!over) return;
 
-    const skill = skills.find((s) => s.id === active.id);
-    if (!skill) return;
+    // Handle deletion by dropping on trash
+    if (over.id === "trash-zone") {
+      if (active.data?.current?.type === "placed-skill") {
+        handleRemoveSkill(active.data.current.placedSkill.id);
+      }
+      return;
+    }
 
-    // Handle dropping on specific count cell
-    if (over.id.toString().startsWith("cell-")) {
+    const skill = skills.find((s) => s.id === active.id);
+    
+    // Handle dropping a new skill from library
+    if (skill && over.id.toString().startsWith("cell-")) {
       const lineIndex = over.data?.current?.lineIndex;
       const count = over.data?.current?.count;
       if (typeof lineIndex === "number" && typeof count === "number") {
@@ -62,6 +81,23 @@ export const RoutineBuilder = () => {
         };
         setPlacedSkills([...placedSkills, newPlacedSkill]);
       }
+      return;
+    }
+
+    // Handle repositioning a placed skill
+    if (active.data?.current?.type === "placed-skill" && over.id.toString().startsWith("cell-")) {
+      const placedSkill = active.data.current.placedSkill;
+      const lineIndex = over.data?.current?.lineIndex;
+      const count = over.data?.current?.count;
+      if (typeof lineIndex === "number" && typeof count === "number") {
+        setPlacedSkills(
+          placedSkills.map((ps) =>
+            ps.id === placedSkill.id
+              ? { ...ps, lineIndex, startCount: count }
+              : ps
+          )
+        );
+      }
     }
   };
 
@@ -69,49 +105,35 @@ export const RoutineBuilder = () => {
     setPlacedSkills(placedSkills.filter((ps) => ps.id !== id));
   };
 
-  const handleAddPosition = () => {
+  const handleAddPositionIcon = (type: PositionIcon["type"]) => {
     if (selectedLine === null) return;
     
-    const newPosition: Position = {
-      id: `position-${Date.now()}-${Math.random()}`,
+    const newIcon: PositionIcon = {
+      id: `icon-${Date.now()}-${Math.random()}`,
+      type,
       x: 100,
       y: 100,
       lineIndex: selectedLine,
     };
-    setPositions([...positions, newPosition]);
+    setPositionIcons([...positionIcons, newIcon]);
   };
 
-  const handleUpdatePosition = (id: string, x: number, y: number) => {
-    setPositions(
-      positions.map((p) => (p.id === id ? { ...p, x, y } : p))
+  const handleUpdatePositionIcon = (id: string, x: number, y: number) => {
+    setPositionIcons(
+      positionIcons.map((icon) => (icon.id === id ? { ...icon, x, y } : icon))
     );
   };
 
-  const handleRemovePosition = (id: string) => {
-    setPositions(positions.filter((p) => p.id !== id));
+  const handleRemovePositionIcon = (id: string) => {
+    setPositionIcons(positionIcons.filter((icon) => icon.id !== id));
   };
 
-  const handleExportCSV = () => {
-    const csv = exportToCSV();
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "skills.csv";
-    a.click();
+  const handleNamePositionIcon = (id: string, name: string) => {
+    setPositionIcons(
+      positionIcons.map((icon) => (icon.id === id ? { ...icon, name } : icon))
+    );
   };
 
-  const handleImportCSV = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const text = e.target?.result as string;
-      importFromCSV(text);
-    };
-    reader.readAsText(file);
-  };
 
   const handleExportPDF = async () => {
     const jsPDF = (await import("jspdf")).default;
@@ -152,26 +174,23 @@ export const RoutineBuilder = () => {
         <div className="flex items-center justify-between mb-4">
           <h1 className="text-2xl font-bold">Cheerleading Routine Builder</h1>
           <div className="flex gap-2">
+            <Link to="/skills-editor">
+              <Button variant="outline" size="sm">
+                <Library className="h-4 w-4 mr-2" />
+                Skills Editor
+              </Button>
+            </Link>
+            <Link to="/about">
+              <Button variant="outline" size="sm">
+                <Info className="h-4 w-4 mr-2" />
+                About
+              </Button>
+            </Link>
             <Button variant="outline" size="sm" onClick={handleExportPDF}>
               <Download className="h-4 w-4 mr-2" />
               Export PDF
             </Button>
-            <Button variant="outline" size="sm" onClick={handleExportCSV}>
-              <Download className="h-4 w-4 mr-2" />
-              Export Skills
-            </Button>
-            <Button variant="outline" size="sm" asChild>
-              <label className="cursor-pointer">
-                <Upload className="h-4 w-4 mr-2" />
-                Import Skills
-                <input
-                  type="file"
-                  accept=".csv"
-                  className="hidden"
-                  onChange={handleImportCSV}
-                />
-              </label>
-            </Button>
+            <ThemeToggle />
           </div>
         </div>
         
@@ -191,9 +210,25 @@ export const RoutineBuilder = () => {
                 <SelectItem value="120">2:00</SelectItem>
                 <SelectItem value="135">2:15</SelectItem>
                 <SelectItem value="150">2:30</SelectItem>
-                <SelectItem value="custom">Custom</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Label>BPM:</Label>
+            <Input
+              type="number"
+              min="120"
+              max="160"
+              value={config.bpm}
+              onChange={(e) => {
+                const bpm = parseInt(e.target.value);
+                if (!isNaN(bpm) && bpm >= 120 && bpm <= 160) {
+                  setConfig({ ...config, bpm });
+                }
+              }}
+              className="w-20"
+            />
           </div>
 
           <div className="flex items-center gap-2">
@@ -253,7 +288,7 @@ export const RoutineBuilder = () => {
           {/* Count Sheet - Center/Right */}
           {(config.category === "team-16" || config.category === "team-24") ? (
             <div className="col-span-8 flex flex-col overflow-hidden">
-              <div className="flex-1 overflow-hidden border-b">
+              <div className="flex-1 overflow-auto">
                 <CountSheet
                   routineLength={config.length}
                   bpm={config.bpm}
@@ -265,13 +300,14 @@ export const RoutineBuilder = () => {
                 />
               </div>
 
-              <div className="h-[400px] overflow-hidden">
+              <div className="h-[400px] overflow-auto border-t">
                 <PositionSheet
-                  positions={positions}
+                  icons={positionIcons}
                   selectedLine={selectedLine}
-                  onUpdatePosition={handleUpdatePosition}
-                  onAddPosition={handleAddPosition}
-                  onRemovePosition={handleRemovePosition}
+                  onUpdateIcon={handleUpdatePositionIcon}
+                  onAddIcon={handleAddPositionIcon}
+                  onRemoveIcon={handleRemovePositionIcon}
+                  onNameIcon={handleNamePositionIcon}
                 />
               </div>
             </div>
@@ -293,6 +329,7 @@ export const RoutineBuilder = () => {
         <DragOverlay>
           {draggedSkill ? <SkillCard skill={draggedSkill} /> : null}
         </DragOverlay>
+        <TrashDropZone isDragging={isDraggingPlacedSkill} />
       </DndContext>
     </div>
   );
