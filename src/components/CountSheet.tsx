@@ -86,27 +86,40 @@ export const CountSheet = ({
     const cellSkills = getSkillsInCell(lineIndex, count);
     const isFirstCountOfSkill = cellSkills.filter(sp => sp.startCount === count);
 
+    // Check if this cell is part of a skill span but not the first cell
+    const isPartOfSkillSpan = cellSkills.length > 0 && isFirstCountOfSkill.length === 0;
+
     return (
       <td
         ref={setNodeRef}
         className={`border border-border min-w-[100px] h-16 p-1 relative ${
-          isOver ? "bg-accent" : "bg-card hover:bg-accent/50"
+          isOver ? "bg-accent" : isPartOfSkillSpan ? "bg-primary/10" : "bg-card hover:bg-accent/50"
         }`}
       >
-        {isFirstCountOfSkill.map((sp) => (
-          <div key={sp.placedSkill.id} className="text-xs flex items-start gap-1 mb-1">
-            <span className="flex-1">{sp.skill.name}</span>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onRemoveSkill(sp.placedSkill.id);
+        {isFirstCountOfSkill.map((sp) => {
+          const cellsToSpan = Math.min(sp.endCount - sp.startCount + 1, 9 - count);
+          return (
+            <div 
+              key={sp.placedSkill.id} 
+              className="absolute inset-0 p-1 text-xs flex items-start gap-1 bg-primary/20 border-l-2 border-primary"
+              style={{ 
+                width: `${cellsToSpan * 100}%`,
+                zIndex: 10
               }}
-              className="text-destructive hover:text-destructive/80"
             >
-              <X className="h-3 w-3" />
-            </button>
-          </div>
-        ))}
+              <span className="flex-1 font-medium">{sp.skill.name}</span>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRemoveSkill(sp.placedSkill.id);
+                }}
+                className="text-destructive hover:text-destructive/80 bg-card rounded px-1"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          );
+        })}
       </td>
     );
   };
@@ -140,7 +153,7 @@ export const CountSheet = ({
         </p>
       </div>
       
-      <ScrollArea className="flex-1">
+      <div className="flex-1 overflow-auto">
         <div className="p-4">
           <table className="w-full border-collapse" id="count-sheet-table">
             <thead>
@@ -160,7 +173,7 @@ export const CountSheet = ({
             </tbody>
           </table>
         </div>
-      </ScrollArea>
+      </div>
     </div>
   );
 };

@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Download, Upload } from "lucide-react";
 
 export const RoutineBuilder = () => {
-  const { skills, importFromCSV, exportToCSV, addCustomSkill } = useSkills();
+  const { skills, importFromCSV, exportToCSV, addCustomSkill, deleteSkill, updateSkillCounts } = useSkills();
   const [config, setConfig] = useState<RoutineConfig>({
     length: 90,
     category: "partner-stunts",
@@ -238,13 +238,45 @@ export const RoutineBuilder = () => {
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         <div className="flex-1 grid grid-cols-12 gap-0 overflow-hidden">
           {/* Skills Panel - Left */}
-          <div className={config.category === "team-16" || config.category === "team-24" ? "col-span-4 overflow-hidden" : "col-span-4 overflow-hidden"}>
-            <SkillsPanel skills={skills} onAddCustomSkill={addCustomSkill} />
+          <div className="col-span-4 overflow-hidden">
+            <SkillsPanel 
+              skills={skills} 
+              onAddCustomSkill={addCustomSkill} 
+              onDeleteSkill={(id) => {
+                deleteSkill(id);
+                setPlacedSkills(placedSkills.filter(ps => ps.skillId !== id));
+              }} 
+              onUpdateSkillCounts={updateSkillCounts} 
+            />
           </div>
 
           {/* Count Sheet - Center/Right */}
-          <div className={config.category === "team-16" || config.category === "team-24" ? "col-span-8 flex flex-col" : "col-span-8 overflow-hidden"}>
-            <div className={config.category === "team-16" || config.category === "team-24" ? "flex-1 overflow-hidden" : "h-full overflow-hidden"}>
+          {(config.category === "team-16" || config.category === "team-24") ? (
+            <div className="col-span-8 flex flex-col overflow-hidden">
+              <div className="flex-1 overflow-hidden border-b">
+                <CountSheet
+                  routineLength={config.length}
+                  bpm={config.bpm}
+                  placedSkills={placedSkills}
+                  skills={skills}
+                  onRemoveSkill={handleRemoveSkill}
+                  onLineClick={setSelectedLine}
+                  selectedLine={selectedLine}
+                />
+              </div>
+
+              <div className="h-[400px] overflow-hidden">
+                <PositionSheet
+                  positions={positions}
+                  selectedLine={selectedLine}
+                  onUpdatePosition={handleUpdatePosition}
+                  onAddPosition={handleAddPosition}
+                  onRemovePosition={handleRemovePosition}
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="col-span-8 overflow-hidden">
               <CountSheet
                 routineLength={config.length}
                 bpm={config.bpm}
@@ -255,20 +287,7 @@ export const RoutineBuilder = () => {
                 selectedLine={selectedLine}
               />
             </div>
-
-            {/* Position Sheet - Bottom Right (only for team categories) */}
-            {(config.category === "team-16" || config.category === "team-24") && (
-              <div className="h-[400px] border-t p-4">
-                <PositionSheet
-                  positions={positions}
-                  selectedLine={selectedLine}
-                  onUpdatePosition={handleUpdatePosition}
-                  onAddPosition={handleAddPosition}
-                  onRemovePosition={handleRemovePosition}
-                />
-              </div>
-            )}
-          </div>
+          )}
         </div>
 
         <DragOverlay>

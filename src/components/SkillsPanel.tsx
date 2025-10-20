@@ -1,12 +1,18 @@
+import { useState } from "react";
 import type { Skill, SkillCategory } from "@/types/routine";
 import { SkillCard } from "./SkillCard";
-import { AddSkillDialog } from "./AddSkillDialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Check, Trash2 } from "lucide-react";
+import { Card } from "@/components/ui/card";
 
 interface SkillsPanelProps {
   skills: Skill[];
   onAddCustomSkill: (skill: any) => void;
+  onDeleteSkill: (id: string) => void;
+  onUpdateSkillCounts: (id: string, counts: number) => void;
 }
 
 const categoryLabels: Record<SkillCategory, string> = {
@@ -19,7 +25,11 @@ const categoryLabels: Record<SkillCategory, string> = {
   transitions: "Transitions",
 };
 
-export const SkillsPanel = ({ skills, onAddCustomSkill }: SkillsPanelProps) => {
+export const SkillsPanel = ({ skills, onAddCustomSkill, onDeleteSkill, onUpdateSkillCounts }: SkillsPanelProps) => {
+  const [newSkillName, setNewSkillName] = useState<Record<SkillCategory, string>>({} as any);
+  const [newSkillCounts, setNewSkillCounts] = useState<Record<SkillCategory, string>>({} as any);
+  const [newSkillDesc, setNewSkillDesc] = useState<Record<SkillCategory, string>>({} as any);
+
   const categories: SkillCategory[] = [
     "mounts",
     "dismounts",
@@ -34,12 +44,31 @@ export const SkillsPanel = ({ skills, onAddCustomSkill }: SkillsPanelProps) => {
     return skills.filter((skill) => skill.category === category);
   };
 
+  const handleAddSkill = (category: SkillCategory) => {
+    const name = newSkillName[category]?.trim();
+    const counts = parseInt(newSkillCounts[category]);
+    const description = newSkillDesc[category]?.trim();
+
+    if (name && counts > 0) {
+      onAddCustomSkill({
+        name,
+        category,
+        level: "premier",
+        counts,
+        description: description || "",
+      });
+
+      setNewSkillName({ ...newSkillName, [category]: "" });
+      setNewSkillCounts({ ...newSkillCounts, [category]: "" });
+      setNewSkillDesc({ ...newSkillDesc, [category]: "" });
+    }
+  };
+
   return (
     <div className="h-full flex flex-col border-r bg-card">
       <div className="p-4 border-b">
         <h2 className="text-lg font-semibold">Skills Library</h2>
-        <p className="text-xs text-muted-foreground mb-3">Drag skills to count sheet</p>
-        <AddSkillDialog onAddSkill={onAddCustomSkill} />
+        <p className="text-xs text-muted-foreground">Drag skills to count sheet</p>
       </div>
       
       <ScrollArea className="flex-1">
@@ -55,13 +84,49 @@ export const SkillsPanel = ({ skills, onAddCustomSkill }: SkillsPanelProps) => {
           {categories.map((category) => (
             <TabsContent key={category} value={category} className="p-4 space-y-2">
               {getSkillsByCategory(category).map((skill) => (
-                <SkillCard key={skill.id} skill={skill} />
+                <div key={skill.id} className="relative group">
+                  <SkillCard skill={skill} onUpdateCounts={onUpdateSkillCounts} />
+                  {skill.id.startsWith("custom-") && (
+                    <button
+                      onClick={() => onDeleteSkill(skill.id)}
+                      className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-destructive text-destructive-foreground p-1 rounded"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  )}
+                </div>
               ))}
-              {getSkillsByCategory(category).length === 0 && (
-                <p className="text-sm text-muted-foreground text-center py-8">
-                  No skills in this category yet
-                </p>
-              )}
+              
+              {/* Inline Add Skill Form */}
+              <Card className="p-3 space-y-2 bg-muted/50">
+                <Input
+                  placeholder="Skill name"
+                  value={newSkillName[category] || ""}
+                  onChange={(e) => setNewSkillName({ ...newSkillName, [category]: e.target.value })}
+                  className="h-8 text-sm"
+                />
+                <Input
+                  placeholder="Counts (e.g., 8)"
+                  type="number"
+                  value={newSkillCounts[category] || ""}
+                  onChange={(e) => setNewSkillCounts({ ...newSkillCounts, [category]: e.target.value })}
+                  className="h-8 text-sm"
+                />
+                <Input
+                  placeholder="Description (optional)"
+                  value={newSkillDesc[category] || ""}
+                  onChange={(e) => setNewSkillDesc({ ...newSkillDesc, [category]: e.target.value })}
+                  className="h-8 text-sm"
+                />
+                <Button
+                  size="sm"
+                  onClick={() => handleAddSkill(category)}
+                  className="w-full h-8"
+                >
+                  <Check className="h-4 w-4 mr-1" />
+                  Add Skill
+                </Button>
+              </Card>
             </TabsContent>
           ))}
         </Tabs>

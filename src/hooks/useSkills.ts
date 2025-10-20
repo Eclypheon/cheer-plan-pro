@@ -19,6 +19,14 @@ export const useSkills = () => {
     setSkills([...skills, newSkill]);
   };
 
+  const deleteSkill = (id: string) => {
+    setSkills(skills.filter(s => s.id !== id));
+  };
+
+  const updateSkillCounts = (id: string, counts: number) => {
+    setSkills(skills.map(s => s.id === id ? { ...s, counts } : s));
+  };
+
   const importFromCSV = (csvText: string) => {
     // Simple CSV parser: expects headers: id,name,category,level,counts,description
     const lines = csvText.trim().split("\n");
@@ -59,5 +67,7 @@ export const useSkills = () => {
     importFromCSV,
     exportToCSV,
     addCustomSkill,
+    deleteSkill,
+    updateSkillCounts,
   };
 };
