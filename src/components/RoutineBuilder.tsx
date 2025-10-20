@@ -1,12 +1,11 @@
 import { useState } from "react";
 import { DndContext, DragEndEvent, DragOverlay, useSensor, useSensors, PointerSensor } from "@dnd-kit/core";
-import { PlacedSkill, Position, RoutineConfig, Skill } from "@/types/routine";
+import type { PlacedSkill, Position, RoutineConfig, Skill } from "@/types/routine";
 import { useSkills } from "@/hooks/useSkills";
 import { SkillsPanel } from "./SkillsPanel";
 import { CountSheet } from "./CountSheet";
 import { PositionSheet } from "./PositionSheet";
 import { SkillCard } from "./SkillCard";
-import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";

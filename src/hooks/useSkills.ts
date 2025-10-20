@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Skill, SkillCategory, SkillLevel } from "@/types/routine";
+import type { Skill, SkillCategory, SkillLevel } from "@/types/routine";
 import { defaultSkills } from "@/data/skillsData";
 
 export const useSkills = () => {

@@ -1,5 +1,5 @@
 import { useDroppable } from "@dnd-kit/core";
-import { PlacedSkill, Skill } from "@/types/routine";
+import type { PlacedSkill, Skill } from "@/types/routine";
 import { X } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 

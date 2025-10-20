@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus } from "lucide-react";
-import { SkillCategory, SkillLevel } from "@/types/routine";
+import type { SkillCategory, SkillLevel } from "@/types/routine";
 
 interface AddSkillDialogProps {
   onAddSkill: (skill: {

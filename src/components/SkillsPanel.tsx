@@ -1,5 +1,4 @@
-import { useDraggable } from "@dnd-kit/core";
-import { Skill, SkillCategory } from "@/types/routine";
+import type { Skill, SkillCategory } from "@/types/routine";
 import { SkillCard } from "./SkillCard";
 import { AddSkillDialog } from "./AddSkillDialog";
 import { ScrollArea } from "@/components/ui/scroll-area";

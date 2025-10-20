@@ -1,7 +1,7 @@
 import { useDraggable } from "@dnd-kit/core";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Skill } from "@/types/routine";
+import type { Skill } from "@/types/routine";
 
 interface SkillCardProps {
   skill: Skill;
