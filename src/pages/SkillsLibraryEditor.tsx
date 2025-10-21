@@ -74,8 +74,8 @@ const SkillsLibraryEditor = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-background p-8">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="min-h-screen bg-background p-3">
+      <div className="max-w-7xl mx-auto space-y-3">
         <div className="flex items-center justify-between">
           <Link to="/">
             <Button variant="outline" size="sm">
@@ -103,15 +103,14 @@ const SkillsLibraryEditor = () => {
           </div>
         </div>
 
-        <h1 className="text-4xl font-bold">Skills Library Editor</h1>
+        <h1 className="text-2xl font-bold">Skills Library Editor</h1>
 
         {categories.map((category) => {
           const categorySkills = skills.filter((s) => s.category === category);
-          if (categorySkills.length === 0) return null;
 
           return (
-            <Card key={category} className="p-6">
-              <h2 className="text-2xl font-semibold mb-4 capitalize">{category}</h2>
+            <Card key={category} className="p-3">
+              <h2 className="text-lg font-semibold mb-2 capitalize">{category}</h2>
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -123,8 +122,8 @@ const SkillsLibraryEditor = () => {
                 </TableHeader>
                 <TableBody>
                   {categorySkills.map((skill) => (
-                    <TableRow key={skill.id}>
-                      <TableCell>
+                     <TableRow key={skill.id}>
+                      <TableCell className="p-1 text-xs">
                         {editingCell?.skillId === skill.id && editingCell?.field === "name" ? (
                           <Input
                             value={editValue}
@@ -134,17 +133,18 @@ const SkillsLibraryEditor = () => {
                               if (e.key === "Enter") handleCellSave(skill.id, "name");
                             }}
                             autoFocus
+                            className="h-7"
                           />
                         ) : (
                           <div
                             onClick={() => handleCellClick(skill, "name")}
-                            className="cursor-pointer hover:bg-muted/50 p-2 rounded"
+                            className="cursor-pointer hover:bg-muted/50 p-1 rounded"
                           >
                             {skill.name}
                           </div>
                         )}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="p-1 text-xs">
                         {editingCell?.skillId === skill.id && editingCell?.field === "counts" ? (
                           <Input
                             type="number"
@@ -155,19 +155,19 @@ const SkillsLibraryEditor = () => {
                               if (e.key === "Enter") handleCellSave(skill.id, "counts");
                             }}
                             autoFocus
-                            className="w-20"
+                            className="w-16 h-7"
                           />
                         ) : (
                           <div
                             onClick={() => handleCellClick(skill, "counts")}
-                            className="cursor-pointer hover:bg-muted/50 p-2 rounded"
+                            className="cursor-pointer hover:bg-muted/50 p-1 rounded"
                           >
                             {skill.counts}
                           </div>
                         )}
                       </TableCell>
-                      <TableCell className="capitalize">{skill.level}</TableCell>
-                      <TableCell>
+                      <TableCell className="capitalize p-1 text-xs">{skill.level}</TableCell>
+                      <TableCell className="p-1 text-xs">
                         {editingCell?.skillId === skill.id && editingCell?.field === "description" ? (
                           <Input
                             value={editValue}

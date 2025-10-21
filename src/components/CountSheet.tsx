@@ -97,7 +97,7 @@ export const CountSheet = ({
     return (
       <td
         ref={setNodeRef}
-        className={`border border-border min-w-[100px] h-16 p-1 relative ${
+        className={`border border-border min-w-[80px] h-12 p-0.5 relative text-xs ${
           isOver ? "bg-accent" : isPartOfSkillSpan ? "bg-primary/10" : "bg-card hover:bg-accent/50"
         }`}
       >
@@ -150,7 +150,7 @@ export const CountSheet = ({
           isSelected ? "bg-accent/30" : "hover:bg-accent/20"
         }`}
       >
-        <td className="border border-border bg-muted font-bold text-center px-4 py-2">
+        <td className="border border-border bg-muted font-bold text-center px-2 py-1 text-xs">
           {lineIndex + 1}
         </td>
         {Array.from({ length: 8 }, (_, i) => (
@@ -161,34 +161,32 @@ export const CountSheet = ({
   };
 
   return (
-    <div className="h-full flex flex-col bg-card">
-      <div className="p-4 border-b">
-        <h2 className="text-lg font-semibold">Count Sheet</h2>
-        <p className="text-sm text-muted-foreground">
+    <div className="h-full flex flex-col bg-card overflow-auto">
+      <div className="p-2 border-b">
+        <h2 className="text-sm font-semibold">Count Sheet</h2>
+        <p className="text-xs text-muted-foreground">
           {totalLines} lines @ {bpm} BPM
         </p>
       </div>
       
       <div className="flex-1 overflow-auto">
-        <div className="p-4">
-          <table className="w-full border-collapse" id="count-sheet-table">
-            <thead>
-              <tr>
-                <th className="border border-border bg-muted font-bold text-center px-4 py-2">#</th>
-                {Array.from({ length: 8 }, (_, i) => (
-                  <th key={i} className="border border-border bg-muted font-bold text-center px-4 py-2">
-                    {i + 1}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {Array.from({ length: totalLines }, (_, i) => (
-                <CountLine key={i} lineIndex={i} />
+        <table className="w-full border-collapse" id="count-sheet-table">
+          <thead>
+            <tr>
+              <th className="border border-border bg-muted font-bold text-center px-2 py-1 text-xs">#</th>
+              {Array.from({ length: 8 }, (_, i) => (
+                <th key={i} className="border border-border bg-muted font-bold text-center px-2 py-1 text-xs">
+                  {i + 1}
+                </th>
               ))}
-            </tbody>
-          </table>
-        </div>
+            </tr>
+          </thead>
+          <tbody>
+            {Array.from({ length: totalLines }, (_, i) => (
+              <CountLine key={i} lineIndex={i} />
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );

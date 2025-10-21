@@ -5,6 +5,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Check, Trash2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 
@@ -43,7 +44,7 @@ export const SkillsPanel = ({ skills, onAddCustomSkill, onDeleteSkill, onUpdateS
   ];
 
   const getSkillsByCategory = (category: SkillCategory) => {
-    return skills.filter((skill) => skill.category === category);
+    return skills.filter((skill) => skill.category === category && skill.level === currentLevel);
   };
 
   const handleAddSkill = (category: SkillCategory) => {
@@ -68,9 +69,21 @@ export const SkillsPanel = ({ skills, onAddCustomSkill, onDeleteSkill, onUpdateS
 
   return (
     <div className="h-full flex flex-col border-r bg-card">
-      <div className="p-4 border-b">
-        <h2 className="text-lg font-semibold">Skills Library</h2>
-        <p className="text-xs text-muted-foreground">Drag skills to count sheet</p>
+      <div className="p-2 border-b space-y-2">
+        <h2 className="text-sm font-semibold">Skills Library</h2>
+        <Select value={currentLevel} onValueChange={onLevelChange}>
+          <SelectTrigger className="w-full h-7 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="novice">Novice</SelectItem>
+            <SelectItem value="intermediate">Intermediate</SelectItem>
+            <SelectItem value="median">Median</SelectItem>
+            <SelectItem value="advanced">Advanced</SelectItem>
+            <SelectItem value="elite">Elite</SelectItem>
+            <SelectItem value="premier">Premier</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
       
       <ScrollArea className="flex-1">
@@ -84,7 +97,7 @@ export const SkillsPanel = ({ skills, onAddCustomSkill, onDeleteSkill, onUpdateS
           </TabsList>
           
           {categories.map((category) => (
-            <TabsContent key={category} value={category} className="p-4 space-y-2">
+            <TabsContent key={category} value={category} className="p-2 space-y-1">
               {getSkillsByCategory(category).map((skill) => (
                 <div key={skill.id} className="relative group">
                   <SkillCard skill={skill} onUpdateCounts={onUpdateSkillCounts} />

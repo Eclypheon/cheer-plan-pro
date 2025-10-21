@@ -27,6 +27,10 @@ export const PositionSheet = ({
   onAddIcon,
   onRemoveIcon,
   onNameIcon,
+  onSelectIcon,
+  onSelectMultiple,
+  onNextLine,
+  onPrevLine,
 }: PositionSheetProps) => {
   const [history, setHistory] = useState<PositionIcon[][]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
@@ -51,7 +55,7 @@ export const PositionSheet = ({
 
     const newX = Math.max(0, Math.min(icon.x + delta.x, 800));
     const newY = Math.max(0, Math.min(icon.y + delta.y, 600));
-    onUpdateIcon(active.id as string, newX, newY);
+    onUpdateIcon(active.id as string, newX, newY, autoFollow);
 
     // Save to history
     const newHistory = history.slice(0, historyIndex + 1);
@@ -74,9 +78,13 @@ export const PositionSheet = ({
     }
   };
 
-  const handleIconClick = (iconId: string) => {
-    setSelectedIconId(iconId);
-    setNameDialogOpen(true);
+  const handleIconClick = (iconId: string, isCtrlClick: boolean = false) => {
+    if (isCtrlClick) {
+      onSelectIcon?.(iconId);
+    } else {
+      setSelectedIconId(iconId);
+      setNameDialogOpen(true);
+    }
   };
 
   const handleSaveName = (name: string) => {
@@ -100,76 +108,49 @@ export const PositionSheet = ({
 
   return (
     <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-      <Card className="h-full flex flex-col" id="position-sheet">
-        <div className="p-4 border-b">
-          <div className="flex items-center justify-between mb-2">
-            <div>
-              <h3 className="text-lg font-semibold">Positions - Line {selectedLine + 1}</h3>
-              <p className="text-xs text-muted-foreground">7 Roll Mats Layout</p>
-            </div>
-            <div className="flex gap-2">
+      <Card className="h-full flex flex-col overflow-hidden" id="position-sheet">
+        <div className="p-2 border-b">
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold">Line {selectedLine + 1}</h3>
+            <div className="flex gap-1">
+              <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => onAddIcon("square")}>
+                <Square className="h-3 w-3 mr-1" />
+                Base
+              </Button>
+              <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => onAddIcon("circle")}>
+                <Circle className="h-3 w-3 mr-1" />
+                Mid
+              </Button>
+              <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => onAddIcon("x")}>
+                <X className="h-3 w-3 mr-1" />
+                Fly
+              </Button>
               <Button
                 size="sm"
                 variant="outline"
+                className="h-7 px-2"
                 onClick={() => setAutoFollow(!autoFollow)}
               >
-                {autoFollow ? (
-                  <>
-                    <ToggleRight className="h-4 w-4 mr-1" />
-                    Auto-Follow On
-                  </>
-                ) : (
-                  <>
-                    <ToggleLeft className="h-4 w-4 mr-1" />
-                    Auto-Follow Off
-                  </>
-                )}
+                {autoFollow ? <ToggleRight className="h-3 w-3" /> : <ToggleLeft className="h-3 w-3" />}
               </Button>
-              <Button size="sm" variant="outline" onClick={handleUndo} disabled={historyIndex <= 0}>
-                <Undo className="h-4 w-4" />
+              <Button size="sm" variant="outline" className="h-7 px-1" onClick={handleUndo} disabled={historyIndex <= 0}>
+                <Undo className="h-3 w-3" />
               </Button>
               <Button
                 size="sm"
                 variant="outline"
+                className="h-7 px-1"
                 onClick={handleRedo}
                 disabled={historyIndex >= history.length - 1}
               >
-                <Redo className="h-4 w-4" />
+                <Redo className="h-3 w-3" />
               </Button>
-            </div>
-          </div>
-
-          <div className="flex gap-2">
-            <Button size="sm" onClick={() => onAddIcon("square")}>
-              <Square className="h-4 w-4 mr-1" />
-              Add Base
-            </Button>
-            <Button size="sm" onClick={() => onAddIcon("circle")}>
-              <Circle className="h-4 w-4 mr-1" />
-              Add Mid Tier
-            </Button>
-            <Button size="sm" onClick={() => onAddIcon("x")}>
-              <X className="h-4 w-4 mr-1" />
-              Add Top Fly
-            </Button>
-          </div>
-
-          <div className="mt-3 p-2 bg-muted rounded text-xs space-y-1">
-            <div className="font-semibold mb-1">Legend:</div>
-            <div className="flex items-center gap-2">
-              <Square className="h-4 w-4" /> Base
-            </div>
-            <div className="flex items-center gap-2">
-              <Circle className="h-4 w-4" /> Mid Tier
-            </div>
-            <div className="flex items-center gap-2">
-              <X className="h-4 w-4" /> Top Fly
             </div>
           </div>
         </div>
 
-        <div className="flex-1 p-4 overflow-auto">
-          <div className="relative w-full h-[500px] bg-background border-2 border-border rounded-lg">
+        <div className="flex-1 p-2 overflow-auto">
+          <div className="relative w-full h-full min-h-[400px] bg-background border border-border rounded">
             {/* 6 horizontal lines representing 7 mats */}
             {Array.from({ length: 6 }, (_, i) => (
               <div
