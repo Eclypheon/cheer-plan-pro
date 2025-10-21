@@ -16,14 +16,13 @@ interface PositionIconProps {
 }
 
 const IconComponent = ({ type }: { type: PositionIconType["type"] }) => {
-  const iconClass = "w-6 h-6";
   switch (type) {
     case "square":
-      return <Square className={iconClass} />;
+      return <Square className="w-6 h-6" />;
     case "circle":
-      return <Circle className={iconClass} />;
+      return <Circle className="w-4 h-4" />;
     case "x":
-      return <X className={iconClass} />;
+      return <X className="w-6 h-6" />;
   }
 };
 
@@ -55,7 +54,10 @@ export const PositionIcon = ({ icon, onUpdate, onClick }: PositionIconProps) => 
       className={cn(
         "absolute w-8 h-8 -ml-4 -mt-4 cursor-grab active:cursor-grabbing",
         "flex items-center justify-center",
-        "text-primary hover:text-primary/70 transition-colors",
+        "transition-colors",
+        icon.selected
+          ? "text-accent-foreground bg-accent rounded-full"
+          : "text-primary hover:text-primary/70",
         isDragging && "opacity-50"
       )}
       style={style}

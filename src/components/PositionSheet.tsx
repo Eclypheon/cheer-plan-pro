@@ -10,10 +10,14 @@ import { PositionIconNameDialog } from "./PositionIconNameDialog";
 interface PositionSheetProps {
   icons: PositionIcon[];
   selectedLine: number | null;
-  onUpdateIcon: (id: string, x: number, y: number) => void;
+  onUpdateIcon: (id: string, x: number, y: number, shouldPropagate?: boolean) => void;
   onAddIcon: (type: PositionIcon["type"]) => void;
   onRemoveIcon: (id: string) => void;
   onNameIcon: (id: string, name: string) => void;
+  onSelectIcon?: (id: string) => void;
+  onSelectMultiple?: (ids: string[]) => void;
+  onNextLine?: () => void;
+  onPrevLine?: () => void;
 }
 
 export const PositionSheet = ({

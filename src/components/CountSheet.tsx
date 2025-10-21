@@ -10,6 +10,9 @@ interface CountSheetProps {
   onRemoveSkill: (id: string) => void;
   onLineClick: (lineIndex: number) => void;
   selectedLine: number | null;
+  selectedSkillId?: string | null;
+  onSelectSkill?: (id: string | null) => void;
+  onMoveSkill?: (id: string, newLineIndex: number, newStartCount: number) => void;
 }
 
 interface SkillPlacement {
@@ -28,6 +31,9 @@ export const CountSheet = ({
   onRemoveSkill,
   onLineClick,
   selectedLine,
+  selectedSkillId,
+  onSelectSkill,
+  onMoveSkill,
 }: CountSheetProps) => {
   // Calculate total lines needed
   const totalBeats = Math.ceil((routineLength * bpm) / 60);

@@ -13,6 +13,8 @@ interface SkillsPanelProps {
   onAddCustomSkill: (skill: any) => void;
   onDeleteSkill: (id: string) => void;
   onUpdateSkillCounts: (id: string, counts: number) => void;
+  currentLevel: import("@/types/routine").SkillLevel;
+  onLevelChange: (level: import("@/types/routine").SkillLevel) => void;
 }
 
 const categoryLabels: Record<SkillCategory, string> = {
@@ -25,7 +27,7 @@ const categoryLabels: Record<SkillCategory, string> = {
   transitions: "Transitions",
 };
 
-export const SkillsPanel = ({ skills, onAddCustomSkill, onDeleteSkill, onUpdateSkillCounts }: SkillsPanelProps) => {
+export const SkillsPanel = ({ skills, onAddCustomSkill, onDeleteSkill, onUpdateSkillCounts, currentLevel, onLevelChange }: SkillsPanelProps) => {
   const [newSkillName, setNewSkillName] = useState<Record<SkillCategory, string>>({} as any);
   const [newSkillCounts, setNewSkillCounts] = useState<Record<SkillCategory, string>>({} as any);
   const [newSkillDesc, setNewSkillDesc] = useState<Record<SkillCategory, string>>({} as any);

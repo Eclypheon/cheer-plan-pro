@@ -8,10 +8,12 @@ export type SkillCategory =
   | "transitions";
 
 export type SkillLevel = 
-  | "premier" 
-  | "elite" 
-  | "advanced" 
-  | "median";
+  | "novice"
+  | "intermediate"
+  | "median"
+  | "advanced"
+  | "elite"
+  | "premier";
 
 export type RoutineCategory = 
   | "partner-stunts" 
@@ -49,6 +51,24 @@ export interface PositionIcon {
   y: number;
   lineIndex: number;
   name?: string;
+  selected?: boolean;
+}
+
+export interface KeyboardSettings {
+  nextLine: string;
+  prevLine: string;
+  undo: string;
+  redo: string;
+  toggleAutoFollow: string;
+  deleteIcon: string;
+  moveLeft: string;
+  moveRight: string;
+  moveUp: string;
+  moveDown: string;
+  altMoveLeft: string;
+  altMoveRight: string;
+  altMoveUp: string;
+  altMoveDown: string;
 }
 
 export interface RoutineConfig {
