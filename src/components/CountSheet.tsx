@@ -39,6 +39,11 @@ export const CountSheet = ({
   const totalBeats = Math.ceil((routineLength * bpm) / 60);
   const totalLines = Math.ceil(totalBeats / 8);
 
+  // Prevent scrolling during drag
+  const handleDragMove = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
   // Process skills and handle overflow to next lines
   const getSkillPlacements = (): SkillPlacement[] => {
     const placements: SkillPlacement[] = [];
@@ -97,7 +102,7 @@ export const CountSheet = ({
     return (
       <td
         ref={setNodeRef}
-        className={`border border-border min-w-[80px] h-12 p-0.5 relative text-xs ${
+        className={`border border-border min-w-[80px] h-10 p-0.5 relative text-xs ${
           isOver ? "bg-accent" : isPartOfSkillSpan ? "bg-primary/10" : "bg-card hover:bg-accent/50"
         }`}
       >
@@ -119,9 +124,13 @@ export const CountSheet = ({
               {...listeners}
               {...attributes}
               style={style}
+              onClick={(e) => {
+                e.stopPropagation();
+                onSelectSkill?.(sp.placedSkill.id);
+              }}
               className={`absolute inset-0 p-1 text-xs flex items-start gap-1 bg-primary/20 border-l-2 border-primary cursor-grab active:cursor-grabbing ${
-                isDragging ? "opacity-50" : ""
-              }`}
+                isDragging ? "opacity-0" : ""
+              } ${selectedSkillId === sp.placedSkill.id ? "ring-2 ring-accent" : ""}`}
             >
               <span className="flex-1 font-medium">{sp.skill.name}</span>
               <button
@@ -161,15 +170,15 @@ export const CountSheet = ({
   };
 
   return (
-    <div className="h-full flex flex-col bg-card overflow-auto">
-      <div className="p-2 border-b">
+    <div className="h-full flex flex-col bg-card overflow-auto" onDragOver={(e) => e.preventDefault()}>
+      <div className="p-1.5 border-b">
         <h2 className="text-sm font-semibold">Count Sheet</h2>
         <p className="text-xs text-muted-foreground">
           {totalLines} lines @ {bpm} BPM
         </p>
       </div>
       
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto" style={{ overflowY: 'scroll', overscrollBehavior: 'contain' }}>
         <table className="w-full border-collapse" id="count-sheet-table">
           <thead>
             <tr>

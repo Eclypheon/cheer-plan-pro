@@ -30,7 +30,10 @@ export const RoutineBuilder = () => {
   const [selectedLine, setSelectedLine] = useState<number | null>(null);
   const [draggedSkill, setDraggedSkill] = useState<Skill | null>(null);
   const [isDraggingPlacedSkill, setIsDraggingPlacedSkill] = useState(false);
+  const [draggedPlacedSkillId, setDraggedPlacedSkillId] = useState<string | null>(null);
   const [selectedSkillId, setSelectedSkillId] = useState<string | null>(null);
+  const [showGrid, setShowGrid] = useState(false);
+  const [autoFollow, setAutoFollow] = useState(true);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -51,87 +54,89 @@ export const RoutineBuilder = () => {
       for (let lineIndex = 0; lineIndex < totalLines; lineIndex++) {
         if (!existingLines.has(lineIndex)) {
           if (config.category === "team-16") {
-            // 10 Bases in 2 rows
+            // 10 Bases in 2 rows - snap to 21x21 grid
+            const gridSize = 800 / 21;
             for (let i = 0; i < 5; i++) {
               newIcons.push({
-                id: `icon-${Date.now()}-base1-${i}`,
+                id: `icon-${Date.now()}-${lineIndex}-base1-${i}`,
                 type: "square",
-                x: 100 + i * 152,
-                y: 150,
+                x: Math.round((114 + i * 152) / gridSize) * gridSize,
+                y: Math.round(152 / gridSize) * gridSize,
                 lineIndex,
               });
             }
             for (let i = 0; i < 5; i++) {
               newIcons.push({
-                id: `icon-${Date.now()}-base2-${i}`,
+                id: `icon-${Date.now()}-${lineIndex}-base2-${i}`,
                 type: "square",
-                x: 100 + i * 152,
-                y: 250,
+                x: Math.round((114 + i * 152) / gridSize) * gridSize,
+                y: Math.round(266 / gridSize) * gridSize,
                 lineIndex,
               });
             }
             // 2 Mid tiers
             newIcons.push({
-              id: `icon-${Date.now()}-mid-0`,
+              id: `icon-${Date.now()}-${lineIndex}-mid-0`,
               type: "circle",
-              x: 228,
-              y: 350,
+              x: Math.round(228 / gridSize) * gridSize,
+              y: Math.round(380 / gridSize) * gridSize,
               lineIndex,
             });
             newIcons.push({
-              id: `icon-${Date.now()}-mid-1`,
+              id: `icon-${Date.now()}-${lineIndex}-mid-1`,
               type: "circle",
-              x: 532,
-              y: 350,
+              x: Math.round(532 / gridSize) * gridSize,
+              y: Math.round(380 / gridSize) * gridSize,
               lineIndex,
             });
             // 4 Top flys
             for (let i = 0; i < 4; i++) {
               newIcons.push({
-                id: `icon-${Date.now()}-fly-${i}`,
+                id: `icon-${Date.now()}-${lineIndex}-fly-${i}`,
                 type: "x",
-                x: 152 + i * 152,
-                y: 450,
+                x: Math.round((152 + i * 152) / gridSize) * gridSize,
+                y: Math.round(494 / gridSize) * gridSize,
                 lineIndex,
               });
             }
           } else {
-            // team-24: 16 Bases, 4 Mid Tiers, 4 Top Flys
+            // team-24: 16 Bases, 4 Mid Tiers, 4 Top Flys - snap to 21x21 grid
+            const gridSize = 800 / 21;
             for (let i = 0; i < 8; i++) {
               newIcons.push({
-                id: `icon-${Date.now()}-base1-${i}`,
+                id: `icon-${Date.now()}-${lineIndex}-base1-${i}`,
                 type: "square",
-                x: 38 + i * 95,
-                y: 150,
+                x: Math.round((38 + i * 95) / gridSize) * gridSize,
+                y: Math.round(152 / gridSize) * gridSize,
                 lineIndex,
               });
             }
             for (let i = 0; i < 8; i++) {
               newIcons.push({
-                id: `icon-${Date.now()}-base2-${i}`,
+                id: `icon-${Date.now()}-${lineIndex}-base2-${i}`,
                 type: "square",
-                x: 38 + i * 95,
-                y: 250,
+                x: Math.round((38 + i * 95) / gridSize) * gridSize,
+                y: Math.round(266 / gridSize) * gridSize,
                 lineIndex,
               });
             }
             // 4 Mid tiers
             for (let i = 0; i < 4; i++) {
               newIcons.push({
-                id: `icon-${Date.now()}-mid-${i}`,
+                id: `icon-${Date.now()}-${lineIndex}-mid-${i}`,
                 type: "circle",
-                x: 133 + i * 152,
-                y: 350,
+                x: Math.round((152 + i * 152) / gridSize) * gridSize,
+                y: Math.round(380 / gridSize) * gridSize,
                 lineIndex,
               });
             }
             // 4 Top flys
             for (let i = 0; i < 4; i++) {
               newIcons.push({
-                id: `icon-${Date.now()}-fly-${i}`,
+                id: `icon-${Date.now()}-${lineIndex}-fly-${i}`,
                 type: "x",
-                x: 133 + i * 152,
-                y: 450,
+                x: Math.round((152 + i * 152) / gridSize) * gridSize,
+                y: Math.round(494 / gridSize) * gridSize,
                 lineIndex,
               });
             }
@@ -154,13 +159,20 @@ export const RoutineBuilder = () => {
     
     if (event.active.data?.current?.type === "placed-skill") {
       setIsDraggingPlacedSkill(true);
+      setDraggedPlacedSkillId(event.active.data.current.placedSkill.id);
       setDraggedSkill(skills.find(s => s.id === event.active.data.current.placedSkill.skillId) || null);
+    }
+    
+    if (event.active.data?.current?.type === "position-icon") {
+      setShowGrid(true);
     }
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
     setDraggedSkill(null);
     setIsDraggingPlacedSkill(false);
+    setDraggedPlacedSkillId(null);
+    setShowGrid(false);
     
     const { active, over } = event;
     if (!over) return;
@@ -252,28 +264,33 @@ export const RoutineBuilder = () => {
     const snappedY = Math.round(y / gridSize) * gridSize;
 
     setPositionIcons(prev => {
-      let updated = prev.map((i) => (i.id === id ? { ...i, x: snappedX, y: snappedY } : i));
+      const updated = prev.map((i) => (i.id === id ? { ...i, x: snappedX, y: snappedY } : i));
       
-      if (shouldPropagate && icon) {
+      if (shouldPropagate && autoFollow) {
         const currentLine = icon.lineIndex;
         const totalLines = Math.ceil((config.length * config.bpm) / 60 / 8);
-        const deltaX = snappedX - icon.x;
-        const deltaY = snappedY - icon.y;
         
+        // Get all icons at current line with their new positions
+        const currentLineIcons = updated.filter(i => i.lineIndex === currentLine);
+        
+        // For each subsequent line, copy the entire icon layout from current line
+        const result = [...updated];
         for (let line = currentLine + 1; line < totalLines; line++) {
-          updated = updated.map(i => {
-            if (i.lineIndex === line) {
-              const prevLineIcon = prev.find(p => 
-                p.lineIndex === currentLine && 
-                p.id === icon.id
-              );
-              if (prevLineIcon) {
-                return { ...i, x: i.x + deltaX, y: i.y + deltaY };
-              }
-            }
-            return i;
-          });
+          // Remove existing icons at this line
+          const otherIcons = result.filter(i => i.lineIndex !== line);
+          
+          // Copy current line icons to this line
+          const copiedIcons = currentLineIcons.map(i => ({
+            ...i,
+            id: `icon-${Date.now()}-${Math.random()}-${line}`,
+            lineIndex: line,
+          }));
+          
+          result.length = 0;
+          result.push(...otherIcons, ...copiedIcons);
         }
+        
+        return result;
       }
       
       return updated;
@@ -395,7 +412,7 @@ export const RoutineBuilder = () => {
               value={config.category}
               onValueChange={(v) => setConfig({ ...config, category: v as any })}
             >
-              <SelectTrigger className="w-32 h-8">
+              <SelectTrigger className="w-40 h-8">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -434,7 +451,7 @@ export const RoutineBuilder = () => {
                   <CountSheet
                     routineLength={config.length}
                     bpm={config.bpm}
-                    placedSkills={placedSkills}
+                    placedSkills={placedSkills.filter(ps => ps.id !== draggedPlacedSkillId)}
                     skills={skills}
                     onRemoveSkill={handleRemoveSkill}
                     onLineClick={setSelectedLine}
@@ -459,6 +476,9 @@ export const RoutineBuilder = () => {
                     onAddIcon={handleAddPositionIcon}
                     onRemoveIcon={handleRemovePositionIcon}
                     onNameIcon={handleNamePositionIcon}
+                    showGrid={showGrid}
+                    autoFollow={autoFollow}
+                    onToggleAutoFollow={() => setAutoFollow(!autoFollow)}
                     onSelectIcon={(id) => {
                       setPositionIcons(prev => prev.map(icon => 
                         ({ ...icon, selected: icon.id === id ? !icon.selected : false })
@@ -507,7 +527,7 @@ export const RoutineBuilder = () => {
         <DragOverlay>
           {draggedSkill ? <SkillCard skill={draggedSkill} /> : null}
         </DragOverlay>
-        <TrashDropZone isDragging={isDraggingPlacedSkill} />
+        <TrashDropZone isDragging={isDraggingPlacedSkill || draggedSkill !== null} />
       </DndContext>
     </div>
   );

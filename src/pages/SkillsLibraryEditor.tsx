@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Download, Upload } from "lucide-react";
+import { ArrowLeft, Download, Upload, Plus, Trash2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useSkills } from "@/hooks/useSkills";
 import type { Skill, SkillCategory, SkillLevel } from "@/types/routine";
@@ -14,24 +14,43 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const SkillsLibraryEditor = () => {
-  const { skills, importFromCSV, exportToCSV, updateSkillCounts, deleteSkill } = useSkills();
+  const { skills, importFromCSV, exportToCSV, updateSkillCounts, deleteSkill, addCustomSkill } = useSkills();
   const [editingCell, setEditingCell] = useState<{ skillId: string; field: keyof Skill } | null>(null);
   const [editValue, setEditValue] = useState("");
+
+  const handleAddSkill = (category: SkillCategory) => {
+    addCustomSkill({
+      name: "",
+      category,
+      level: "premier",
+      counts: 1,
+      description: "",
+    });
+  };
 
   const handleCellClick = (skill: Skill, field: keyof Skill) => {
     setEditingCell({ skillId: skill.id, field });
     setEditValue(String(skill[field]));
   };
 
-  const handleCellSave = (skillId: string, field: keyof Skill) => {
+  const handleCellSave = (skillId: string, field: keyof Skill, value?: string) => {
     const skill = skills.find((s) => s.id === skillId);
     if (!skill) return;
 
+    const finalValue = value !== undefined ? value : editValue;
+
     // Update the skill based on the field
     if (field === "counts") {
-      const counts = parseInt(editValue);
+      const counts = parseInt(finalValue);
       if (!isNaN(counts)) {
         updateSkillCounts(skillId, counts);
       }
@@ -73,9 +92,18 @@ const SkillsLibraryEditor = () => {
     "transitions",
   ];
 
+  const levelOptions: SkillLevel[] = [
+    "novice",
+    "intermediate",
+    "median",
+    "advanced",
+    "elite",
+    "premier",
+  ];
+
   return (
-    <div className="min-h-screen bg-background p-3">
-      <div className="max-w-7xl mx-auto space-y-3">
+    <div className="min-h-screen bg-background p-2">
+      <div className="max-w-7xl mx-auto space-y-2">
         <div className="flex items-center justify-between">
           <Link to="/">
             <Button variant="outline" size="sm">
@@ -109,20 +137,32 @@ const SkillsLibraryEditor = () => {
           const categorySkills = skills.filter((s) => s.category === category);
 
           return (
-            <Card key={category} className="p-3">
-              <h2 className="text-lg font-semibold mb-2 capitalize">{category}</h2>
+            <Card key={category} className="p-2">
+              <div className="flex items-center justify-between mb-1.5">
+                <h2 className="text-base font-semibold capitalize">{category}</h2>
+                <Button 
+                  size="sm" 
+                  variant="ghost" 
+                  className="h-6 px-2"
+                  onClick={() => handleAddSkill(category)}
+                >
+                  <Plus className="h-3 w-3 mr-1" />
+                  Add
+                </Button>
+              </div>
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Counts</TableHead>
-                    <TableHead>Level</TableHead>
-                    <TableHead>Description</TableHead>
+                  <TableRow className="h-8">
+                    <TableHead className="text-xs p-1.5">Name</TableHead>
+                    <TableHead className="text-xs p-1.5 w-16">Counts</TableHead>
+                    <TableHead className="text-xs p-1.5 w-28">Level</TableHead>
+                    <TableHead className="text-xs p-1.5">Description</TableHead>
+                    <TableHead className="text-xs p-1.5 w-12"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {categorySkills.map((skill) => (
-                     <TableRow key={skill.id}>
+                     <TableRow key={skill.id} className="h-8">
                       <TableCell className="p-1 text-xs">
                         {editingCell?.skillId === skill.id && editingCell?.field === "name" ? (
                           <Input
@@ -133,14 +173,14 @@ const SkillsLibraryEditor = () => {
                               if (e.key === "Enter") handleCellSave(skill.id, "name");
                             }}
                             autoFocus
-                            className="h-7"
+                            className="h-6 text-xs"
                           />
                         ) : (
                           <div
                             onClick={() => handleCellClick(skill, "name")}
-                            className="cursor-pointer hover:bg-muted/50 p-1 rounded"
+                            className="cursor-pointer hover:bg-muted/50 p-1 rounded min-h-[24px]"
                           >
-                            {skill.name}
+                            {skill.name || "(empty)"}
                           </div>
                         )}
                       </TableCell>
@@ -155,18 +195,43 @@ const SkillsLibraryEditor = () => {
                               if (e.key === "Enter") handleCellSave(skill.id, "counts");
                             }}
                             autoFocus
-                            className="w-16 h-7"
+                            className="w-14 h-6 text-xs"
                           />
                         ) : (
                           <div
                             onClick={() => handleCellClick(skill, "counts")}
-                            className="cursor-pointer hover:bg-muted/50 p-1 rounded"
+                            className="cursor-pointer hover:bg-muted/50 p-1 rounded min-h-[24px]"
                           >
                             {skill.counts}
                           </div>
                         )}
                       </TableCell>
-                      <TableCell className="capitalize p-1 text-xs">{skill.level}</TableCell>
+                      <TableCell className="p-1 text-xs">
+                        {editingCell?.skillId === skill.id && editingCell?.field === "level" ? (
+                          <Select
+                            value={editValue}
+                            onValueChange={(value) => handleCellSave(skill.id, "level", value)}
+                          >
+                            <SelectTrigger className="h-6 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {levelOptions.map((level) => (
+                                <SelectItem key={level} value={level} className="text-xs capitalize">
+                                  {level}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <div
+                            onClick={() => handleCellClick(skill, "level")}
+                            className="cursor-pointer hover:bg-muted/50 p-1 rounded capitalize min-h-[24px]"
+                          >
+                            {skill.level}
+                          </div>
+                        )}
+                      </TableCell>
                       <TableCell className="p-1 text-xs">
                         {editingCell?.skillId === skill.id && editingCell?.field === "description" ? (
                           <Input
@@ -177,15 +242,26 @@ const SkillsLibraryEditor = () => {
                               if (e.key === "Enter") handleCellSave(skill.id, "description");
                             }}
                             autoFocus
+                            className="h-6 text-xs"
                           />
                         ) : (
                           <div
                             onClick={() => handleCellClick(skill, "description")}
-                            className="cursor-pointer hover:bg-muted/50 p-2 rounded"
+                            className="cursor-pointer hover:bg-muted/50 p-1 rounded min-h-[24px]"
                           >
                             {skill.description || "-"}
                           </div>
                         )}
+                      </TableCell>
+                      <TableCell className="p-1 text-xs">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-6 w-6 p-0"
+                          onClick={() => deleteSkill(skill.id)}
+                        >
+                          <Trash2 className="h-3 w-3 text-destructive" />
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}
