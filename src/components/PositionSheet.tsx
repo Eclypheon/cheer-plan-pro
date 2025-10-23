@@ -286,28 +286,28 @@ export const PositionSheet = ({
             onMouseMove={handleSheetMouseMove}
             onMouseUp={handleSheetMouseUp}
           >
-            {/* Grid overlay - 45x45 grid */}
+            {/* Grid overlay - 36x36 grid */}
             {(showGrid || isDraggingIcon || isDraggingMultipleIcons) && (
               <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 5 }}>
-                {Array.from({ length: 46 }, (_, i) => (
+                {Array.from({ length: 37 }, (_, i) => (
                   <line
                     key={`v-${i}`}
-                    x1={`${(i / 45) * 100}%`}
+                    x1={`${(i / 36) * 100}%`}
                     y1="0"
-                    x2={`${(i / 45) * 100}%`}
+                    x2={`${(i / 36) * 100}%`}
                     y2="100%"
                     stroke="currentColor"
                     strokeOpacity="0.2"
                     strokeWidth="0.5"
                   />
                 ))}
-                {Array.from({ length: 46 }, (_, i) => (
+                {Array.from({ length: 37 }, (_, i) => (
                   <line
                     key={`h-${i}`}
                     x1="0"
-                    y1={`${(i / 45) * 100}%`}
+                    y1={`${(i / 36) * 100}%`}
                     x2="100%"
-                    y2={`${(i / 45) * 100}%`}
+                    y2={`${(i / 36) * 100}%`}
                     stroke="currentColor"
                     strokeOpacity="0.2"
                     strokeWidth="0.5"
