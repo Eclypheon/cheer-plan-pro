@@ -23,10 +23,10 @@ export const TrashDropZone = ({ isDragging }: TrashDropZoneProps) => {
         "border-4 border-dashed",
         isOver
           ? "bg-destructive scale-110 border-destructive shadow-lg"
-          : "bg-destructive/70 border-destructive-foreground/50 scale-100"
+          : "bg-muted/80 border-muted-foreground/50 scale-100"
       )}
     >
-      <Trash2 className={cn("h-12 w-12", isOver ? "text-destructive-foreground animate-pulse" : "text-destructive-foreground/90")} />
+      <Trash2 className={cn("h-12 w-12", isOver ? "text-destructive-foreground animate-pulse" : "text-muted-foreground/90")} />
     </div>
   );
 };

@@ -39,11 +39,6 @@ export const CountSheet = ({
   const totalBeats = Math.ceil((routineLength * bpm) / 60);
   const totalLines = Math.ceil(totalBeats / 8);
 
-  // Prevent scrolling during drag
-  const handleDragMove = (e: React.DragEvent) => {
-    e.preventDefault();
-  };
-
   // Process skills and handle overflow to next lines
   const getSkillPlacements = (): SkillPlacement[] => {
     const placements: SkillPlacement[] = [];
@@ -170,7 +165,7 @@ export const CountSheet = ({
   };
 
   return (
-    <div className="h-full flex flex-col bg-card overflow-auto" onDragOver={(e) => e.preventDefault()}>
+    <div className="h-full flex flex-col bg-card overflow-hidden">
       <div className="p-1.5 border-b">
         <h2 className="text-sm font-semibold">Count Sheet</h2>
         <p className="text-xs text-muted-foreground">
@@ -178,7 +173,7 @@ export const CountSheet = ({
         </p>
       </div>
       
-      <div className="flex-1 overflow-auto" style={{ overflowY: 'scroll', overscrollBehavior: 'contain' }}>
+      <div className="flex-1 overflow-auto">
         <table className="w-full border-collapse" id="count-sheet-table">
           <thead>
             <tr>

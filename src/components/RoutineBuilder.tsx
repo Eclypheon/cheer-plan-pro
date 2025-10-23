@@ -34,6 +34,109 @@ export const RoutineBuilder = () => {
   const [selectedSkillId, setSelectedSkillId] = useState<string | null>(null);
   const [showGrid, setShowGrid] = useState(false);
   const [autoFollow, setAutoFollow] = useState(true);
+  const [isDraggingIcon, setIsDraggingIcon] = useState(false);
+
+  // Load keyboard settings
+  const [keyboardSettings] = useState(() => {
+    const saved = localStorage.getItem("keyboardSettings");
+    return saved ? JSON.parse(saved) : {
+      nextLine: "ArrowDown",
+      prevLine: "ArrowUp",
+      undo: "z",
+      redo: "y",
+      toggleAutoFollow: "f",
+      deleteIcon: "Delete",
+      moveLeft: "ArrowLeft",
+      moveRight: "ArrowRight",
+      moveUp: "ArrowUp",
+      moveDown: "ArrowDown",
+      altMoveLeft: "a",
+      altMoveRight: "d",
+      altMoveUp: "w",
+      altMoveDown: "s",
+    };
+  });
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Position sheet shortcuts
+      if (e.key === keyboardSettings.nextLine && !e.ctrlKey && !e.shiftKey) {
+        const totalLines = Math.ceil((config.length * config.bpm) / 60 / 8);
+        if (selectedLine !== null && selectedLine < totalLines - 1) {
+          setSelectedLine(selectedLine + 1);
+          e.preventDefault();
+        }
+      }
+      
+      if (e.key === keyboardSettings.prevLine && !e.ctrlKey && !e.shiftKey) {
+        if (selectedLine !== null && selectedLine > 0) {
+          setSelectedLine(selectedLine - 1);
+          e.preventDefault();
+        }
+      }
+
+      if (e.key === keyboardSettings.toggleAutoFollow) {
+        setAutoFollow(!autoFollow);
+        e.preventDefault();
+      }
+
+      if (e.key === keyboardSettings.deleteIcon || e.key === "Delete") {
+        const selectedIcons = positionIcons.filter(icon => icon.selected);
+        if (selectedIcons.length > 0) {
+          setPositionIcons(prev => prev.filter(icon => !icon.selected));
+          e.preventDefault();
+        }
+      }
+
+      // Count sheet shortcuts
+      if (selectedSkillId) {
+        const selectedSkill = placedSkills.find(ps => ps.id === selectedSkillId);
+        if (!selectedSkill) return;
+        
+        const totalLines = Math.ceil((config.length * config.bpm) / 60 / 8);
+        
+        if (e.key === keyboardSettings.moveLeft || e.key === keyboardSettings.altMoveLeft) {
+          if (selectedSkill.startCount > 1) {
+            setPlacedSkills(prev => prev.map(ps =>
+              ps.id === selectedSkillId ? { ...ps, startCount: ps.startCount - 1 } : ps
+            ));
+          }
+          e.preventDefault();
+        }
+        
+        if (e.key === keyboardSettings.moveRight || e.key === keyboardSettings.altMoveRight) {
+          if (selectedSkill.startCount < 8) {
+            setPlacedSkills(prev => prev.map(ps =>
+              ps.id === selectedSkillId ? { ...ps, startCount: ps.startCount + 1 } : ps
+            ));
+          }
+          e.preventDefault();
+        }
+        
+        if (e.key === keyboardSettings.moveUp || e.key === keyboardSettings.altMoveUp) {
+          if (selectedSkill.lineIndex > 0) {
+            setPlacedSkills(prev => prev.map(ps =>
+              ps.id === selectedSkillId ? { ...ps, lineIndex: ps.lineIndex - 1 } : ps
+            ));
+          }
+          e.preventDefault();
+        }
+        
+        if (e.key === keyboardSettings.moveDown || e.key === keyboardSettings.altMoveDown) {
+          if (selectedSkill.lineIndex < totalLines - 1) {
+            setPlacedSkills(prev => prev.map(ps =>
+              ps.id === selectedSkillId ? { ...ps, lineIndex: ps.lineIndex + 1 } : ps
+            ));
+          }
+          e.preventDefault();
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [selectedLine, config, autoFollow, positionIcons, selectedSkillId, placedSkills, keyboardSettings]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -165,6 +268,7 @@ export const RoutineBuilder = () => {
     
     if (event.active.data?.current?.type === "position-icon") {
       setShowGrid(true);
+      setIsDraggingIcon(true);
     }
   };
 
@@ -173,6 +277,7 @@ export const RoutineBuilder = () => {
     setIsDraggingPlacedSkill(false);
     setDraggedPlacedSkillId(null);
     setShowGrid(false);
+    setIsDraggingIcon(false);
     
     const { active, over } = event;
     if (!over) return;
@@ -402,7 +507,7 @@ export const RoutineBuilder = () => {
                   setConfig({ ...config, bpm });
                 }
               }}
-              className="w-16 h-8"
+              className="w-[70px] h-8"
             />
           </div>
 
@@ -479,6 +584,7 @@ export const RoutineBuilder = () => {
                     showGrid={showGrid}
                     autoFollow={autoFollow}
                     onToggleAutoFollow={() => setAutoFollow(!autoFollow)}
+                    isDraggingIcon={isDraggingIcon}
                     onSelectIcon={(id) => {
                       setPositionIcons(prev => prev.map(icon => 
                         ({ ...icon, selected: icon.id === id ? !icon.selected : false })

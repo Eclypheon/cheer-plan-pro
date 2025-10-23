@@ -51,6 +51,7 @@ export const PositionIcon = ({ icon, onUpdate, onClick }: PositionIconProps) => 
         e.stopPropagation();
         onClick();
       }}
+      data-position-icon
       className={cn(
         "absolute w-8 h-8 -ml-4 -mt-4 cursor-grab active:cursor-grabbing",
         "flex items-center justify-center",

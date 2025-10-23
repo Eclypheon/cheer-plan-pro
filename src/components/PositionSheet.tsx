@@ -17,6 +17,7 @@ interface PositionSheetProps {
   showGrid?: boolean;
   autoFollow?: boolean;
   onToggleAutoFollow?: () => void;
+  isDraggingIcon?: boolean;
   onSelectIcon?: (id: string) => void;
   onSelectMultiple?: (ids: string[]) => void;
   onNextLine?: () => void;
@@ -33,6 +34,7 @@ export const PositionSheet = ({
   showGrid = false,
   autoFollow = true,
   onToggleAutoFollow,
+  isDraggingIcon = false,
   onSelectIcon,
   onSelectMultiple,
   onNextLine,
@@ -46,6 +48,8 @@ export const PositionSheet = ({
   const [clickTimer, setClickTimer] = useState<NodeJS.Timeout | null>(null);
   const [selectionStart, setSelectionStart] = useState<{ x: number; y: number } | null>(null);
   const [selectionEnd, setSelectionEnd] = useState<{ x: number; y: number } | null>(null);
+  const [isDraggingSelection, setIsDraggingSelection] = useState(false);
+  const [multiSelectDragStart, setMultiSelectDragStart] = useState<{ x: number; y: number } | null>(null);
   const sheetRef = useRef<HTMLDivElement>(null);
 
   const sensors = useSensors(
@@ -60,16 +64,24 @@ export const PositionSheet = ({
     const { active, delta } = event;
     if (!delta) return;
 
-    const icon = icons.find((i) => i.id === active.id);
-    if (!icon) return;
+    const selectedIcons = icons.filter(i => i.selected && i.lineIndex === selectedLine);
+    
+    if (selectedIcons.length > 1 && selectedIcons.some(i => i.id === active.id)) {
+      // Multi-icon drag
+      selectedIcons.forEach(icon => {
+        const newX = Math.max(0, icon.x + delta.x);
+        const newY = Math.max(0, icon.y + delta.y);
+        onUpdateIcon(icon.id, newX, newY, false);
+      });
+    } else {
+      // Single icon drag
+      const icon = icons.find((i) => i.id === active.id);
+      if (!icon) return;
 
-    const container = sheetRef.current;
-    if (!container) return;
-
-    const rect = container.getBoundingClientRect();
-    const newX = Math.max(0, Math.min(icon.x + delta.x, rect.width));
-    const newY = Math.max(0, Math.min(icon.y + delta.y, rect.height));
-    onUpdateIcon(active.id as string, newX, newY, autoFollow);
+      const newX = Math.max(0, icon.x + delta.x);
+      const newY = Math.max(0, icon.y + delta.y);
+      onUpdateIcon(active.id as string, newX, newY, autoFollow);
+    }
 
     // Save to history
     const newHistory = history.slice(0, historyIndex + 1);
@@ -115,22 +127,26 @@ export const PositionSheet = ({
   };
 
   const handleSheetMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (e.target === e.currentTarget || (e.target as HTMLElement).closest('.sheet-background')) {
+    const target = e.target as HTMLElement;
+    const isIcon = target.closest('[data-position-icon]');
+    
+    if (!isIcon && (e.target === e.currentTarget || target.closest('.sheet-background'))) {
       const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
       setSelectionStart({ x: e.clientX - rect.left, y: e.clientY - rect.top });
       setSelectionEnd(null);
+      setIsDraggingSelection(true);
     }
   };
 
   const handleSheetMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (selectionStart) {
+    if (selectionStart && isDraggingSelection) {
       const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
       setSelectionEnd({ x: e.clientX - rect.left, y: e.clientY - rect.top });
     }
   };
 
   const handleSheetMouseUp = () => {
-    if (selectionStart && selectionEnd) {
+    if (selectionStart && selectionEnd && isDraggingSelection) {
       const minX = Math.min(selectionStart.x, selectionEnd.x);
       const maxX = Math.max(selectionStart.x, selectionEnd.x);
       const minY = Math.min(selectionStart.y, selectionEnd.y);
@@ -144,6 +160,7 @@ export const PositionSheet = ({
     }
     setSelectionStart(null);
     setSelectionEnd(null);
+    setIsDraggingSelection(false);
   };
 
   const handleSaveName = (name: string) => {
@@ -164,6 +181,7 @@ export const PositionSheet = ({
 
   const lineIcons = icons.filter((i) => i.lineIndex === selectedLine);
   const selectedIcon = icons.find((i) => i.id === selectedIconId);
+  const selectedIconsCount = lineIcons.filter(i => i.selected).length;
 
   return (
     <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
@@ -204,21 +222,35 @@ export const PositionSheet = ({
               >
                 <Redo className="h-3 w-3" />
               </Button>
+              {selectedIconsCount > 0 && (
+                <Button 
+                  size="sm" 
+                  variant="destructive" 
+                  className="h-6 px-1.5 text-xs"
+                  onClick={() => {
+                    const selectedIds = lineIcons.filter(i => i.selected).map(i => i.id);
+                    selectedIds.forEach(id => onRemoveIcon(id));
+                  }}
+                >
+                  <X className="h-3 w-3 mr-0.5" />
+                  Delete ({selectedIconsCount})
+                </Button>
+              )}
             </div>
           </div>
         </div>
 
-        <div className="flex-1 p-1.5 overflow-hidden">
+        <div className="flex-1 p-1.5 flex items-center justify-center overflow-hidden">
           <div 
             ref={sheetRef}
-            className="sheet-background relative w-full h-full bg-background border border-border rounded"
-            style={{ aspectRatio: '4/3', maxHeight: '100%' }}
+            className="sheet-background relative bg-background border border-border rounded"
+            style={{ width: '800px', height: '600px', flexShrink: 0 }}
             onMouseDown={handleSheetMouseDown}
             onMouseMove={handleSheetMouseMove}
             onMouseUp={handleSheetMouseUp}
           >
             {/* Grid overlay */}
-            {showGrid && (
+            {(showGrid || isDraggingIcon) && (
               <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 5 }}>
                 {Array.from({ length: 22 }, (_, i) => (
                   <line
@@ -228,7 +260,7 @@ export const PositionSheet = ({
                     x2={`${(i / 21) * 100}%`}
                     y2="100%"
                     stroke="currentColor"
-                    strokeOpacity="0.2"
+                    strokeOpacity="0.3"
                     strokeWidth="1"
                   />
                 ))}
@@ -240,24 +272,24 @@ export const PositionSheet = ({
                     x2="100%"
                     y2={`${(i / 21) * 100}%`}
                     stroke="currentColor"
-                    strokeOpacity="0.2"
+                    strokeOpacity="0.3"
                     strokeWidth="1"
                   />
                 ))}
               </svg>
             )}
 
-            {/* 6 horizontal lines representing 7 mats */}
-            {Array.from({ length: 6 }, (_, i) => (
+            {/* 8 vertical lines representing roll mats */}
+            {Array.from({ length: 8 }, (_, i) => (
               <div
                 key={i}
-                className="absolute left-0 right-0 border-t border-muted pointer-events-none"
-                style={{ top: `${((i + 1) / 7) * 100}%`, zIndex: 1 }}
+                className="absolute top-0 bottom-0 border-l border-muted pointer-events-none"
+                style={{ left: `${(i / 8) * 100}%`, zIndex: 1 }}
               />
             ))}
 
             {/* Selection rectangle */}
-            {selectionStart && selectionEnd && (
+            {selectionStart && selectionEnd && isDraggingSelection && (
               <div
                 className="absolute border-2 border-accent bg-accent/20 pointer-events-none"
                 style={{
