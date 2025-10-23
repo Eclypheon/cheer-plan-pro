@@ -157,7 +157,7 @@ export const RoutineBuilder = () => {
       for (let lineIndex = 0; lineIndex < totalLines; lineIndex++) {
         if (!existingLines.has(lineIndex)) {
           if (config.category === "team-16") {
-            // 10 Bases in 2 rows - snap to 45x45 grid
+            // 10 Bases in 2 rows - snap to 36x36 grid
             const gridSize = 800 / 36;
             for (let i = 0; i < 5; i++) {
               newIcons.push({
@@ -203,7 +203,7 @@ export const RoutineBuilder = () => {
               });
             }
           } else {
-            // team-24: 16 Bases, 4 Mid Tiers, 4 Top Flys - snap to 45x45 grid
+            // team-24: 16 Bases, 4 Mid Tiers, 4 Top Flys - snap to 36x36 grid
             const gridSize = 800 / 36;
             for (let i = 0; i < 8; i++) {
               newIcons.push({
@@ -338,19 +338,19 @@ export const RoutineBuilder = () => {
   const handleAddPositionIcon = (type: PositionIcon["type"]) => {
     if (selectedLine === null) return;
     
-    const gridSize = 800 / 45;
+    const gridSize = 800 / 36;
     const lineIcons = positionIcons.filter(i => i.lineIndex === selectedLine);
     const occupied = new Set(lineIcons.map(i => `${i.x},${i.y}`));
     
     let x = 100, y = 100;
-    for (let row = 0; row < 45; row++) {
-      for (let col = 0; col < 45; col++) {
+    for (let row = 0; row < 36; row++) {
+      for (let col = 0; col < 36; col++) {
         const testX = Math.round(col * gridSize);
         const testY = Math.round(row * gridSize);
         if (!occupied.has(`${testX},${testY}`)) {
           x = testX;
           y = testY;
-          row = 45;
+          row = 36;
           break;
         }
       }
@@ -370,7 +370,7 @@ export const RoutineBuilder = () => {
     const icon = positionIcons.find(i => i.id === id);
     if (!icon) return;
 
-    const gridSize = 800 / 45;
+    const gridSize = 800 / 36;
     const snappedX = Math.round(x / gridSize) * gridSize;
     const snappedY = Math.round(y / gridSize) * gridSize;
 
