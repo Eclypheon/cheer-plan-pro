@@ -157,8 +157,8 @@ export const RoutineBuilder = () => {
       for (let lineIndex = 0; lineIndex < totalLines; lineIndex++) {
         if (!existingLines.has(lineIndex)) {
           if (config.category === "team-16") {
-            // 10 Bases in 2 rows - snap to 21x21 grid
-            const gridSize = 800 / 21;
+            // 10 Bases in 2 rows - snap to 45x45 grid
+            const gridSize = 800 / 45;
             for (let i = 0; i < 5; i++) {
               newIcons.push({
                 id: `icon-${Date.now()}-${lineIndex}-base1-${i}`,
@@ -203,8 +203,8 @@ export const RoutineBuilder = () => {
               });
             }
           } else {
-            // team-24: 16 Bases, 4 Mid Tiers, 4 Top Flys - snap to 21x21 grid
-            const gridSize = 800 / 21;
+            // team-24: 16 Bases, 4 Mid Tiers, 4 Top Flys - snap to 45x45 grid
+            const gridSize = 800 / 45;
             for (let i = 0; i < 8; i++) {
               newIcons.push({
                 id: `icon-${Date.now()}-${lineIndex}-base1-${i}`,
@@ -257,6 +257,8 @@ export const RoutineBuilder = () => {
     const skill = skills.find((s) => s.id === event.active.id);
     if (skill) {
       setDraggedSkill(skill);
+      // Prevent scrolling during drag
+      document.body.style.overflow = 'hidden';
       return;
     }
     
@@ -264,6 +266,8 @@ export const RoutineBuilder = () => {
       setIsDraggingPlacedSkill(true);
       setDraggedPlacedSkillId(event.active.data.current.placedSkill.id);
       setDraggedSkill(skills.find(s => s.id === event.active.data.current.placedSkill.skillId) || null);
+      // Prevent scrolling during drag
+      document.body.style.overflow = 'hidden';
     }
     
     if (event.active.data?.current?.type === "position-icon") {
@@ -278,6 +282,8 @@ export const RoutineBuilder = () => {
     setDraggedPlacedSkillId(null);
     setShowGrid(false);
     setIsDraggingIcon(false);
+    // Re-enable scrolling
+    document.body.style.overflow = '';
     
     const { active, over } = event;
     if (!over) return;
@@ -332,19 +338,19 @@ export const RoutineBuilder = () => {
   const handleAddPositionIcon = (type: PositionIcon["type"]) => {
     if (selectedLine === null) return;
     
-    const gridSize = 38;
+    const gridSize = 800 / 45;
     const lineIcons = positionIcons.filter(i => i.lineIndex === selectedLine);
     const occupied = new Set(lineIcons.map(i => `${i.x},${i.y}`));
     
     let x = 100, y = 100;
-    for (let row = 0; row < 21; row++) {
-      for (let col = 0; col < 21; col++) {
-        const testX = col * gridSize;
-        const testY = row * gridSize;
+    for (let row = 0; row < 45; row++) {
+      for (let col = 0; col < 45; col++) {
+        const testX = Math.round(col * gridSize);
+        const testY = Math.round(row * gridSize);
         if (!occupied.has(`${testX},${testY}`)) {
           x = testX;
           y = testY;
-          row = 21;
+          row = 45;
           break;
         }
       }
@@ -364,7 +370,7 @@ export const RoutineBuilder = () => {
     const icon = positionIcons.find(i => i.id === id);
     if (!icon) return;
 
-    const gridSize = 800 / 21;
+    const gridSize = 800 / 45;
     const snappedX = Math.round(x / gridSize) * gridSize;
     const snappedY = Math.round(y / gridSize) * gridSize;
 
@@ -507,7 +513,7 @@ export const RoutineBuilder = () => {
                   setConfig({ ...config, bpm });
                 }
               }}
-              className="w-[70px] h-8"
+              className="w-[80px] h-8"
             />
           </div>
 
@@ -633,7 +639,7 @@ export const RoutineBuilder = () => {
         <DragOverlay>
           {draggedSkill ? <SkillCard skill={draggedSkill} /> : null}
         </DragOverlay>
-        <TrashDropZone isDragging={isDraggingPlacedSkill || draggedSkill !== null} />
+        <TrashDropZone isDragging={isDraggingPlacedSkill || draggedSkill !== null || isDraggingIcon} />
       </DndContext>
     </div>
   );

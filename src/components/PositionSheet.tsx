@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { DndContext, DragEndEvent, useSensor, useSensors, PointerSensor } from "@dnd-kit/core";
+import { DndContext, DragEndEvent, DragStartEvent, useSensor, useSensors, PointerSensor } from "@dnd-kit/core";
 import type { PositionIcon } from "@/types/routine";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -40,7 +40,7 @@ export const PositionSheet = ({
   onNextLine,
   onPrevLine,
 }: PositionSheetProps) => {
-  const [history, setHistory] = useState<PositionIcon[][]>([]);
+  const [history, setHistory] = useState<{ icons: PositionIcon[], lineIndex: number }[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [selectedIconId, setSelectedIconId] = useState<string | null>(null);
   const [nameDialogOpen, setNameDialogOpen] = useState(false);
@@ -49,7 +49,8 @@ export const PositionSheet = ({
   const [selectionStart, setSelectionStart] = useState<{ x: number; y: number } | null>(null);
   const [selectionEnd, setSelectionEnd] = useState<{ x: number; y: number } | null>(null);
   const [isDraggingSelection, setIsDraggingSelection] = useState(false);
-  const [multiSelectDragStart, setMultiSelectDragStart] = useState<{ x: number; y: number } | null>(null);
+  const [isDraggingMultipleIcons, setIsDraggingMultipleIcons] = useState(false);
+  const [draggedIconsPositions, setDraggedIconsPositions] = useState<Map<string, { x: number; y: number }>>(new Map());
   const sheetRef = useRef<HTMLDivElement>(null);
 
   const sensors = useSensors(
@@ -62,16 +63,20 @@ export const PositionSheet = ({
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, delta } = event;
+    setIsDraggingMultipleIcons(false);
+    setDraggedIconsPositions(new Map());
+    
     if (!delta) return;
 
     const selectedIcons = icons.filter(i => i.selected && i.lineIndex === selectedLine);
     
     if (selectedIcons.length > 1 && selectedIcons.some(i => i.id === active.id)) {
-      // Multi-icon drag
+      // Multi-icon drag - update all selected icons and propagate if autoFollow is on
+      const shouldPropagate = autoFollow;
       selectedIcons.forEach(icon => {
         const newX = Math.max(0, icon.x + delta.x);
         const newY = Math.max(0, icon.y + delta.y);
-        onUpdateIcon(icon.id, newX, newY, false);
+        onUpdateIcon(icon.id, newX, newY, shouldPropagate);
       });
     } else {
       // Single icon drag
@@ -84,23 +89,53 @@ export const PositionSheet = ({
     }
 
     // Save to history
-    const newHistory = history.slice(0, historyIndex + 1);
-    newHistory.push([...icons]);
-    setHistory(newHistory);
-    setHistoryIndex(newHistory.length - 1);
+    if (selectedLine !== null) {
+      const newHistory = history.slice(0, historyIndex + 1);
+      newHistory.push({ icons: [...icons], lineIndex: selectedLine });
+      setHistory(newHistory);
+      setHistoryIndex(newHistory.length - 1);
+    }
+  };
+
+  const handleDragStart = (event: DragStartEvent) => {
+    const selectedIcons = icons.filter(i => i.selected && i.lineIndex === selectedLine);
+    if (selectedIcons.length > 1 && selectedIcons.some(i => i.id === event.active.id)) {
+      setIsDraggingMultipleIcons(true);
+      const positions = new Map<string, { x: number; y: number }>();
+      selectedIcons.forEach(icon => {
+        positions.set(icon.id, { x: icon.x, y: icon.y });
+      });
+      setDraggedIconsPositions(positions);
+    }
   };
 
   const handleUndo = () => {
     if (historyIndex > 0) {
-      setHistoryIndex(historyIndex - 1);
-      // Apply history state
+      const prevState = history[historyIndex - 1];
+      if (prevState && prevState.lineIndex === selectedLine) {
+        // Restore only icons for the current line
+        const otherLineIcons = icons.filter(i => i.lineIndex !== selectedLine);
+        const restoredLineIcons = prevState.icons.filter(i => i.lineIndex === selectedLine);
+        // Update icons through parent component
+        restoredLineIcons.forEach(icon => {
+          onUpdateIcon(icon.id, icon.x, icon.y, false);
+        });
+        setHistoryIndex(historyIndex - 1);
+      }
     }
   };
 
   const handleRedo = () => {
     if (historyIndex < history.length - 1) {
-      setHistoryIndex(historyIndex + 1);
-      // Apply history state
+      const nextState = history[historyIndex + 1];
+      if (nextState && nextState.lineIndex === selectedLine) {
+        // Restore only icons for the current line
+        const restoredLineIcons = nextState.icons.filter(i => i.lineIndex === selectedLine);
+        restoredLineIcons.forEach(icon => {
+          onUpdateIcon(icon.id, icon.x, icon.y, false);
+        });
+        setHistoryIndex(historyIndex + 1);
+      }
     }
   };
 
@@ -130,6 +165,7 @@ export const PositionSheet = ({
     const target = e.target as HTMLElement;
     const isIcon = target.closest('[data-position-icon]');
     
+    // Only start selection if clicking on empty space (not on an icon)
     if (!isIcon && (e.target === e.currentTarget || target.closest('.sheet-background'))) {
       const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
       setSelectionStart({ x: e.clientX - rect.left, y: e.clientY - rect.top });
@@ -139,7 +175,8 @@ export const PositionSheet = ({
   };
 
   const handleSheetMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (selectionStart && isDraggingSelection) {
+    // Only update selection rectangle if we're in selection mode (not dragging an icon)
+    if (selectionStart && isDraggingSelection && !isDraggingMultipleIcons) {
       const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
       setSelectionEnd({ x: e.clientX - rect.left, y: e.clientY - rect.top });
     }
@@ -184,7 +221,7 @@ export const PositionSheet = ({
   const selectedIconsCount = lineIcons.filter(i => i.selected).length;
 
   return (
-    <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+    <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <Card className="h-full flex flex-col overflow-hidden" id="position-sheet">
         <div className="p-1.5 border-b">
           <div className="flex items-center justify-between gap-1.5">
@@ -240,7 +277,7 @@ export const PositionSheet = ({
           </div>
         </div>
 
-        <div className="flex-1 p-1.5 flex items-center justify-center overflow-hidden">
+        <div className="flex-1 p-1.5 flex items-center justify-center overflow-auto">
           <div 
             ref={sheetRef}
             className="sheet-background relative bg-background border border-border rounded"
@@ -249,47 +286,47 @@ export const PositionSheet = ({
             onMouseMove={handleSheetMouseMove}
             onMouseUp={handleSheetMouseUp}
           >
-            {/* Grid overlay */}
-            {(showGrid || isDraggingIcon) && (
+            {/* Grid overlay - 45x45 grid */}
+            {(showGrid || isDraggingIcon || isDraggingMultipleIcons) && (
               <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 5 }}>
-                {Array.from({ length: 22 }, (_, i) => (
+                {Array.from({ length: 46 }, (_, i) => (
                   <line
                     key={`v-${i}`}
-                    x1={`${(i / 21) * 100}%`}
+                    x1={`${(i / 45) * 100}%`}
                     y1="0"
-                    x2={`${(i / 21) * 100}%`}
+                    x2={`${(i / 45) * 100}%`}
                     y2="100%"
                     stroke="currentColor"
-                    strokeOpacity="0.3"
-                    strokeWidth="1"
+                    strokeOpacity="0.2"
+                    strokeWidth="0.5"
                   />
                 ))}
-                {Array.from({ length: 22 }, (_, i) => (
+                {Array.from({ length: 46 }, (_, i) => (
                   <line
                     key={`h-${i}`}
                     x1="0"
-                    y1={`${(i / 21) * 100}%`}
+                    y1={`${(i / 45) * 100}%`}
                     x2="100%"
-                    y2={`${(i / 21) * 100}%`}
+                    y2={`${(i / 45) * 100}%`}
                     stroke="currentColor"
-                    strokeOpacity="0.3"
-                    strokeWidth="1"
+                    strokeOpacity="0.2"
+                    strokeWidth="0.5"
                   />
                 ))}
               </svg>
             )}
 
-            {/* 8 vertical lines representing roll mats */}
-            {Array.from({ length: 8 }, (_, i) => (
+            {/* 9 vertical lines representing roll mats */}
+            {Array.from({ length: 9 }, (_, i) => (
               <div
                 key={i}
                 className="absolute top-0 bottom-0 border-l border-muted pointer-events-none"
-                style={{ left: `${(i / 8) * 100}%`, zIndex: 1 }}
+                style={{ left: `${(i / 9) * 100}%`, zIndex: 1 }}
               />
             ))}
 
-            {/* Selection rectangle */}
-            {selectionStart && selectionEnd && isDraggingSelection && (
+            {/* Selection rectangle - only show when dragging on empty space, not when dragging icons */}
+            {selectionStart && selectionEnd && isDraggingSelection && !isDraggingMultipleIcons && (
               <div
                 className="absolute border-2 border-accent bg-accent/20 pointer-events-none"
                 style={{
@@ -311,6 +348,30 @@ export const PositionSheet = ({
                 onClick={() => handleIconClick(icon.id)}
               />
             ))}
+            
+            {/* Ghost icons for multi-drag */}
+            {isDraggingMultipleIcons && Array.from(draggedIconsPositions.entries()).map(([iconId, pos]) => {
+              const icon = lineIcons.find(i => i.id === iconId);
+              if (!icon) return null;
+              return (
+                <div
+                  key={`ghost-${iconId}`}
+                  className="absolute pointer-events-none opacity-50"
+                  style={{
+                    left: pos.x,
+                    top: pos.y,
+                    transform: 'translate(-50%, -50%)',
+                    zIndex: 100,
+                  }}
+                >
+                  <PositionIconComponent
+                    icon={icon}
+                    onUpdate={() => {}}
+                    onClick={() => {}}
+                  />
+                </div>
+              );
+            })}
           </div>
         </div>
       </Card>
