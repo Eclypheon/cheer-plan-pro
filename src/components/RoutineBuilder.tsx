@@ -158,7 +158,7 @@ export const RoutineBuilder = () => {
         if (!existingLines.has(lineIndex)) {
           if (config.category === "team-16") {
             // 10 Bases in 2 rows - snap to 45x45 grid
-            const gridSize = 800 / 45;
+            const gridSize = 800 / 36;
             for (let i = 0; i < 5; i++) {
               newIcons.push({
                 id: `icon-${Date.now()}-${lineIndex}-base1-${i}`,
@@ -204,7 +204,7 @@ export const RoutineBuilder = () => {
             }
           } else {
             // team-24: 16 Bases, 4 Mid Tiers, 4 Top Flys - snap to 45x45 grid
-            const gridSize = 800 / 45;
+            const gridSize = 800 / 36;
             for (let i = 0; i < 8; i++) {
               newIcons.push({
                 id: `icon-${Date.now()}-${lineIndex}-base1-${i}`,
