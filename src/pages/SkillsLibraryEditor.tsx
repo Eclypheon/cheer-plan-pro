@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/select";
 
 const SkillsLibraryEditor = () => {
-  const { skills, importFromCSV, exportToCSV, updateSkillCounts, deleteSkill, addCustomSkill } = useSkills();
+  const { skills, importFromCSV, exportToCSV, updateSkillCounts, deleteSkill, addCustomSkill, updateSkillName, updateSkillDescription, updateSkillLevel } = useSkills();
   const [editingCell, setEditingCell] = useState<{ skillId: string; field: keyof Skill } | null>(null);
   const [editValue, setEditValue] = useState("");
 
@@ -54,8 +54,13 @@ const SkillsLibraryEditor = () => {
       if (!isNaN(counts)) {
         updateSkillCounts(skillId, counts);
       }
+    } else if (field === "name") {
+      updateSkillName(skillId, finalValue);
+    } else if (field === "description") {
+      updateSkillDescription(skillId, finalValue);
+    } else if (field === "level") {
+      updateSkillLevel(skillId, finalValue as SkillLevel);
     }
-    // Add more field updates as needed
 
     setEditingCell(null);
   };
