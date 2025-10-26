@@ -68,7 +68,7 @@ export const SkillsPanel = ({ skills, onAddCustomSkill, onDeleteSkill, onUpdateS
   };
 
   return (
-    <div className="h-full flex flex-col border-r bg-card">
+    <div className="h-full flex flex-col border-r bg-card relative z-10">
       <div className="p-2 border-b space-y-2">
         <h2 className="text-sm font-semibold">Skills Library</h2>
         <Select value={currentLevel} onValueChange={onLevelChange}>
@@ -85,7 +85,7 @@ export const SkillsPanel = ({ skills, onAddCustomSkill, onDeleteSkill, onUpdateS
           </SelectContent>
         </Select>
       </div>
-      
+
       <ScrollArea className="flex-1">
         <Tabs defaultValue="mounts" className="w-full">
           <TabsList className="w-full flex-wrap h-auto justify-start gap-1 p-2">

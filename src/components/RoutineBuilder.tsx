@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { DndContext, DragEndEvent, DragOverlay, useSensor, useSensors, PointerSensor, DragStartEvent } from "@dnd-kit/core";
+import { useState, useEffect, useRef } from "react";
+  import { DndContext, DragEndEvent, DragOverlay, useSensor, useSensors, PointerSensor, DragStartEvent, DragMoveEvent, CollisionDetection, rectIntersection, closestCenter } from "@dnd-kit/core";
 import type { PlacedSkill, RoutineConfig, Skill, PositionIcon } from "@/types/routine";
 import { useSkills } from "@/hooks/useSkills";
 import { SkillsPanel } from "./SkillsPanel";
@@ -12,9 +12,10 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Download, Info, Library, Settings as SettingsIcon } from "lucide-react";
+import { Download, Info, Library, RotateCcw, Settings as SettingsIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
+import { lineBreak } from "html2canvas/dist/types/css/property-descriptors/line-break";
 
 export const RoutineBuilder = () => {
   const { skills, exportToCSV, addCustomSkill, deleteSkill, updateSkillCounts } = useSkills();
@@ -35,6 +36,10 @@ export const RoutineBuilder = () => {
   const [showGrid, setShowGrid] = useState(false);
   const [autoFollow, setAutoFollow] = useState(true);
   const [isDraggingIcon, setIsDraggingIcon] = useState(false);
+  const [dragOffset, setDragOffset] = useState<{ x: number; y: number } | null>(null);
+  const [draggedIconId, setDraggedIconId] = useState<string | null>(null);
+  const [hasLoadedState, setHasLoadedState] = useState(false);
+  const initialLoadedCategoryRef = useRef<string | null>(null);
 
   // Load keyboard settings
   const [keyboardSettings] = useState(() => {
@@ -56,6 +61,63 @@ export const RoutineBuilder = () => {
       altMoveDown: "s",
     };
   });
+
+  // Load saved state on component mount
+  useEffect(() => {
+    const savedState = localStorage.getItem('routineState');
+    if (savedState) {
+      try {
+        const { placedSkills: savedPlacedSkills, positionIcons: savedPositionIcons, config: savedConfig } = JSON.parse(savedState);
+        if (savedPlacedSkills) setPlacedSkills(savedPlacedSkills);
+        if (savedPositionIcons) setPositionIcons(savedPositionIcons);
+        if (savedConfig) {
+          setConfig(savedConfig);
+          // Store the initially loaded category so we know when user manually changes it
+          initialLoadedCategoryRef.current = savedConfig.category;
+        }
+      } catch (e) {
+        console.error('Failed to load saved state:', e);
+      }
+    }
+    // Mark that we've attempted to load saved state (even if none existed)
+    setHasLoadedState(true);
+  }, []);
+
+  // Handle category changes - clear and repopulate icons for team categories (only for user-initiated changes)
+  useEffect(() => {
+    // Only handle category changes after initial load
+    if (!hasLoadedState) return;
+
+    // Only clear and repopulate if this is different from the initially loaded category
+    // This prevents clearing loaded saved state
+    if (initialLoadedCategoryRef.current !== null && initialLoadedCategoryRef.current !== config.category) {
+      if (config.category === "team-16" || config.category === "team-24") {
+        // Clear existing icons and populate with default team icons
+        const totalLines = Math.ceil((config.length * config.bpm) / 60 / 8);
+        const newIcons: PositionIcon[] = [];
+
+        for (let lineIndex = 0; lineIndex < totalLines; lineIndex++) {
+          newIcons.push(...generateTeamIcons(config.category, lineIndex));
+        }
+
+        setPositionIcons(newIcons);
+      } else {
+        // For non-team categories, clear icons (no auto-population)
+        setPositionIcons([]);
+      }
+    }
+  }, [config.category, config.length, config.bpm, hasLoadedState]);
+
+  // Save state whenever it changes
+  useEffect(() => {
+    const stateToSave = {
+      placedSkills,
+      positionIcons,
+      config,
+      timestamp: Date.now()
+    };
+    localStorage.setItem('routineState', JSON.stringify(stateToSave));
+  }, [placedSkills, positionIcons, config]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -81,12 +143,19 @@ export const RoutineBuilder = () => {
         e.preventDefault();
       }
 
-      if (e.key === keyboardSettings.deleteIcon || e.key === "Delete") {
+      if (e.key === keyboardSettings.deleteIcon || e.key === "Delete" || e.key === "Backspace") {
         const selectedIcons = positionIcons.filter(icon => icon.selected);
         if (selectedIcons.length > 0) {
           setPositionIcons(prev => prev.filter(icon => !icon.selected));
           e.preventDefault();
         }
+      }
+
+      // Delete key for selected skills in count sheet
+      if ((e.key === "Delete" || e.key === "Backspace") && selectedSkillId && !e.ctrlKey && !e.shiftKey) {
+        handleRemoveSkill(selectedSkillId);
+        setSelectedSkillId(null);
+        e.preventDefault();
       }
 
       // Count sheet shortcuts
@@ -132,6 +201,125 @@ export const RoutineBuilder = () => {
           e.preventDefault();
         }
       }
+
+      // Advanced keyboard shortcuts for bulk skill movement
+      if (selectedSkillId && e.shiftKey && !e.ctrlKey) {
+        // Shift + Arrow keys: Move selected skill and all skills after it
+        const selectedSkill = placedSkills.find(ps => ps.id === selectedSkillId);
+        if (!selectedSkill) return;
+
+        if (e.key === keyboardSettings.moveLeft || e.key === keyboardSettings.altMoveLeft) {
+          if (selectedSkill.startCount > 1) {
+            const skillsToMove = placedSkills.filter(ps =>
+              ps.lineIndex > selectedSkill.lineIndex ||
+              (ps.lineIndex === selectedSkill.lineIndex && ps.startCount > selectedSkill.startCount)
+            );
+            setPlacedSkills(prev => prev.map(ps =>
+              skillsToMove.some(stm => stm.id === ps.id) ? { ...ps, startCount: ps.startCount - 1 } : ps
+            ));
+          }
+          e.preventDefault();
+        }
+
+        if (e.key === keyboardSettings.moveRight || e.key === keyboardSettings.altMoveRight) {
+          if (selectedSkill.startCount < 8) {
+            const skillsToMove = placedSkills.filter(ps =>
+              ps.lineIndex > selectedSkill.lineIndex ||
+              (ps.lineIndex === selectedSkill.lineIndex && ps.startCount > selectedSkill.startCount)
+            );
+            setPlacedSkills(prev => prev.map(ps =>
+              skillsToMove.some(stm => stm.id === ps.id) ? { ...ps, startCount: ps.startCount + 1 } : ps
+            ));
+          }
+          e.preventDefault();
+        }
+
+        if (e.key === keyboardSettings.moveUp || e.key === keyboardSettings.altMoveUp) {
+          if (selectedSkill.lineIndex > 0) {
+            const skillsToMove = placedSkills.filter(ps =>
+              ps.lineIndex > selectedSkill.lineIndex ||
+              (ps.lineIndex === selectedSkill.lineIndex && ps.startCount > selectedSkill.startCount)
+            );
+            setPlacedSkills(prev => prev.map(ps =>
+              skillsToMove.some(stm => stm.id === ps.id) ? { ...ps, lineIndex: ps.lineIndex - 1 } : ps
+            ));
+          }
+          e.preventDefault();
+        }
+
+        if (e.key === keyboardSettings.moveDown || e.key === keyboardSettings.altMoveDown) {
+          const totalLines = Math.ceil((config.length * config.bpm) / 60 / 8);
+          if (selectedSkill.lineIndex < totalLines - 1) {
+            const skillsToMove = placedSkills.filter(ps =>
+              ps.lineIndex > selectedSkill.lineIndex ||
+              (ps.lineIndex === selectedSkill.lineIndex && ps.startCount > selectedSkill.startCount)
+            );
+            setPlacedSkills(prev => prev.map(ps =>
+              skillsToMove.some(stm => stm.id === ps.id) ? { ...ps, lineIndex: ps.lineIndex + 1 } : ps
+            ));
+          }
+          e.preventDefault();
+        }
+      }
+
+      if (selectedSkillId && e.ctrlKey && !e.shiftKey) {
+        // Ctrl + Arrow keys: Move selected skill and all skills before it
+        const selectedSkill = placedSkills.find(ps => ps.id === selectedSkillId);
+        if (!selectedSkill) return;
+
+        if (e.key === keyboardSettings.moveLeft || e.key === keyboardSettings.altMoveLeft) {
+          if (selectedSkill.startCount > 1) {
+            const skillsToMove = placedSkills.filter(ps =>
+              ps.lineIndex < selectedSkill.lineIndex ||
+              (ps.lineIndex === selectedSkill.lineIndex && ps.startCount < selectedSkill.startCount)
+            );
+            setPlacedSkills(prev => prev.map(ps =>
+              skillsToMove.some(stm => stm.id === ps.id) ? { ...ps, startCount: ps.startCount - 1 } : ps
+            ));
+          }
+          e.preventDefault();
+        }
+
+        if (e.key === keyboardSettings.moveRight || e.key === keyboardSettings.altMoveRight) {
+          if (selectedSkill.startCount < 8) {
+            const skillsToMove = placedSkills.filter(ps =>
+              ps.lineIndex < selectedSkill.lineIndex ||
+              (ps.lineIndex === selectedSkill.lineIndex && ps.startCount < selectedSkill.startCount)
+            );
+            setPlacedSkills(prev => prev.map(ps =>
+              skillsToMove.some(stm => stm.id === ps.id) ? { ...ps, startCount: ps.startCount + 1 } : ps
+            ));
+          }
+          e.preventDefault();
+        }
+
+        if (e.key === keyboardSettings.moveUp || e.key === keyboardSettings.altMoveUp) {
+          if (selectedSkill.lineIndex > 0) {
+            const skillsToMove = placedSkills.filter(ps =>
+              ps.lineIndex < selectedSkill.lineIndex ||
+              (ps.lineIndex === selectedSkill.lineIndex && ps.startCount < selectedSkill.startCount)
+            );
+            setPlacedSkills(prev => prev.map(ps =>
+              skillsToMove.some(stm => stm.id === ps.id) ? { ...ps, lineIndex: ps.lineIndex - 1 } : ps
+            ));
+          }
+          e.preventDefault();
+        }
+
+        if (e.key === keyboardSettings.moveDown || e.key === keyboardSettings.altMoveDown) {
+          const totalLines = Math.ceil((config.length * config.bpm) / 60 / 8);
+          if (selectedSkill.lineIndex < totalLines - 1) {
+            const skillsToMove = placedSkills.filter(ps =>
+              ps.lineIndex < selectedSkill.lineIndex ||
+              (ps.lineIndex === selectedSkill.lineIndex && ps.startCount < selectedSkill.startCount)
+            );
+            setPlacedSkills(prev => prev.map(ps =>
+              skillsToMove.some(stm => stm.id === ps.id) ? { ...ps, lineIndex: ps.lineIndex + 1 } : ps
+            ));
+          }
+          e.preventDefault();
+        }
+      }
     };
 
     window.addEventListener("keydown", handleKeyDown);
@@ -146,112 +334,150 @@ export const RoutineBuilder = () => {
     })
   );
 
-  // Auto-populate position icons for Team categories
-  useEffect(() => {
-    if (config.category === "team-16" || config.category === "team-24") {
-      const totalLines = Math.ceil((config.length * config.bpm) / 60 / 8);
-      const existingLines = new Set(positionIcons.map(icon => icon.lineIndex));
-      
-      const newIcons: PositionIcon[] = [];
-      
-      for (let lineIndex = 0; lineIndex < totalLines; lineIndex++) {
-        if (!existingLines.has(lineIndex)) {
-          if (config.category === "team-16") {
-            // 10 Bases in 2 rows - snap to 45x45 grid
-            const gridSize = 800 / 45;
-            for (let i = 0; i < 5; i++) {
-              newIcons.push({
-                id: `icon-${Date.now()}-${lineIndex}-base1-${i}`,
-                type: "square",
-                x: Math.round((114 + i * 152) / gridSize) * gridSize,
-                y: Math.round(152 / gridSize) * gridSize,
-                lineIndex,
-              });
-            }
-            for (let i = 0; i < 5; i++) {
-              newIcons.push({
-                id: `icon-${Date.now()}-${lineIndex}-base2-${i}`,
-                type: "square",
-                x: Math.round((114 + i * 152) / gridSize) * gridSize,
-                y: Math.round(266 / gridSize) * gridSize,
-                lineIndex,
-              });
-            }
-            // 2 Mid tiers
-            newIcons.push({
-              id: `icon-${Date.now()}-${lineIndex}-mid-0`,
-              type: "circle",
-              x: Math.round(228 / gridSize) * gridSize,
-              y: Math.round(380 / gridSize) * gridSize,
-              lineIndex,
-            });
-            newIcons.push({
-              id: `icon-${Date.now()}-${lineIndex}-mid-1`,
-              type: "circle",
-              x: Math.round(532 / gridSize) * gridSize,
-              y: Math.round(380 / gridSize) * gridSize,
-              lineIndex,
-            });
-            // 4 Top flys
-            for (let i = 0; i < 4; i++) {
-              newIcons.push({
-                id: `icon-${Date.now()}-${lineIndex}-fly-${i}`,
-                type: "x",
-                x: Math.round((152 + i * 152) / gridSize) * gridSize,
-                y: Math.round(494 / gridSize) * gridSize,
-                lineIndex,
-              });
-            }
-          } else {
-            // team-24: 16 Bases, 4 Mid Tiers, 4 Top Flys - snap to 45x45 grid
-            const gridSize = 800 / 45;
-            for (let i = 0; i < 8; i++) {
-              newIcons.push({
-                id: `icon-${Date.now()}-${lineIndex}-base1-${i}`,
-                type: "square",
-                x: Math.round((38 + i * 95) / gridSize) * gridSize,
-                y: Math.round(152 / gridSize) * gridSize,
-                lineIndex,
-              });
-            }
-            for (let i = 0; i < 8; i++) {
-              newIcons.push({
-                id: `icon-${Date.now()}-${lineIndex}-base2-${i}`,
-                type: "square",
-                x: Math.round((38 + i * 95) / gridSize) * gridSize,
-                y: Math.round(266 / gridSize) * gridSize,
-                lineIndex,
-              });
-            }
-            // 4 Mid tiers
-            for (let i = 0; i < 4; i++) {
-              newIcons.push({
-                id: `icon-${Date.now()}-${lineIndex}-mid-${i}`,
-                type: "circle",
-                x: Math.round((152 + i * 152) / gridSize) * gridSize,
-                y: Math.round(380 / gridSize) * gridSize,
-                lineIndex,
-              });
-            }
-            // 4 Top flys
-            for (let i = 0; i < 4; i++) {
-              newIcons.push({
-                id: `icon-${Date.now()}-${lineIndex}-fly-${i}`,
-                type: "x",
-                x: Math.round((152 + i * 152) / gridSize) * gridSize,
-                y: Math.round(494 / gridSize) * gridSize,
-                lineIndex,
-              });
-            }
-          }
-        }
+  /**
+   * Generate position icons for team categories (team-16 or team-24) in evenly distributed positions
+   */
+  const generateTeamIcons = (category: string, lineIndex: number): PositionIcon[] => {
+    const gridSize = 800 / 36; // ≈22.222 units per cell
+    const icons: PositionIcon[] = [];
+    const timestamp = Date.now();
+
+    if (category === "team-16") {
+      // 5 bases per row, evenly distributed across 36 columns
+      // Spacing of ~6.9 columns between each (36 total / 6 gaps = 6 per gap)
+      const basePositions = [4, 11, 18, 25, 32]; // Evenly spaced across grid
+      for (let i = 0; i < 5; i++) {
+        icons.push({
+          id: `icon-${timestamp}-${lineIndex}-base1-${i}`,
+          type: "square",
+          x: Math.round((basePositions[i] * gridSize)),
+          y: Math.round(6 * gridSize), // Row 6
+          lineIndex,
+        });
       }
-      
-      if (newIcons.length > 0) {
-        setPositionIcons(prev => [...prev, ...newIcons]);
+      for (let i = 0; i < 5; i++) {
+        icons.push({
+          id: `icon-${timestamp}-${lineIndex}-base2-${i}`,
+          type: "square",
+          x: Math.round((basePositions[i] * gridSize)),
+          y: Math.round(12 * gridSize), // Row 12
+          lineIndex,
+        });
+      }
+      // 2 Mid tiers evenly spaced between bases
+      const midPositions = [10, 26]; // Centered between base groups
+      for (let i = 0; i < 2; i++) {
+        icons.push({
+          id: `icon-${timestamp}-${lineIndex}-mid-${i}`,
+          type: "circle",
+          x: Math.round((midPositions[i] * gridSize)),
+          y: Math.round(17 * gridSize), // Row 17
+          lineIndex,
+        });
+      }
+      // 4 Top flys evenly distributed like bases
+      const flyPositions = [5, 14, 22, 31]; // Even spacing like bases but slightly offset
+      for (let i = 0; i < 4; i++) {
+        icons.push({
+          id: `icon-${timestamp}-${lineIndex}-fly-${i}`,
+          type: "x",
+          x: Math.round((flyPositions[i] * gridSize)),
+          y: Math.round(22 * gridSize), // Row 22
+          lineIndex,
+        });
+      }
+    } else if (category === "team-24") {
+      // 8 bases per row, evenly distributed across 36 columns
+      // Spacing of ~4.3 columns between each (36 total / 9 gaps ≈ 4 per gap)
+      const basePositions = [4, 8, 12, 16, 20, 24, 28, 32]; // Evenly spaced
+      for (let i = 0; i < 8; i++) {
+        icons.push({
+          id: `icon-${timestamp}-${lineIndex}-base1-${i}`,
+          type: "square",
+          x: Math.round((basePositions[i] * gridSize)),
+          y: Math.round(6 * gridSize), // Row 6
+          lineIndex,
+        });
+      }
+      for (let i = 0; i < 8; i++) {
+        icons.push({
+          id: `icon-${timestamp}-${lineIndex}-base2-${i}`,
+          type: "square",
+          x: Math.round((basePositions[i] * gridSize)),
+          y: Math.round(12 * gridSize), // Row 12
+          lineIndex,
+        });
+      }
+      // 4 Mid tiers evenly spaced between base groups
+      const midPositions = [5, 14, 22, 31]; // Between base clusters
+      for (let i = 0; i < 4; i++) {
+        icons.push({
+          id: `icon-${timestamp}-${lineIndex}-mid-${i}`,
+          type: "circle",
+          x: Math.round((midPositions[i] * gridSize)),
+          y: Math.round(17 * gridSize), // Row 17
+          lineIndex,
+        });
+      }
+      // 4 Top flys evenly distributed
+      const flyPositions = [5, 14, 22, 31]; // Even spacing across formation
+      for (let i = 0; i < 4; i++) {
+        icons.push({
+          id: `icon-${timestamp}-${lineIndex}-fly-${i}`,
+          type: "x",
+          x: Math.round((flyPositions[i] * gridSize)),
+          y: Math.round(22 * gridSize), // Row 22
+          lineIndex,
+        });
       }
     }
-  }, [config.category, config.length, config.bpm]);
+
+    return icons;
+  };
+
+  /**
+   * Custom collision detection function that prioritizes rectIntersection for the trash-zone,
+   * and falls back to closestCenter for the fine-grained grid cells.
+   */
+  const customCollisionDetection: CollisionDetection = (args) => {
+    // 1. Check for collisions using rectIntersection (for trash zone)
+    const rectCollisions = rectIntersection(args);
+    const trashCollision = rectCollisions.find(collision =>
+      collision.id === 'trash-zone' ||
+      (collision.data?.current?.type === 'trash-zone')
+    );
+
+    // If we have a collision with the trash zone, only return that.
+    if (trashCollision) {
+        return [trashCollision];
+    }
+
+    // 2. If not hovering over the trash zone, use closestCenter for grid snapping
+    return closestCenter(args);
+  };
+
+  // Auto-populate position icons for Team categories (only when not loaded from saved state)
+  useEffect(() => {
+    if (!hasLoadedState && (config.category === "team-16" || config.category === "team-24") && positionIcons.length === 0) {
+      const totalLines = Math.ceil((config.length * config.bpm) / 60 / 8);
+
+      const newIcons: PositionIcon[] = [];
+
+      for (let lineIndex = 0; lineIndex < totalLines; lineIndex++) {
+        newIcons.push(...generateTeamIcons(config.category, lineIndex));
+      }
+
+      setPositionIcons(newIcons);
+    }
+  }, [hasLoadedState, config.category, config.length, config.bpm, positionIcons.length]);
+
+  const handleDragMove = (event: DragMoveEvent) => {
+    const { active, delta } = event;
+    
+    if (active.data?.current?.type === "position-icon") {
+      setDragOffset({ x: delta.x, y: delta.y });
+    }
+  };
 
   const handleDragStart = (event: DragStartEvent) => {
     const skill = skills.find((s) => s.id === event.active.id);
@@ -261,7 +487,7 @@ export const RoutineBuilder = () => {
       document.body.style.overflow = 'hidden';
       return;
     }
-    
+
     if (event.active.data?.current?.type === "placed-skill") {
       setIsDraggingPlacedSkill(true);
       setDraggedPlacedSkillId(event.active.data.current.placedSkill.id);
@@ -269,10 +495,12 @@ export const RoutineBuilder = () => {
       // Prevent scrolling during drag
       document.body.style.overflow = 'hidden';
     }
-    
+
     if (event.active.data?.current?.type === "position-icon") {
       setShowGrid(true);
       setIsDraggingIcon(true);
+      setDraggedIconId(event.active.id as string);
+      setDragOffset({ x: 0, y: 0 });
     }
   };
 
@@ -282,16 +510,51 @@ export const RoutineBuilder = () => {
     setDraggedPlacedSkillId(null);
     setShowGrid(false);
     setIsDraggingIcon(false);
+    setDragOffset(null);
+    setDraggedIconId(null);
     // Re-enable scrolling
     document.body.style.overflow = '';
-    
-    const { active, over } = event;
+
+    const { active, over, delta } = event;
     if (!over) return;
 
-    if (over.id === "trash-zone") {
+    // Check for trash zone drop with more robust detection
+    if (over.id === "trash-zone" || over.id === "trash-drop-zone" || over.data?.current?.type === "trash-zone") {
       if (active.data?.current?.type === "placed-skill") {
         handleRemoveSkill(active.data.current.placedSkill.id);
+        setSelectedSkillId(null);
+      } else if (active.data?.current?.type === "position-icon") {
+        // Handle position icon deletion
+        const iconId = active.id as string;
+        handleRemovePositionIcon(iconId);
       }
+      return;
+    }
+
+    // Handle position icon dragging
+    if (active.data?.current?.type === "position-icon") {
+      const icon = positionIcons.find(i => i.id === active.id);
+      if (!icon) return;
+
+      // Handle multi-icon drag
+      const selectedIcons = positionIcons.filter(i => i.selected && i.lineIndex === selectedLine);
+      if (selectedIcons.length > 1 && selectedIcons.some(i => i.id === active.id)) {
+        // Multi-icon drag - update all selected icons and propagate if autoFollow is on
+        selectedIcons.forEach(selectedIcon => {
+          const newX = Math.max(0, selectedIcon.x + delta.x);
+          const newY = Math.max(0, selectedIcon.y + delta.y);
+          handleUpdatePositionIcon(selectedIcon.id, newX, newY, autoFollow);
+        });
+      } else {
+        // Single icon drag
+        const newX = Math.max(0, icon.x + delta.x);
+        const newY = Math.max(0, icon.y + delta.y);
+        handleUpdatePositionIcon(active.id as string, newX, newY, autoFollow);
+      }
+
+      // Save to history (if the PositionSheet component handles this, we might not need it here)
+      // The PositionSheet component handles history, so we don't need to duplicate it here
+
       return;
     }
 
@@ -338,19 +601,19 @@ export const RoutineBuilder = () => {
   const handleAddPositionIcon = (type: PositionIcon["type"]) => {
     if (selectedLine === null) return;
     
-    const gridSize = 800 / 45;
+    const gridSize = 800 / 36;
     const lineIcons = positionIcons.filter(i => i.lineIndex === selectedLine);
     const occupied = new Set(lineIcons.map(i => `${i.x},${i.y}`));
     
     let x = 100, y = 100;
-    for (let row = 0; row < 45; row++) {
-      for (let col = 0; col < 45; col++) {
+    for (let row = 0; row < 36; row++) {
+      for (let col = 0; col < 36; col++) {
         const testX = Math.round(col * gridSize);
         const testY = Math.round(row * gridSize);
         if (!occupied.has(`${testX},${testY}`)) {
           x = testX;
           y = testY;
-          row = 45;
+          row = 36;
           break;
         }
       }
@@ -370,7 +633,7 @@ export const RoutineBuilder = () => {
     const icon = positionIcons.find(i => i.id === id);
     if (!icon) return;
 
-    const gridSize = 800 / 45;
+    const gridSize = 800 / 36;
     const snappedX = Math.round(x / gridSize) * gridSize;
     const snappedY = Math.round(y / gridSize) * gridSize;
 
@@ -412,6 +675,10 @@ export const RoutineBuilder = () => {
     setPositionIcons(positionIcons.filter((icon) => icon.id !== id));
   };
 
+  const handleRemoveMultiplePositionIcons = (ids: string[]) => {
+    setPositionIcons(positionIcons.filter((icon) => !ids.includes(icon.id)));
+  };
+
   const handleNamePositionIcon = (id: string, name: string) => {
     setPositionIcons(
       positionIcons.map((icon) => (icon.id === id ? { ...icon, name } : icon))
@@ -423,7 +690,7 @@ export const RoutineBuilder = () => {
     const html2canvas = (await import("html2canvas")).default;
 
     const pdf = new jsPDF("l", "mm", "a4");
-    
+
     const countSheetElement = document.getElementById("count-sheet-table");
     if (countSheetElement) {
       const canvas = await html2canvas(countSheetElement);
@@ -448,8 +715,33 @@ export const RoutineBuilder = () => {
     pdf.save("routine.pdf");
   };
 
+  const handleReset = () => {
+    // Reset to default state
+    setPlacedSkills([]);
+    setSelectedLine(null);
+    setSelectedSkillId(null);
+
+    // For team categories, reset icons to default positions
+    if (config.category === "team-16" || config.category === "team-24") {
+      const totalLines = Math.ceil((config.length * config.bpm) / 60 / 8);
+      const resetIcons: PositionIcon[] = [];
+
+      for (let lineIndex = 0; lineIndex < totalLines; lineIndex++) {
+        resetIcons.push(...generateTeamIcons(config.category, lineIndex));
+      }
+
+      setPositionIcons(resetIcons);
+    } else {
+      // For non-team categories, clear icons (no auto-population happens)
+      setPositionIcons([]);
+    }
+
+    // Clear saved state from localStorage
+    localStorage.removeItem('routineState');
+  };
+
   return (
-    <div className="h-screen flex flex-col">
+    <div className="h-screen flex flex-col overflow-hidden">
       <header className="border-b bg-card p-2">
         <div className="flex items-center justify-between mb-2">
           <h1 className="text-xl font-bold">Cheerleading Routine Builder</h1>
@@ -466,6 +758,10 @@ export const RoutineBuilder = () => {
                 Settings
               </Button>
             </Link>
+            <Button variant="destructive" size="sm" onClick={handleReset}>
+              <RotateCcw className="h-4 w-4 mr-1" />
+              Reset
+            </Button>
             <Link to="/about">
               <Button variant="outline" size="sm">
                 <Info className="h-4 w-4 mr-1" />
@@ -537,24 +833,31 @@ export const RoutineBuilder = () => {
         </div>
       </header>
 
-      <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={customCollisionDetection}
+        onDragStart={handleDragStart}
+        onDragMove={handleDragMove}
+        onDragEnd={handleDragEnd}
+        autoScroll={false}
+      >
         <ResizablePanelGroup direction="horizontal" className="flex-1 w-full">
           <ResizablePanel defaultSize={25} minSize={10} maxSize={40} collapsible>
-            <SkillsPanel 
-              skills={skills} 
-              onAddCustomSkill={addCustomSkill} 
+            <SkillsPanel
+              skills={skills}
+              onAddCustomSkill={addCustomSkill}
               onDeleteSkill={(id) => {
                 deleteSkill(id);
                 setPlacedSkills(placedSkills.filter(ps => ps.skillId !== id));
-              }} 
+              }}
               onUpdateSkillCounts={updateSkillCounts}
               currentLevel={config.level}
               onLevelChange={(level) => setConfig({ ...config, level })}
             />
           </ResizablePanel>
-          
+
           <ResizableHandle withHandle />
-          
+
           <ResizablePanel defaultSize={75}>
             {(config.category === "team-16" || config.category === "team-24") ? (
               <ResizablePanelGroup direction="vertical" className="h-full">
@@ -570,15 +873,15 @@ export const RoutineBuilder = () => {
                     selectedSkillId={selectedSkillId}
                     onSelectSkill={setSelectedSkillId}
                     onMoveSkill={(id, newLineIndex, newStartCount) => {
-                      setPlacedSkills(placedSkills.map(ps => 
+                      setPlacedSkills(placedSkills.map(ps =>
                         ps.id === id ? { ...ps, lineIndex: newLineIndex, startCount: newStartCount } : ps
                       ));
                     }}
                   />
                 </ResizablePanel>
-                
+
                 <ResizableHandle withHandle />
-                
+
                 <ResizablePanel defaultSize={40} minSize={30}>
                   <PositionSheet
                     icons={positionIcons}
@@ -586,18 +889,21 @@ export const RoutineBuilder = () => {
                     onUpdateIcon={handleUpdatePositionIcon}
                     onAddIcon={handleAddPositionIcon}
                     onRemoveIcon={handleRemovePositionIcon}
+                    onRemoveMultipleIcons={handleRemoveMultiplePositionIcons}
                     onNameIcon={handleNamePositionIcon}
                     showGrid={showGrid}
                     autoFollow={autoFollow}
                     onToggleAutoFollow={() => setAutoFollow(!autoFollow)}
                     isDraggingIcon={isDraggingIcon}
+                    dragOffset={dragOffset}
+                    draggedIconId={draggedIconId}
                     onSelectIcon={(id) => {
-                      setPositionIcons(prev => prev.map(icon => 
+                      setPositionIcons(prev => prev.map(icon =>
                         ({ ...icon, selected: icon.id === id ? !icon.selected : false })
                       ));
                     }}
                     onSelectMultiple={(ids) => {
-                      setPositionIcons(prev => prev.map(icon => 
+                      setPositionIcons(prev => prev.map(icon =>
                         ({ ...icon, selected: ids.includes(icon.id) })
                       ));
                     }}
@@ -611,6 +917,14 @@ export const RoutineBuilder = () => {
                       if (selectedLine !== null && selectedLine > 0) {
                         setSelectedLine(selectedLine - 1);
                       }
+                    }}
+                    onIconDragStart={() => {
+                      setShowGrid(true);
+                      setIsDraggingIcon(true);
+                    }}
+                    onIconDragEnd={() => {
+                      setShowGrid(false);
+                      setIsDraggingIcon(false);
                     }}
                   />
                 </ResizablePanel>
@@ -627,7 +941,7 @@ export const RoutineBuilder = () => {
                 selectedSkillId={selectedSkillId}
                 onSelectSkill={setSelectedSkillId}
                 onMoveSkill={(id, newLineIndex, newStartCount) => {
-                  setPlacedSkills(placedSkills.map(ps => 
+                  setPlacedSkills(placedSkills.map(ps =>
                     ps.id === id ? { ...ps, lineIndex: newLineIndex, startCount: newStartCount } : ps
                   ));
                 }}
@@ -636,10 +950,10 @@ export const RoutineBuilder = () => {
           </ResizablePanel>
         </ResizablePanelGroup>
 
-        <DragOverlay>
+        <DragOverlay className="z-[3000]">
           {draggedSkill ? <SkillCard skill={draggedSkill} /> : null}
         </DragOverlay>
-        <TrashDropZone isDragging={isDraggingPlacedSkill || draggedSkill !== null || isDraggingIcon} />
+        <TrashDropZone isDragging={isDraggingPlacedSkill || draggedSkill !== null} />
       </DndContext>
     </div>
   );

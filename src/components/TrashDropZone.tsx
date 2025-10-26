@@ -9,6 +9,9 @@ interface TrashDropZoneProps {
 export const TrashDropZone = ({ isDragging }: TrashDropZoneProps) => {
   const { isOver, setNodeRef } = useDroppable({
     id: "trash-zone",
+    data: {
+      type: "trash-zone",
+    },
   });
 
   if (!isDragging) return null;
@@ -17,9 +20,9 @@ export const TrashDropZone = ({ isDragging }: TrashDropZoneProps) => {
     <div
       ref={setNodeRef}
       className={cn(
-        "fixed bottom-8 left-1/2 -translate-x-1/2 z-50 transition-all pointer-events-auto",
+        "fixed bottom-8 left-0 z-50 transition-all pointer-events-auto",
         "flex items-center justify-center",
-        "w-32 h-32 rounded-full",
+        "w-screen h-32 rounded-full",
         "border-4 border-dashed",
         isOver
           ? "bg-destructive scale-110 border-destructive shadow-lg"

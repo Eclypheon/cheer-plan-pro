@@ -13,6 +13,9 @@ interface PositionIconProps {
   icon: PositionIconType;
   onUpdate: (x: number, y: number) => void;
   onClick: () => void;
+  onRemove?: (id: string) => void;
+  dragOffset?: { x: number; y: number } | null;
+  isMultiDrag?: boolean;
 }
 
 const IconComponent = ({ type }: { type: PositionIconType["type"] }) => {
@@ -26,16 +29,23 @@ const IconComponent = ({ type }: { type: PositionIconType["type"] }) => {
   }
 };
 
-export const PositionIcon = ({ icon, onUpdate, onClick }: PositionIconProps) => {
+export const PositionIcon = ({ icon, onUpdate, onClick, onRemove, dragOffset, isMultiDrag = false }: PositionIconProps) => {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: icon.id,
     data: { type: "position-icon", icon },
   });
 
+  const enhancedListeners = listeners;
+
   const style = transform
     ? {
         left: `${icon.x + transform.x}px`,
         top: `${icon.y + transform.y}px`,
+      }
+    : dragOffset && icon.selected
+    ? {
+        left: `${icon.x + dragOffset.x}px`,
+        top: `${icon.y + dragOffset.y}px`,
       }
     : {
         left: `${icon.x}px`,
@@ -45,15 +55,16 @@ export const PositionIcon = ({ icon, onUpdate, onClick }: PositionIconProps) => 
   const iconContent = (
     <div
       ref={setNodeRef}
-      {...listeners}
+      {...enhancedListeners}
       {...attributes}
       onClick={(e) => {
         e.stopPropagation();
         onClick();
       }}
       data-position-icon
+      data-dnd-handle="position-icon-drag"
       className={cn(
-        "absolute w-8 h-8 -ml-4 -mt-4 cursor-grab active:cursor-grabbing",
+        "absolute w-8 h-8 -ml-4 -mt-4 cursor-grab active:cursor-grabbing z-[2000]",
         "flex items-center justify-center",
         "transition-colors",
         icon.selected

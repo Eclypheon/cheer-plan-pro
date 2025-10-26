@@ -1,9 +1,26 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { Skill, SkillCategory, SkillLevel } from "@/types/routine";
 import { defaultSkills } from "@/data/skillsData";
 
 export const useSkills = () => {
-  const [skills, setSkills] = useState<Skill[]>(defaultSkills);
+  const [skills, setSkills] = useState<Skill[]>(() => {
+    // Load skills from localStorage on initialization
+    const savedSkills = localStorage.getItem('skillsLibrary');
+    if (savedSkills) {
+      try {
+        return JSON.parse(savedSkills);
+      } catch (e) {
+        console.error('Failed to load skills from localStorage:', e);
+        return defaultSkills;
+      }
+    }
+    return defaultSkills;
+  });
+
+  // Auto-save skills whenever they change
+  useEffect(() => {
+    localStorage.setItem('skillsLibrary', JSON.stringify(skills));
+  }, [skills]);
 
   const addCustomSkill = (skillData: {
     name: string;
@@ -16,7 +33,7 @@ export const useSkills = () => {
       id: `custom-${Date.now()}-${Math.random()}`,
       ...skillData,
     };
-    setSkills([...skills, newSkill]);
+    setSkills(prev => [...prev, newSkill]);
   };
 
   const deleteSkill = (id: string) => {
@@ -25,6 +42,18 @@ export const useSkills = () => {
 
   const updateSkillCounts = (id: string, counts: number) => {
     setSkills(skills.map(s => s.id === id ? { ...s, counts } : s));
+  };
+
+  const updateSkillName = (id: string, name: string) => {
+    setSkills(skills.map(s => s.id === id ? { ...s, name } : s));
+  };
+
+  const updateSkillDescription = (id: string, description: string) => {
+    setSkills(skills.map(s => s.id === id ? { ...s, description } : s));
+  };
+
+  const updateSkillLevel = (id: string, level: SkillLevel) => {
+    setSkills(skills.map(s => s.id === id ? { ...s, level } : s));
   };
 
   const importFromCSV = (csvText: string) => {
@@ -69,5 +98,8 @@ export const useSkills = () => {
     addCustomSkill,
     deleteSkill,
     updateSkillCounts,
+    updateSkillName,
+    updateSkillDescription,
+    updateSkillLevel,
   };
 };

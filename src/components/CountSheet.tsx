@@ -108,22 +108,38 @@ export const CountSheet = ({
             data: { type: "placed-skill", placedSkill: sp.placedSkill },
           });
 
+          // Enhanced drag listeners to handle trash zone
+          const enhancedListeners = {
+            ...listeners,
+            onDragEnd: (event: any) => {
+              const { over } = event;
+              if (over && (over.id === "trash-zone" || over.id === "trash-drop-zone")) {
+                onRemoveSkill(sp.placedSkill.id);
+                if (onSelectSkill) onSelectSkill(null);
+              }
+              // Call original drag end handler if it exists
+              if (listeners?.onDragEnd) {
+                listeners.onDragEnd(event);
+              }
+            }
+          };
+
           const style = transform
             ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` }
             : undefined;
 
           return (
-            <div 
+            <div
               key={sp.placedSkill.id}
               ref={setNodeRef}
-              {...listeners}
+              {...enhancedListeners}
               {...attributes}
               style={style}
               onClick={(e) => {
                 e.stopPropagation();
                 onSelectSkill?.(sp.placedSkill.id);
               }}
-              className={`absolute inset-0 p-1 text-xs flex items-start gap-1 bg-primary/20 border-l-2 border-primary cursor-grab active:cursor-grabbing ${
+              className={`absolute inset-0 p-1 text-xs flex items-start gap-1 bg-primary/20 border-l-2 border-primary cursor-grab active:cursor-grabbing z-[2000] ${
                 isDragging ? "opacity-0" : ""
               } ${selectedSkillId === sp.placedSkill.id ? "ring-2 ring-accent" : ""}`}
             >
@@ -165,16 +181,16 @@ export const CountSheet = ({
   };
 
   return (
-    <div className="h-full flex flex-col bg-card overflow-hidden">
+    <div className="h-full flex flex-col bg-card relative z-10">
       <div className="p-1.5 border-b">
         <h2 className="text-sm font-semibold">Count Sheet</h2>
         <p className="text-xs text-muted-foreground">
           {totalLines} lines @ {bpm} BPM
         </p>
       </div>
-      
-      <div className="flex-1 overflow-auto">
-        <table className="w-full border-collapse" id="count-sheet-table">
+
+      <div className="flex-1 overflow-auto relative z-10">
+        <table className="w-full border-collapse relative z-10" id="count-sheet-table">
           <thead>
             <tr>
               <th className="border border-border bg-muted font-bold text-center px-2 py-1 text-xs">#</th>
