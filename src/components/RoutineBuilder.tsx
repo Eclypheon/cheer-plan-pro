@@ -472,6 +472,7 @@ export const RoutineBuilder = () => {
   }, [hasLoadedState, config.category, config.length, config.bpm, positionIcons.length]);
 
   const handleDragMove = (event: DragMoveEvent) => {
+    console.log(`Drag Move: Type='${event.active.data?.current?.type || (skills.find(s => s.id === event.active.id) ? 'new skill' : 'unknown')}', ID='${event.active.id}'`);
     const { active, delta } = event;
     
     if (active.data?.current?.type === "position-icon") {
@@ -480,6 +481,7 @@ export const RoutineBuilder = () => {
   };
 
   const handleDragStart = (event: DragStartEvent) => {
+    console.log(`Drag Start: Type='${event.active.data?.current?.type || (skills.find(s => s.id === event.active.id) ? 'new skill' : 'unknown')}', ID='${event.active.id}'`);
     const skill = skills.find((s) => s.id === event.active.id);
     if (skill) {
       setDraggedSkill(skill);
@@ -504,7 +506,16 @@ export const RoutineBuilder = () => {
     }
   };
 
-  const handleDragEnd = (event: DragEndEvent) => {
+const handleDragEnd = (event: DragEndEvent) => {
+    // Console log using state variables for accurate type reporting
+    console.log(`Drag End: Type='${isDraggingPlacedSkill ? 'placed skill' : isDraggingIcon ? 'position icon' : (skills.find(s => s.id === event.active.id) ? 'new skill' : 'unknown')}', ID='${event.active.id}', Over='${event.over?.id}', Over Data Type='${event.over?.data?.current?.type || 'N/A'}'`);
+
+    // Store state before resetting, as we need it for logic below
+    const wasDraggingPlacedSkill = isDraggingPlacedSkill;
+    const originalPlacedSkillId = draggedPlacedSkillId;
+    const wasDraggingIcon = isDraggingIcon; // Added for completeness, might be useful later
+
+    // Reset drag state immediately
     setDraggedSkill(null);
     setIsDraggingPlacedSkill(false);
     setDraggedPlacedSkillId(null);
@@ -516,22 +527,26 @@ export const RoutineBuilder = () => {
     document.body.style.overflow = '';
 
     const { active, over, delta } = event;
+    // Exit if dropped outside a droppable area
     if (!over) return;
 
-    // Check for trash zone drop with more robust detection
+    // --- Trash Zone Logic ---
+    // Check for trash zone drop with robust detection
     if (over.id === "trash-zone" || over.id === "trash-drop-zone" || over.data?.current?.type === "trash-zone") {
-      if (active.data?.current?.type === "placed-skill") {
-        handleRemoveSkill(active.data.current.placedSkill.id);
-        setSelectedSkillId(null);
-      } else if (active.data?.current?.type === "position-icon") {
+      // Use stored state to check if it was a placed skill
+      if (wasDraggingPlacedSkill && originalPlacedSkillId) {
+        handleRemoveSkill(originalPlacedSkillId);
+        setSelectedSkillId(null); // Deselect if the deleted skill was selected
+      } else if (active.data?.current?.type === "position-icon") { // Check original data for icon type
         // Handle position icon deletion
         const iconId = active.id as string;
-        handleRemovePositionIcon(iconId);
+        handleRemovePositionIcon(iconId); // Assuming you have this function
       }
-      return;
+      return; // Stop further processing after deleting
     }
 
-    // Handle position icon dragging
+    // --- Position Icon Drag Logic ---
+    // Use the original active.data.current.type for icons as overlay isn't used for them
     if (active.data?.current?.type === "position-icon") {
       const icon = positionIcons.find(i => i.id === active.id);
       if (!icon) return;
@@ -541,54 +556,54 @@ export const RoutineBuilder = () => {
       if (selectedIcons.length > 1 && selectedIcons.some(i => i.id === active.id)) {
         // Multi-icon drag - update all selected icons and propagate if autoFollow is on
         selectedIcons.forEach(selectedIcon => {
-          const newX = Math.max(0, selectedIcon.x + delta.x);
-          const newY = Math.max(0, selectedIcon.y + delta.y);
+          // Calculate new position based on delta, ensuring it stays within bounds (e.g., 0 to 800/600)
+          const newX = Math.max(0, Math.min(800, selectedIcon.x + delta.x)); // Assuming 800 width
+          const newY = Math.max(0, Math.min(600, selectedIcon.y + delta.y)); // Assuming 600 height
           handleUpdatePositionIcon(selectedIcon.id, newX, newY, autoFollow);
         });
       } else {
         // Single icon drag
-        const newX = Math.max(0, icon.x + delta.x);
-        const newY = Math.max(0, icon.y + delta.y);
+        const newX = Math.max(0, Math.min(800, icon.x + delta.x));
+        const newY = Math.max(0, Math.min(600, icon.y + delta.y));
         handleUpdatePositionIcon(active.id as string, newX, newY, autoFollow);
       }
-
-      // Save to history (if the PositionSheet component handles this, we might not need it here)
-      // The PositionSheet component handles history, so we don't need to duplicate it here
-
-      return;
+      // PositionSheet handles history, no need to add here.
+      return; // Stop further processing for icons
     }
 
-    const skill = skills.find((s) => s.id === active.id);
-    
-    if (skill && over.id.toString().startsWith("cell-")) {
-      const lineIndex = over.data?.current?.lineIndex;
-      const count = over.data?.current?.count;
-      if (typeof lineIndex === "number" && typeof count === "number") {
-        const newPlacedSkill: PlacedSkill = {
-          id: `placed-${Date.now()}-${Math.random()}`,
-          skillId: skill.id,
-          lineIndex,
-          startCount: count,
-        };
-        setPlacedSkills([...placedSkills, newPlacedSkill]);
-      }
-      return;
-    }
 
-    if (active.data?.current?.type === "placed-skill" && over.id.toString().startsWith("cell-")) {
-      const placedSkill = active.data.current.placedSkill;
-      const lineIndex = over.data?.current?.lineIndex;
-      const count = over.data?.current?.count;
-      if (typeof lineIndex === "number" && typeof count === "number") {
-        setPlacedSkills(
-          placedSkills.map((ps) =>
-            ps.id === placedSkill.id
-              ? { ...ps, lineIndex, startCount: count }
-              : ps
-          )
-        );
-      }
+    // --- Skill Drop Logic ---
+    // Check if dropping onto a valid cell
+    if (over.id.toString().startsWith("cell-")) {
+        const lineIndex = over.data?.current?.lineIndex;
+        const count = over.data?.current?.count;
+
+        if (typeof lineIndex === "number" && typeof count === "number") {
+            // Check if we *started* dragging a PLACED skill
+            if (wasDraggingPlacedSkill && originalPlacedSkillId) {
+                setPlacedSkills(
+                    (prevSkills) => prevSkills.map((ps) =>
+                        ps.id === originalPlacedSkillId // Use the ID stored from drag start
+                        ? { ...ps, lineIndex, startCount: count }
+                        : ps
+                    )
+                );
+            } else {
+                // Check if we are dropping a NEW skill from the panel
+                const skillFromPanel = skills.find((s) => s.id === active.id);
+                if (skillFromPanel) {
+                    const newPlacedSkill: PlacedSkill = {
+                        id: `placed-${Date.now()}-${Math.random()}`,
+                        skillId: skillFromPanel.id,
+                        lineIndex,
+                        startCount: count,
+                    };
+                    setPlacedSkills((prevSkills) => [...prevSkills, newPlacedSkill]);
+                }
+            }
+        }
     }
+    // No further actions if not dropped on a cell or trash
   };
 
   const handleRemoveSkill = (id: string) => {
