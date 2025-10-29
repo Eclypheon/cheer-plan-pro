@@ -436,11 +436,13 @@ export const RoutineBuilder = () => {
   };
 
   /**
-   * Custom collision detection function that prioritizes rectIntersection for the trash-zone,
-   * and falls back to closestCenter for the fine-grained grid cells.
+   * Custom collision detection function that prioritizes:
+   * 1. Trash zone collisions using rectIntersection
+   * 2. Position sheet grid when dragging position icons (uses rectIntersection)
+   * 3. Falls back to closestCenter for count sheet cells
    */
   const customCollisionDetection: CollisionDetection = (args) => {
-    // 1. Check for collisions using rectIntersection (for trash zone)
+    // 1. Check for collisions using rectIntersection (for trash zone and prioritized areas)
     const rectCollisions = rectIntersection(args);
     const trashCollision = rectCollisions.find(collision =>
       collision.id === 'trash-zone' ||
@@ -452,7 +454,19 @@ export const RoutineBuilder = () => {
         return [trashCollision];
     }
 
-    // 2. If not hovering over the trash zone, use closestCenter for grid snapping
+    // 2. When dragging position icons, prioritize the position sheet grid
+    if (args.active.data?.current?.type === "position-icon") {
+      const positionSheetGridCollision = rectCollisions.find(collision =>
+        collision.id === 'position-sheet-grid'
+      );
+
+      // If dragging a position icon over the position sheet grid, prioritize it
+      if (positionSheetGridCollision) {
+        return [positionSheetGridCollision];
+      }
+    }
+
+    // 3. Fall back to closestCenter for count sheet cells and other scenarios
     return closestCenter(args);
   };
 
@@ -569,6 +583,47 @@ const handleDragEnd = (event: DragEndEvent) => {
       }
       // PositionSheet handles history, no need to add here.
       return; // Stop further processing for icons
+    }
+
+    // --- Position Sheet Grid Drop Logic ---
+    // Handle dropping items onto the position sheet grid
+    if (over.id === "position-sheet-grid" && over.rect) {
+      const positionSheetElement = document.getElementById("position-sheet");
+      if (positionSheetElement) {
+        const rect = positionSheetElement.getBoundingClientRect();
+        // Calculate coordinates relative to the position sheet grid area
+        // The position sheet has padding and the grid area is offset by p-1.5 (6px on each side)
+        const offsetX = delta.x + (active.rect?.current?.initial?.width || 0) / 2;
+        const offsetY = delta.y + (active.rect?.current?.initial?.height || 0) / 2;
+
+        // Ensure coordinates are within grid bounds (0-800, 0-600)
+        const dropX = Math.max(0, Math.min(800, offsetX));
+        const dropY = Math.max(0, Math.min(600, offsetY));
+
+        if (active.data?.current?.type === "position-icon") {
+          // Moving existing position icon
+          const iconId = active.id as string;
+          handleUpdatePositionIcon(iconId, dropX, dropY, autoFollow);
+        } else if (active.data?.current && !active.data.current.type) {
+          // Dropping a new position icon from somewhere else (could be from a tool button or other source)
+          // For now, we'll create a default type, but this could be enhanced to handle different drop sources
+          const newIcon: PositionIcon = {
+            id: `icon-${Date.now()}-${Math.random()}`,
+            type: "square", // Default type
+            x: dropX,
+            y: dropY,
+            lineIndex: selectedLine || 0,
+          };
+          // Add the icon using the existing handler
+          const tempIcons = [...positionIcons, newIcon];
+          setPositionIcons(tempIcons);
+          // Mark the new icon as selected
+          setPositionIcons(prev => prev.map(icon =>
+            icon.id === newIcon.id ? { ...icon, selected: true } : { ...icon, selected: false }
+          ));
+        }
+      }
+      return; // Stop further processing
     }
 
 

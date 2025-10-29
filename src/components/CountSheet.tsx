@@ -181,7 +181,7 @@ export const CountSheet = ({
   };
 
   return (
-    <div className="h-full flex flex-col bg-card relative z-10">
+    <div className="h-full flex flex-col bg-card relative z-10 overflow-hidden">
       <div className="p-1.5 border-b">
         <h2 className="text-sm font-semibold">Count Sheet</h2>
         <p className="text-xs text-muted-foreground">
@@ -189,7 +189,7 @@ export const CountSheet = ({
         </p>
       </div>
 
-      <div className="flex-1 overflow-auto relative z-10">
+      <div className="flex-1 overflow-auto relative">
         <table className="w-full border-collapse relative z-10" id="count-sheet-table">
           <thead>
             <tr>
