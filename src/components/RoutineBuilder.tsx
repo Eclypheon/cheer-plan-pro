@@ -458,9 +458,11 @@ export const RoutineBuilder = () => {
 
   /**
    * Helper functions for category-based state management
+   * Category states are now scoped per save state to avoid conflicts
    */
   const saveCategoryState = (category: RoutineConfig['category']) => {
-    const key = `category-${category}`;
+    if (!loadedSaveStateSlot) return; // Shouldn't happen, but safety check
+    const key = `category-${loadedSaveStateSlot}-${category}`;
     const data: CategoryStateData = {
       placedSkills: [...placedSkills],
       positionIcons: [...positionIcons],
@@ -470,7 +472,8 @@ export const RoutineBuilder = () => {
   };
 
   const loadCategoryState = (category: RoutineConfig['category']): CategoryStateData | null => {
-    const key = `category-${category}`;
+    if (!loadedSaveStateSlot) return null; // Shouldn't happen, but safety check
+    const key = `category-${loadedSaveStateSlot}-${category}`;
     const saved = localStorage.getItem(key);
     return saved ? JSON.parse(saved) : null;
   };
@@ -491,7 +494,9 @@ export const RoutineBuilder = () => {
   const loadFromSlot = (slotNumber: 1 | 2 | 3) => {
     const key = `save-state-${slotNumber}`;
     const saved = localStorage.getItem(key);
+
     if (saved) {
+      // Load existing saved data
       const data: SaveStateData = JSON.parse(saved);
       setPlacedSkills(data.placedSkills);
       setPositionIcons(data.positionIcons);
@@ -499,6 +504,38 @@ export const RoutineBuilder = () => {
       setCurrentSaveState(data);
       setLoadedSaveStateSlot(slotNumber);
       initialLoadedCategoryRef.current = data.config.category;
+    } else {
+      // Create default state for new slot
+      const defaultPlacedSkills: PlacedSkill[] = [];
+
+      let defaultPositionIcons: PositionIcon[] = [];
+      if (config.category === "team-16" || config.category === "team-24") {
+        // Generate default team icons
+        const totalLines = Math.ceil((config.length * config.bpm) / 60 / 8);
+        for (let lineIndex = 0; lineIndex < totalLines; lineIndex++) {
+          defaultPositionIcons.push(...generateTeamIcons(config.category, lineIndex));
+        }
+      }
+      // For individual categories, positionIcons remains empty
+
+      // Create default save state data
+      const defaultData: SaveStateData = {
+        placedSkills: defaultPlacedSkills,
+        positionIcons: defaultPositionIcons,
+        config: { ...config },
+        timestamp: Date.now()
+      };
+
+      // Apply the default state
+      setPlacedSkills(defaultPlacedSkills);
+      setPositionIcons(defaultPositionIcons);
+      // Keep current config
+
+      // Save as the initial state for this slot
+      localStorage.setItem(key, JSON.stringify(defaultData));
+      setCurrentSaveState(defaultData);
+      setLoadedSaveStateSlot(slotNumber);
+      initialLoadedCategoryRef.current = config.category;
     }
   };
 
