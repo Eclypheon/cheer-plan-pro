@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
   import { DndContext, DragEndEvent, DragOverlay, useSensor, useSensors, PointerSensor, DragStartEvent, DragMoveEvent, CollisionDetection, rectIntersection, closestCenter } from "@dnd-kit/core";
-import type { PlacedSkill, RoutineConfig, Skill, PositionIcon } from "@/types/routine";
+import type { PlacedSkill, RoutineConfig, Skill, PositionIcon, CategoryStateData, SaveStateData } from "@/types/routine";
 import { useSkills } from "@/hooks/useSkills";
 import { SkillsPanel } from "./SkillsPanel";
 import { CountSheet } from "./CountSheet";
@@ -40,6 +40,8 @@ export const RoutineBuilder = () => {
   const [draggedIconId, setDraggedIconId] = useState<string | null>(null);
   const [hasLoadedState, setHasLoadedState] = useState(false);
   const initialLoadedCategoryRef = useRef<string | null>(null);
+  const [currentSaveState, setCurrentSaveState] = useState<SaveStateData | null>(null);
+  const [loadedSaveStateSlot, setLoadedSaveStateSlot] = useState<null | 1 | 2 | 3>(null);
 
   // Load keyboard settings
   const [keyboardSettings] = useState(() => {
@@ -62,62 +64,81 @@ export const RoutineBuilder = () => {
     };
   });
 
-  // Load saved state on component mount
+  // Load saved state on component mount - auto-load State 1 if available
   useEffect(() => {
-    const savedState = localStorage.getItem('routineState');
-    if (savedState) {
+    const state1Key = 'save-state-1';
+    const savedState1 = localStorage.getItem(state1Key);
+    if (savedState1) {
       try {
-        const { placedSkills: savedPlacedSkills, positionIcons: savedPositionIcons, config: savedConfig } = JSON.parse(savedState);
-        if (savedPlacedSkills) setPlacedSkills(savedPlacedSkills);
-        if (savedPositionIcons) setPositionIcons(savedPositionIcons);
-        if (savedConfig) {
-          setConfig(savedConfig);
-          // Store the initially loaded category so we know when user manually changes it
-          initialLoadedCategoryRef.current = savedConfig.category;
-        }
+        const data: SaveStateData = JSON.parse(savedState1);
+        setPlacedSkills(data.placedSkills);
+        setPositionIcons(data.positionIcons);
+        setConfig(data.config);
+        setCurrentSaveState(data);
+        setLoadedSaveStateSlot(1);
+        // Store the initially loaded category so we know when user manually changes it
+        initialLoadedCategoryRef.current = data.config.category;
       } catch (e) {
-        console.error('Failed to load saved state:', e);
+        console.error('Failed to load State 1:', e);
       }
+    } else {
+      // No State 1 exists - start fresh but default to State 1
+      setLoadedSaveStateSlot(1);
     }
-    // Mark that we've attempted to load saved state (even if none existed)
+    // Mark that we've attempted to load saved state
     setHasLoadedState(true);
   }, []);
 
-  // Handle category changes - clear and repopulate icons for team categories (only for user-initiated changes)
+  // Handle category changes - auto-save/load category states
   useEffect(() => {
     // Only handle category changes after initial load
     if (!hasLoadedState) return;
 
-    // Only clear and repopulate if this is different from the initially loaded category
-    // This prevents clearing loaded saved state
+    // Save current category state before switching (only for user-initiated changes)
     if (initialLoadedCategoryRef.current !== null && initialLoadedCategoryRef.current !== config.category) {
+      saveCategoryState(initialLoadedCategoryRef.current as RoutineConfig['category']);
+    }
+
+    // Load saved state for new category if it exists
+    const savedCategoryData = loadCategoryState(config.category);
+    if (savedCategoryData) {
+      setPlacedSkills(savedCategoryData.placedSkills);
+      setPositionIcons(savedCategoryData.positionIcons);
+    } else {
+      // No saved state - create default state for category
+      setPlacedSkills([]);
       if (config.category === "team-16" || config.category === "team-24") {
-        // Clear existing icons and populate with default team icons
+        // Generate default team icons
         const totalLines = Math.ceil((config.length * config.bpm) / 60 / 8);
         const newIcons: PositionIcon[] = [];
-
         for (let lineIndex = 0; lineIndex < totalLines; lineIndex++) {
           newIcons.push(...generateTeamIcons(config.category, lineIndex));
         }
-
         setPositionIcons(newIcons);
       } else {
-        // For non-team categories, clear icons (no auto-population)
+        // For individual categories, start with empty position sheet
         setPositionIcons([]);
       }
     }
+
+    // Update the reference
+    initialLoadedCategoryRef.current = config.category;
   }, [config.category, config.length, config.bpm, hasLoadedState]);
 
-  // Save state whenever it changes
+  // Auto-save to current slot whenever state changes
   useEffect(() => {
-    const stateToSave = {
-      placedSkills,
-      positionIcons,
-      config,
-      timestamp: Date.now()
-    };
-    localStorage.setItem('routineState', JSON.stringify(stateToSave));
-  }, [placedSkills, positionIcons, config]);
+    if (loadedSaveStateSlot) {
+      const key = `save-state-${loadedSaveStateSlot}`;
+      const data: SaveStateData = {
+        placedSkills: [...placedSkills],
+        positionIcons: [...positionIcons],
+        config: { ...config },
+        timestamp: Date.now()
+      };
+      localStorage.setItem(key, JSON.stringify(data));
+      setCurrentSaveState(data);
+    }
+  }, [placedSkills, positionIcons, config, loadedSaveStateSlot]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -433,6 +454,52 @@ export const RoutineBuilder = () => {
     }
 
     return icons;
+  };
+
+  /**
+   * Helper functions for category-based state management
+   */
+  const saveCategoryState = (category: RoutineConfig['category']) => {
+    const key = `category-${category}`;
+    const data: CategoryStateData = {
+      placedSkills: [...placedSkills],
+      positionIcons: [...positionIcons],
+      timestamp: Date.now()
+    };
+    localStorage.setItem(key, JSON.stringify(data));
+  };
+
+  const loadCategoryState = (category: RoutineConfig['category']): CategoryStateData | null => {
+    const key = `category-${category}`;
+    const saved = localStorage.getItem(key);
+    return saved ? JSON.parse(saved) : null;
+  };
+
+  const saveToSlot = (slotNumber: 1 | 2 | 3) => {
+    const key = `save-state-${slotNumber}`;
+    const data: SaveStateData = {
+      placedSkills: [...placedSkills],
+      positionIcons: [...positionIcons],
+      config: { ...config },
+      timestamp: Date.now()
+    };
+    localStorage.setItem(key, JSON.stringify(data));
+    setCurrentSaveState(data);
+    setLoadedSaveStateSlot(slotNumber);
+  };
+
+  const loadFromSlot = (slotNumber: 1 | 2 | 3) => {
+    const key = `save-state-${slotNumber}`;
+    const saved = localStorage.getItem(key);
+    if (saved) {
+      const data: SaveStateData = JSON.parse(saved);
+      setPlacedSkills(data.placedSkills);
+      setPositionIcons(data.positionIcons);
+      setConfig(data.config);
+      setCurrentSaveState(data);
+      setLoadedSaveStateSlot(slotNumber);
+      initialLoadedCategoryRef.current = data.config.category;
+    }
   };
 
   /**
@@ -806,8 +873,8 @@ const handleDragEnd = (event: DragEndEvent) => {
       setPositionIcons([]);
     }
 
-    // Clear saved state from localStorage
-    localStorage.removeItem('routineState');
+    // Don't clear auto-saved states - reset is just for clearing current work
+    // The current state will auto-save as empty if the auto-save effect runs again
   };
 
   return (
@@ -897,6 +964,54 @@ const handleDragEnd = (event: DragEndEvent) => {
                 <SelectItem value="group-stunts">Group Stunts</SelectItem>
                 <SelectItem value="team-16">Team (16)</SelectItem>
                 <SelectItem value="team-24">Team (24)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex items-center gap-1">
+            <Label className="text-xs">Save State:</Label>
+            <Select
+              value={loadedSaveStateSlot?.toString() || "1"}
+              onValueChange={(slot) => {
+                const newSlot = parseInt(slot) as 1 | 2 | 3;
+                // Auto-save current state before switching to new slot
+                if (loadedSaveStateSlot) {
+                  const key = `save-state-${loadedSaveStateSlot}`;
+                  const data: SaveStateData = {
+                    placedSkills: [...placedSkills],
+                    positionIcons: [...positionIcons],
+                    config: { ...config },
+                    timestamp: Date.now()
+                  };
+                  localStorage.setItem(key, JSON.stringify(data));
+                }
+                // Load the new slot
+                loadFromSlot(newSlot);
+              }}
+            >
+              <SelectTrigger className="w-60 h-8">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {([1, 2, 3] as const).map(slot => {
+                  const key = `save-state-${slot}`;
+                  const saved = localStorage.getItem(key);
+                  let label = `State ${slot}`;
+                  if (saved) {
+                    try {
+                      const data = JSON.parse(saved) as SaveStateData;
+                      const category = data.config.category.replace('-', ' ').toUpperCase();
+                      label += ` (${category})`;
+                    } catch (e) {
+                      // Keep default label if parsing fails
+                    }
+                  }
+                  return (
+                    <SelectItem key={slot} value={slot.toString()}>
+                      {label}
+                    </SelectItem>
+                  );
+                })}
               </SelectContent>
             </Select>
           </div>
