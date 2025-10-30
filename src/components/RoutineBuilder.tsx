@@ -137,8 +137,13 @@ export const RoutineBuilder = () => {
       };
       localStorage.setItem(key, JSON.stringify(data));
       setCurrentSaveState(data);
+
+      // Also save to current category state if we have loaded state
+      if (hasLoadedState) {
+        saveCategoryState(config.category);
+      }
     }
-  }, [placedSkills, positionIcons, config, loadedSaveStateSlot]);
+  }, [placedSkills, positionIcons, config, loadedSaveStateSlot, hasLoadedState]);
 
   // Keyboard shortcuts
   useEffect(() => {
