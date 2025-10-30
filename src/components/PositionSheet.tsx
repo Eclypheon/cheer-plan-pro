@@ -257,7 +257,7 @@ return (
         </div>
       </div>
 
-      <div className="flex-1 p-1.5 overflow-auto">
+      <div className="flex-1 p-1.5 flex justify-center overflow-auto">
         <div
           ref={(node) => {
             sheetRef.current = node;
