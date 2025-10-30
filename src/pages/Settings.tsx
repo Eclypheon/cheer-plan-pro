@@ -80,14 +80,14 @@ export default function Settings() {
               <h2 className="text-lg font-semibold mb-3">Position Sheet Controls</h2>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label>Undo (Ctrl +)</Label>
+                  <Label>Undo (Z)</Label>
                   <Input
                     value={settings.undo}
                     onChange={(e) => setSettings({ ...settings, undo: e.target.value })}
                   />
                 </div>
                 <div>
-                  <Label>Redo (Ctrl +)</Label>
+                  <Label>Redo (Y)</Label>
                   <Input
                     value={settings.redo}
                     onChange={(e) => setSettings({ ...settings, redo: e.target.value })}

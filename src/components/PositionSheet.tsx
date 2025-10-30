@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import React, { useState, useRef } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import type { PositionIcon } from "@/types/routine";
 import { Card } from "@/components/ui/card";
@@ -15,6 +15,10 @@ interface PositionSheetProps {
   onRemoveIcon: (id: string) => void;
   onRemoveMultipleIcons?: (ids: string[]) => void;
   onNameIcon: (id: string, name: string) => void;
+  onRestoreLineState?: (lineIndex: number, icons: PositionIcon[]) => void;
+  lineHistories: { [lineIndex: number]: { history: PositionIcon[][], index: number } };
+  onUndoLine?: (lineIndex: number) => void;
+  onRedoLine?: (lineIndex: number) => void;
   showGrid?: boolean;
   autoFollow?: boolean;
   onToggleAutoFollow?: () => void;
@@ -37,6 +41,10 @@ export const PositionSheet = ({
   onRemoveIcon,
   onRemoveMultipleIcons,
   onNameIcon,
+  onRestoreLineState,
+  lineHistories,
+  onUndoLine,
+  onRedoLine,
   showGrid = false,
   autoFollow = true,
   onToggleAutoFollow,
@@ -50,8 +58,6 @@ export const PositionSheet = ({
   onIconDragStart,
   onIconDragEnd,
 }: PositionSheetProps) => {
-  const [history, setHistory] = useState<{ icons: PositionIcon[], lineIndex: number }[]>([]);
-  const [historyIndex, setHistoryIndex] = useState(-1);
   const [selectedIconId, setSelectedIconId] = useState<string | null>(null);
   const [nameDialogOpen, setNameDialogOpen] = useState(false);
   const [clickCount, setClickCount] = useState(0);
@@ -107,44 +113,14 @@ export const PositionSheet = ({
   };
 
   const handleUndo = () => {
-    if (historyIndex > 0) {
-      const prevState = history[historyIndex - 1];
-      if (prevState && prevState.lineIndex === selectedLine) {
-        // Restore only icons for the current line
-        const otherLineIcons = icons.filter(i => i.lineIndex !== selectedLine);
-        const restoredLineIcons = prevState.icons.filter(i => i.lineIndex === selectedLine);
-
-        // Remove current line icons first
-        const currentLineIconIds = icons.filter(i => i.lineIndex === selectedLine).map(i => i.id);
-        currentLineIconIds.forEach(id => onRemoveIcon(id));
-
-        // Add restored icons
-        restoredLineIcons.forEach(icon => {
-          onUpdateIcon(icon.id, icon.x, icon.y, false);
-        });
-
-        setHistoryIndex(historyIndex - 1);
-      }
+    if (selectedLine !== null && onUndoLine) {
+      onUndoLine(selectedLine);
     }
   };
 
   const handleRedo = () => {
-    if (historyIndex < history.length - 1) {
-      const nextState = history[historyIndex + 1];
-      if (nextState && nextState.lineIndex === selectedLine) {
-        // Restore only icons for the current line
-        const currentLineIconIds = icons.filter(i => i.lineIndex === selectedLine).map(i => i.id);
-        // Remove current line icons first
-        currentLineIconIds.forEach(id => onRemoveIcon(id));
-
-        // Add restored icons
-        const restoredLineIcons = nextState.icons.filter(i => i.lineIndex === selectedLine);
-        restoredLineIcons.forEach(icon => {
-          onUpdateIcon(icon.id, icon.x, icon.y, false);
-        });
-
-        setHistoryIndex(historyIndex + 1);
-      }
+    if (selectedLine !== null && onRedoLine) {
+      onRedoLine(selectedLine);
     }
   };
 
@@ -235,7 +211,13 @@ return (
             >
               {autoFollow ? <ToggleRight className="h-3 w-3" /> : <ToggleLeft className="h-3 w-3" />}
             </Button>
-            <Button size="sm" variant="outline" className="h-6 px-1" onClick={handleUndo} disabled={historyIndex <= 0}>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-6 px-1"
+              onClick={handleUndo}
+              disabled={selectedLine === null || !lineHistories[selectedLine] || lineHistories[selectedLine].index <= 0}
+            >
               <Undo className="h-3 w-3" />
             </Button>
             <Button
@@ -243,7 +225,11 @@ return (
               variant="outline"
               className="h-6 px-1"
               onClick={handleRedo}
-              disabled={historyIndex >= history.length - 1}
+              disabled={
+                selectedLine === null ||
+                !lineHistories[selectedLine] ||
+                lineHistories[selectedLine].index >= lineHistories[selectedLine].history.length - 1
+              }
             >
               <Redo className="h-3 w-3" />
             </Button>
@@ -271,7 +257,7 @@ return (
         </div>
       </div>
 
-      <div className="flex-1 p-1.5 flex items-center justify-center overflow-auto">
+      <div className="flex-1 p-1.5 overflow-auto">
         <div
           ref={(node) => {
             sheetRef.current = node;
