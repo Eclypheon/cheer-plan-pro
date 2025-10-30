@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { useDroppable } from "@dnd-kit/core";
 import type { PositionIcon } from "@/types/routine";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -59,6 +60,12 @@ export const PositionSheet = ({
   const [selectionEnd, setSelectionEnd] = useState<{ x: number; y: number } | null>(null);
   const [isDraggingSelection, setIsDraggingSelection] = useState(false);
   const sheetRef = useRef<HTMLDivElement>(null);
+
+  // Set up droppable area for the position sheet grid
+  const { setNodeRef, isOver } = useDroppable({
+    id: "position-sheet-grid",
+    data: { type: "position-sheet-grid" },
+  });
 
   const handleSelectionMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement;
@@ -266,8 +273,13 @@ return (
 
       <div className="flex-1 p-1.5 flex items-center justify-center overflow-auto">
         <div
-          ref={sheetRef}
-          className="sheet-background relative bg-background border border-border rounded"
+          ref={(node) => {
+            sheetRef.current = node;
+            setNodeRef(node);
+          }}
+          className={`sheet-background relative bg-background border border-border rounded ${
+            isOver ? "bg-accent/10" : ""
+          }`}
           style={{ width: '800px', height: '600px', flexShrink: 0 }}
           onMouseDown={handleSelectionMouseDown}
           onMouseMove={handleSelectionMouseMove}
