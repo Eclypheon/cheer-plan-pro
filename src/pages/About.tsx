@@ -80,6 +80,7 @@ const About = () => {
               <li>Use the auto-follow toggle in position sheets to maintain consistent positioning across lines</li>
               <li>Undo/Redo buttons help you recover from mistakes in position mapping</li>
               <li>Edit counts directly in the skills library for quick adjustments</li>
+              <li>Use <kbd className="px-1 py-0.5 bg-muted rounded text-sm">Shift</kbd> + arrow keys to move a selected skill and all skills after it together</li>
             </ul>
           </section>
         </Card>
