@@ -77,3 +77,16 @@ export interface RoutineConfig {
   level: SkillLevel;
   bpm: number;
 }
+
+export interface CategoryStateData {
+  placedSkills: PlacedSkill[];
+  positionIcons: PositionIcon[];
+  timestamp: number;
+}
+
+export interface SaveStateData {
+  placedSkills: PlacedSkill[];
+  positionIcons: PositionIcon[];
+  config: RoutineConfig;
+  timestamp: number;
+}

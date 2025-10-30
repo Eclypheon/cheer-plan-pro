@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
   import { DndContext, DragEndEvent, DragOverlay, useSensor, useSensors, PointerSensor, DragStartEvent, DragMoveEvent, CollisionDetection, rectIntersection, closestCenter } from "@dnd-kit/core";
-import type { PlacedSkill, RoutineConfig, Skill, PositionIcon } from "@/types/routine";
+import type { PlacedSkill, RoutineConfig, Skill, PositionIcon, CategoryStateData, SaveStateData } from "@/types/routine";
 import { useSkills } from "@/hooks/useSkills";
 import { SkillsPanel } from "./SkillsPanel";
 import { CountSheet } from "./CountSheet";
@@ -40,6 +40,8 @@ export const RoutineBuilder = () => {
   const [draggedIconId, setDraggedIconId] = useState<string | null>(null);
   const [hasLoadedState, setHasLoadedState] = useState(false);
   const initialLoadedCategoryRef = useRef<string | null>(null);
+  const [currentSaveState, setCurrentSaveState] = useState<SaveStateData | null>(null);
+  const [loadedSaveStateSlot, setLoadedSaveStateSlot] = useState<null | 1 | 2 | 3>(null);
 
   // Load keyboard settings
   const [keyboardSettings] = useState(() => {
@@ -62,62 +64,81 @@ export const RoutineBuilder = () => {
     };
   });
 
-  // Load saved state on component mount
+  // Load saved state on component mount - auto-load State 1 if available
   useEffect(() => {
-    const savedState = localStorage.getItem('routineState');
-    if (savedState) {
+    const state1Key = 'save-state-1';
+    const savedState1 = localStorage.getItem(state1Key);
+    if (savedState1) {
       try {
-        const { placedSkills: savedPlacedSkills, positionIcons: savedPositionIcons, config: savedConfig } = JSON.parse(savedState);
-        if (savedPlacedSkills) setPlacedSkills(savedPlacedSkills);
-        if (savedPositionIcons) setPositionIcons(savedPositionIcons);
-        if (savedConfig) {
-          setConfig(savedConfig);
-          // Store the initially loaded category so we know when user manually changes it
-          initialLoadedCategoryRef.current = savedConfig.category;
-        }
+        const data: SaveStateData = JSON.parse(savedState1);
+        setPlacedSkills(data.placedSkills);
+        setPositionIcons(data.positionIcons);
+        setConfig(data.config);
+        setCurrentSaveState(data);
+        setLoadedSaveStateSlot(1);
+        // Store the initially loaded category so we know when user manually changes it
+        initialLoadedCategoryRef.current = data.config.category;
       } catch (e) {
-        console.error('Failed to load saved state:', e);
+        console.error('Failed to load State 1:', e);
       }
+    } else {
+      // No State 1 exists - start fresh but default to State 1
+      setLoadedSaveStateSlot(1);
     }
-    // Mark that we've attempted to load saved state (even if none existed)
+    // Mark that we've attempted to load saved state
     setHasLoadedState(true);
   }, []);
 
-  // Handle category changes - clear and repopulate icons for team categories (only for user-initiated changes)
+  // Handle category changes - auto-save/load category states
   useEffect(() => {
     // Only handle category changes after initial load
     if (!hasLoadedState) return;
 
-    // Only clear and repopulate if this is different from the initially loaded category
-    // This prevents clearing loaded saved state
+    // Save current category state before switching (only for user-initiated changes)
     if (initialLoadedCategoryRef.current !== null && initialLoadedCategoryRef.current !== config.category) {
+      saveCategoryState(initialLoadedCategoryRef.current as RoutineConfig['category']);
+    }
+
+    // Load saved state for new category if it exists
+    const savedCategoryData = loadCategoryState(config.category);
+    if (savedCategoryData) {
+      setPlacedSkills(savedCategoryData.placedSkills);
+      setPositionIcons(savedCategoryData.positionIcons);
+    } else {
+      // No saved state - create default state for category
+      setPlacedSkills([]);
       if (config.category === "team-16" || config.category === "team-24") {
-        // Clear existing icons and populate with default team icons
+        // Generate default team icons
         const totalLines = Math.ceil((config.length * config.bpm) / 60 / 8);
         const newIcons: PositionIcon[] = [];
-
         for (let lineIndex = 0; lineIndex < totalLines; lineIndex++) {
           newIcons.push(...generateTeamIcons(config.category, lineIndex));
         }
-
         setPositionIcons(newIcons);
       } else {
-        // For non-team categories, clear icons (no auto-population)
+        // For individual categories, start with empty position sheet
         setPositionIcons([]);
       }
     }
+
+    // Update the reference
+    initialLoadedCategoryRef.current = config.category;
   }, [config.category, config.length, config.bpm, hasLoadedState]);
 
-  // Save state whenever it changes
+  // Auto-save to current slot whenever state changes
   useEffect(() => {
-    const stateToSave = {
-      placedSkills,
-      positionIcons,
-      config,
-      timestamp: Date.now()
-    };
-    localStorage.setItem('routineState', JSON.stringify(stateToSave));
-  }, [placedSkills, positionIcons, config]);
+    if (loadedSaveStateSlot) {
+      const key = `save-state-${loadedSaveStateSlot}`;
+      const data: SaveStateData = {
+        placedSkills: [...placedSkills],
+        positionIcons: [...positionIcons],
+        config: { ...config },
+        timestamp: Date.now()
+      };
+      localStorage.setItem(key, JSON.stringify(data));
+      setCurrentSaveState(data);
+    }
+  }, [placedSkills, positionIcons, config, loadedSaveStateSlot]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -436,11 +457,96 @@ export const RoutineBuilder = () => {
   };
 
   /**
-   * Custom collision detection function that prioritizes rectIntersection for the trash-zone,
-   * and falls back to closestCenter for the fine-grained grid cells.
+   * Helper functions for category-based state management
+   * Category states are now scoped per save state to avoid conflicts
+   */
+  const saveCategoryState = (category: RoutineConfig['category']) => {
+    if (!loadedSaveStateSlot) return; // Shouldn't happen, but safety check
+    const key = `category-${loadedSaveStateSlot}-${category}`;
+    const data: CategoryStateData = {
+      placedSkills: [...placedSkills],
+      positionIcons: [...positionIcons],
+      timestamp: Date.now()
+    };
+    localStorage.setItem(key, JSON.stringify(data));
+  };
+
+  const loadCategoryState = (category: RoutineConfig['category']): CategoryStateData | null => {
+    if (!loadedSaveStateSlot) return null; // Shouldn't happen, but safety check
+    const key = `category-${loadedSaveStateSlot}-${category}`;
+    const saved = localStorage.getItem(key);
+    return saved ? JSON.parse(saved) : null;
+  };
+
+  const saveToSlot = (slotNumber: 1 | 2 | 3) => {
+    const key = `save-state-${slotNumber}`;
+    const data: SaveStateData = {
+      placedSkills: [...placedSkills],
+      positionIcons: [...positionIcons],
+      config: { ...config },
+      timestamp: Date.now()
+    };
+    localStorage.setItem(key, JSON.stringify(data));
+    setCurrentSaveState(data);
+    setLoadedSaveStateSlot(slotNumber);
+  };
+
+  const loadFromSlot = (slotNumber: 1 | 2 | 3) => {
+    const key = `save-state-${slotNumber}`;
+    const saved = localStorage.getItem(key);
+
+    if (saved) {
+      // Load existing saved data
+      const data: SaveStateData = JSON.parse(saved);
+      setPlacedSkills(data.placedSkills);
+      setPositionIcons(data.positionIcons);
+      setConfig(data.config);
+      setCurrentSaveState(data);
+      setLoadedSaveStateSlot(slotNumber);
+      initialLoadedCategoryRef.current = data.config.category;
+    } else {
+      // Create default state for new slot
+      const defaultPlacedSkills: PlacedSkill[] = [];
+
+      let defaultPositionIcons: PositionIcon[] = [];
+      if (config.category === "team-16" || config.category === "team-24") {
+        // Generate default team icons
+        const totalLines = Math.ceil((config.length * config.bpm) / 60 / 8);
+        for (let lineIndex = 0; lineIndex < totalLines; lineIndex++) {
+          defaultPositionIcons.push(...generateTeamIcons(config.category, lineIndex));
+        }
+      }
+      // For individual categories, positionIcons remains empty
+
+      // Create default save state data
+      const defaultData: SaveStateData = {
+        placedSkills: defaultPlacedSkills,
+        positionIcons: defaultPositionIcons,
+        config: { ...config },
+        timestamp: Date.now()
+      };
+
+      // Apply the default state
+      setPlacedSkills(defaultPlacedSkills);
+      setPositionIcons(defaultPositionIcons);
+      // Keep current config
+
+      // Save as the initial state for this slot
+      localStorage.setItem(key, JSON.stringify(defaultData));
+      setCurrentSaveState(defaultData);
+      setLoadedSaveStateSlot(slotNumber);
+      initialLoadedCategoryRef.current = config.category;
+    }
+  };
+
+  /**
+   * Custom collision detection function that prioritizes:
+   * 1. Trash zone collisions using rectIntersection
+   * 2. Position sheet grid when dragging position icons (uses rectIntersection)
+   * 3. Falls back to closestCenter for count sheet cells
    */
   const customCollisionDetection: CollisionDetection = (args) => {
-    // 1. Check for collisions using rectIntersection (for trash zone)
+    // 1. Check for collisions using rectIntersection (for trash zone and prioritized areas)
     const rectCollisions = rectIntersection(args);
     const trashCollision = rectCollisions.find(collision =>
       collision.id === 'trash-zone' ||
@@ -452,7 +558,19 @@ export const RoutineBuilder = () => {
         return [trashCollision];
     }
 
-    // 2. If not hovering over the trash zone, use closestCenter for grid snapping
+    // 2. When dragging position icons, prioritize the position sheet grid
+    if (args.active.data?.current?.type === "position-icon") {
+      const positionSheetGridCollision = rectCollisions.find(collision =>
+        collision.id === 'position-sheet-grid'
+      );
+
+      // If dragging a position icon over the position sheet grid, prioritize it
+      if (positionSheetGridCollision) {
+        return [positionSheetGridCollision];
+      }
+    }
+
+    // 3. Fall back to closestCenter for count sheet cells and other scenarios
     return closestCenter(args);
   };
 
@@ -472,6 +590,7 @@ export const RoutineBuilder = () => {
   }, [hasLoadedState, config.category, config.length, config.bpm, positionIcons.length]);
 
   const handleDragMove = (event: DragMoveEvent) => {
+    console.log(`Drag Move: Type='${event.active.data?.current?.type || (skills.find(s => s.id === event.active.id) ? 'new skill' : 'unknown')}', ID='${event.active.id}'`);
     const { active, delta } = event;
     
     if (active.data?.current?.type === "position-icon") {
@@ -480,6 +599,7 @@ export const RoutineBuilder = () => {
   };
 
   const handleDragStart = (event: DragStartEvent) => {
+    console.log(`Drag Start: Type='${event.active.data?.current?.type || (skills.find(s => s.id === event.active.id) ? 'new skill' : 'unknown')}', ID='${event.active.id}'`);
     const skill = skills.find((s) => s.id === event.active.id);
     if (skill) {
       setDraggedSkill(skill);
@@ -504,7 +624,16 @@ export const RoutineBuilder = () => {
     }
   };
 
-  const handleDragEnd = (event: DragEndEvent) => {
+const handleDragEnd = (event: DragEndEvent) => {
+    // Console log using state variables for accurate type reporting
+    console.log(`Drag End: Type='${isDraggingPlacedSkill ? 'placed skill' : isDraggingIcon ? 'position icon' : (skills.find(s => s.id === event.active.id) ? 'new skill' : 'unknown')}', ID='${event.active.id}', Over='${event.over?.id}', Over Data Type='${event.over?.data?.current?.type || 'N/A'}'`);
+
+    // Store state before resetting, as we need it for logic below
+    const wasDraggingPlacedSkill = isDraggingPlacedSkill;
+    const originalPlacedSkillId = draggedPlacedSkillId;
+    const wasDraggingIcon = isDraggingIcon; // Added for completeness, might be useful later
+
+    // Reset drag state immediately
     setDraggedSkill(null);
     setIsDraggingPlacedSkill(false);
     setDraggedPlacedSkillId(null);
@@ -516,22 +645,26 @@ export const RoutineBuilder = () => {
     document.body.style.overflow = '';
 
     const { active, over, delta } = event;
+    // Exit if dropped outside a droppable area
     if (!over) return;
 
-    // Check for trash zone drop with more robust detection
+    // --- Trash Zone Logic ---
+    // Check for trash zone drop with robust detection
     if (over.id === "trash-zone" || over.id === "trash-drop-zone" || over.data?.current?.type === "trash-zone") {
-      if (active.data?.current?.type === "placed-skill") {
-        handleRemoveSkill(active.data.current.placedSkill.id);
-        setSelectedSkillId(null);
-      } else if (active.data?.current?.type === "position-icon") {
+      // Use stored state to check if it was a placed skill
+      if (wasDraggingPlacedSkill && originalPlacedSkillId) {
+        handleRemoveSkill(originalPlacedSkillId);
+        setSelectedSkillId(null); // Deselect if the deleted skill was selected
+      } else if (active.data?.current?.type === "position-icon") { // Check original data for icon type
         // Handle position icon deletion
         const iconId = active.id as string;
-        handleRemovePositionIcon(iconId);
+        handleRemovePositionIcon(iconId); // Assuming you have this function
       }
-      return;
+      return; // Stop further processing after deleting
     }
 
-    // Handle position icon dragging
+    // --- Position Icon Drag Logic ---
+    // Use the original active.data.current.type for icons as overlay isn't used for them
     if (active.data?.current?.type === "position-icon") {
       const icon = positionIcons.find(i => i.id === active.id);
       if (!icon) return;
@@ -541,54 +674,95 @@ export const RoutineBuilder = () => {
       if (selectedIcons.length > 1 && selectedIcons.some(i => i.id === active.id)) {
         // Multi-icon drag - update all selected icons and propagate if autoFollow is on
         selectedIcons.forEach(selectedIcon => {
-          const newX = Math.max(0, selectedIcon.x + delta.x);
-          const newY = Math.max(0, selectedIcon.y + delta.y);
+          // Calculate new position based on delta, ensuring it stays within bounds (e.g., 0 to 800/600)
+          const newX = Math.max(0, Math.min(800, selectedIcon.x + delta.x)); // Assuming 800 width
+          const newY = Math.max(0, Math.min(600, selectedIcon.y + delta.y)); // Assuming 600 height
           handleUpdatePositionIcon(selectedIcon.id, newX, newY, autoFollow);
         });
       } else {
         // Single icon drag
-        const newX = Math.max(0, icon.x + delta.x);
-        const newY = Math.max(0, icon.y + delta.y);
+        const newX = Math.max(0, Math.min(800, icon.x + delta.x));
+        const newY = Math.max(0, Math.min(600, icon.y + delta.y));
         handleUpdatePositionIcon(active.id as string, newX, newY, autoFollow);
       }
-
-      // Save to history (if the PositionSheet component handles this, we might not need it here)
-      // The PositionSheet component handles history, so we don't need to duplicate it here
-
-      return;
+      // PositionSheet handles history, no need to add here.
+      return; // Stop further processing for icons
     }
 
-    const skill = skills.find((s) => s.id === active.id);
-    
-    if (skill && over.id.toString().startsWith("cell-")) {
-      const lineIndex = over.data?.current?.lineIndex;
-      const count = over.data?.current?.count;
-      if (typeof lineIndex === "number" && typeof count === "number") {
-        const newPlacedSkill: PlacedSkill = {
-          id: `placed-${Date.now()}-${Math.random()}`,
-          skillId: skill.id,
-          lineIndex,
-          startCount: count,
-        };
-        setPlacedSkills([...placedSkills, newPlacedSkill]);
+    // --- Position Sheet Grid Drop Logic ---
+    // Handle dropping items onto the position sheet grid
+    if (over.id === "position-sheet-grid" && over.rect) {
+      const positionSheetElement = document.getElementById("position-sheet");
+      if (positionSheetElement) {
+        const rect = positionSheetElement.getBoundingClientRect();
+        // Calculate coordinates relative to the position sheet grid area
+        // The position sheet has padding and the grid area is offset by p-1.5 (6px on each side)
+        const offsetX = delta.x + (active.rect?.current?.initial?.width || 0) / 2;
+        const offsetY = delta.y + (active.rect?.current?.initial?.height || 0) / 2;
+
+        // Ensure coordinates are within grid bounds (0-800, 0-600)
+        const dropX = Math.max(0, Math.min(800, offsetX));
+        const dropY = Math.max(0, Math.min(600, offsetY));
+
+        if (active.data?.current?.type === "position-icon") {
+          // Moving existing position icon
+          const iconId = active.id as string;
+          handleUpdatePositionIcon(iconId, dropX, dropY, autoFollow);
+        } else if (active.data?.current && !active.data.current.type) {
+          // Dropping a new position icon from somewhere else (could be from a tool button or other source)
+          // For now, we'll create a default type, but this could be enhanced to handle different drop sources
+          const newIcon: PositionIcon = {
+            id: `icon-${Date.now()}-${Math.random()}`,
+            type: "square", // Default type
+            x: dropX,
+            y: dropY,
+            lineIndex: selectedLine || 0,
+          };
+          // Add the icon using the existing handler
+          const tempIcons = [...positionIcons, newIcon];
+          setPositionIcons(tempIcons);
+          // Mark the new icon as selected
+          setPositionIcons(prev => prev.map(icon =>
+            icon.id === newIcon.id ? { ...icon, selected: true } : { ...icon, selected: false }
+          ));
+        }
       }
-      return;
+      return; // Stop further processing
     }
 
-    if (active.data?.current?.type === "placed-skill" && over.id.toString().startsWith("cell-")) {
-      const placedSkill = active.data.current.placedSkill;
-      const lineIndex = over.data?.current?.lineIndex;
-      const count = over.data?.current?.count;
-      if (typeof lineIndex === "number" && typeof count === "number") {
-        setPlacedSkills(
-          placedSkills.map((ps) =>
-            ps.id === placedSkill.id
-              ? { ...ps, lineIndex, startCount: count }
-              : ps
-          )
-        );
-      }
+
+    // --- Skill Drop Logic ---
+    // Check if dropping onto a valid cell
+    if (over.id.toString().startsWith("cell-")) {
+        const lineIndex = over.data?.current?.lineIndex;
+        const count = over.data?.current?.count;
+
+        if (typeof lineIndex === "number" && typeof count === "number") {
+            // Check if we *started* dragging a PLACED skill
+            if (wasDraggingPlacedSkill && originalPlacedSkillId) {
+                setPlacedSkills(
+                    (prevSkills) => prevSkills.map((ps) =>
+                        ps.id === originalPlacedSkillId // Use the ID stored from drag start
+                        ? { ...ps, lineIndex, startCount: count }
+                        : ps
+                    )
+                );
+            } else {
+                // Check if we are dropping a NEW skill from the panel
+                const skillFromPanel = skills.find((s) => s.id === active.id);
+                if (skillFromPanel) {
+                    const newPlacedSkill: PlacedSkill = {
+                        id: `placed-${Date.now()}-${Math.random()}`,
+                        skillId: skillFromPanel.id,
+                        lineIndex,
+                        startCount: count,
+                    };
+                    setPlacedSkills((prevSkills) => [...prevSkills, newPlacedSkill]);
+                }
+            }
+        }
     }
+    // No further actions if not dropped on a cell or trash
   };
 
   const handleRemoveSkill = (id: string) => {
@@ -736,8 +910,8 @@ export const RoutineBuilder = () => {
       setPositionIcons([]);
     }
 
-    // Clear saved state from localStorage
-    localStorage.removeItem('routineState');
+    // Don't clear auto-saved states - reset is just for clearing current work
+    // The current state will auto-save as empty if the auto-save effect runs again
   };
 
   return (
@@ -827,6 +1001,54 @@ export const RoutineBuilder = () => {
                 <SelectItem value="group-stunts">Group Stunts</SelectItem>
                 <SelectItem value="team-16">Team (16)</SelectItem>
                 <SelectItem value="team-24">Team (24)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex items-center gap-1">
+            <Label className="text-xs">Save State:</Label>
+            <Select
+              value={loadedSaveStateSlot?.toString() || "1"}
+              onValueChange={(slot) => {
+                const newSlot = parseInt(slot) as 1 | 2 | 3;
+                // Auto-save current state before switching to new slot
+                if (loadedSaveStateSlot) {
+                  const key = `save-state-${loadedSaveStateSlot}`;
+                  const data: SaveStateData = {
+                    placedSkills: [...placedSkills],
+                    positionIcons: [...positionIcons],
+                    config: { ...config },
+                    timestamp: Date.now()
+                  };
+                  localStorage.setItem(key, JSON.stringify(data));
+                }
+                // Load the new slot
+                loadFromSlot(newSlot);
+              }}
+            >
+              <SelectTrigger className="w-60 h-8">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {([1, 2, 3] as const).map(slot => {
+                  const key = `save-state-${slot}`;
+                  const saved = localStorage.getItem(key);
+                  let label = `State ${slot}`;
+                  if (saved) {
+                    try {
+                      const data = JSON.parse(saved) as SaveStateData;
+                      const category = data.config.category.replace('-', ' ').toUpperCase();
+                      label += ` (${category})`;
+                    } catch (e) {
+                      // Keep default label if parsing fails
+                    }
+                  }
+                  return (
+                    <SelectItem key={slot} value={slot.toString()}>
+                      {label}
+                    </SelectItem>
+                  );
+                })}
               </SelectContent>
             </Select>
           </div>
