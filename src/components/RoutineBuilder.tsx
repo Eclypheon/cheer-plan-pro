@@ -941,6 +941,10 @@ export const RoutineBuilder = () => {
       setDraggedIconId(event.active.id as string);
       setDragOffset({ x: 0, y: 0 });
     }
+
+    if (event.active.data?.current?.type === "skill-resize") {
+      // Skill resize drag started - no special handling needed at start
+    }
   };
 
 const handleDragEnd = (event: DragEndEvent) => {
@@ -966,6 +970,58 @@ const handleDragEnd = (event: DragEndEvent) => {
     const { active, over, delta } = event;
     // Exit if dropped outside a droppable area
     if (!over) return;
+
+    // --- Skill Resize Handle Logic ---
+    if (active.data?.current?.type === "skill-resize") {
+      const { skill: resizeSkill, originalCellsToSpan, direction } = active.data.current;
+
+      // Get the count sheet table to dynamically calculate cell width
+      const firstDataCell = document.querySelector("#count-sheet-table tbody tr:first-child td:nth-child(2)");
+
+      let dynamicCellWidth = 80; // Default fallback
+      if (firstDataCell) {
+        dynamicCellWidth = firstDataCell.clientWidth;
+      } else {
+        console.warn("Could not find count sheet cell to calculate width. Using fallback 80px.");
+      }
+
+      if (resizeSkill && typeof originalCellsToSpan === "number") {
+        // Calculate drag distance (pixels) and convert to count change
+        const CELL_WIDTH = dynamicCellWidth; // Use the dynamic width
+        const dragDistance = direction === "right" ? delta.x : -delta.x;
+
+        // Only calculate countChange if CELL_WIDTH is valid
+        let countChange = 0;
+        if (CELL_WIDTH > 0) {
+          countChange = Math.round(dragDistance / CELL_WIDTH);
+        }
+
+        // Calculate new counts, ensuring minimum of 1
+        const newCounts = Math.max(1, originalCellsToSpan + countChange);
+
+        // Only update if the count actually changed
+        if (newCounts !== originalCellsToSpan && newCounts !== resizeSkill.counts) {
+          updateSkillCounts(resizeSkill.id, newCounts);
+
+          // For left handle: move the placed skill by the count change amount
+          if (direction === "left") {
+            // Find the placed skill for this skill
+            const placedSkill = placedSkills.find(ps => ps.skillId === resizeSkill.id);
+            if (placedSkill) {
+              // Positive countChange (left drag): move skill left by countChange amount
+              // Negative countChange (right drag): move skill right by -countChange amount
+              const newStartCount = Math.max(1, placedSkill.startCount - countChange);
+              setPlacedSkills(prev => prev.map(ps =>
+                ps.id === placedSkill.id
+                  ? { ...ps, startCount: newStartCount }
+                  : ps
+              ));
+            }
+          }
+        }
+      }
+      return; // Stop further processing for resize handles
+    }
 
     // --- Trash Zone Logic ---
     // Check for trash zone drop with robust detection
@@ -1548,6 +1604,7 @@ const handleDragEnd = (event: DragEndEvent) => {
                         ps.id === id ? { ...ps, lineIndex: newLineIndex, startCount: newStartCount } : ps
                       ));
                     }}
+                    onUpdateSkillCounts={updateSkillCounts}
                   />
                 </ResizablePanel>
 
@@ -1624,6 +1681,7 @@ const handleDragEnd = (event: DragEndEvent) => {
                     ps.id === id ? { ...ps, lineIndex: newLineIndex, startCount: newStartCount } : ps
                   ));
                 }}
+                onUpdateSkillCounts={updateSkillCounts}
               />
             )}
           </ResizablePanel>
