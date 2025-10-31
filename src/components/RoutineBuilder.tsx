@@ -165,6 +165,64 @@ export const RoutineBuilder = () => {
     }
   }, [placedSkills, positionIcons, config, loadedSaveStateSlot, hasLoadedState]);
 
+  // Auto-scroll to keep selected skill in view after keyboard movement
+  useEffect(() => {
+    if (!selectedSkillId) return;
+
+    const selectedSkill = placedSkills.find(ps => ps.id === selectedSkillId);
+    if (!selectedSkill) return;
+
+    // Find the count sheet container (the scrollable div)
+    const countSheetContainer = document.querySelector('.flex-1.overflow-auto.relative') as HTMLElement;
+    if (!countSheetContainer) return;
+
+    // Find the specific skill element for the selected skill
+    const skillElement = document.querySelector(`[data-skill-id="${selectedSkillId}"]`) as HTMLElement;
+    if (!skillElement) return;
+
+    const containerRect = countSheetContainer.getBoundingClientRect();
+    const skillRect = skillElement.getBoundingClientRect();
+
+    // Calculate if the skill is outside the visible area
+    const isAboveViewport = skillRect.top < containerRect.top;
+    const isBelowViewport = skillRect.bottom > containerRect.bottom;
+    const isLeftOfViewport = skillRect.left < containerRect.left;
+    const isRightOfViewport = skillRect.right > containerRect.right;
+
+    // If any part of the skill is outside the viewport, scroll to bring it into view
+    if (isAboveViewport || isBelowViewport || isLeftOfViewport || isRightOfViewport) {
+      const currentScrollTop = countSheetContainer.scrollTop;
+      const currentScrollLeft = countSheetContainer.scrollLeft;
+
+      // Calculate how much to scroll to center the skill vertically
+      let newScrollTop = currentScrollTop;
+      if (isAboveViewport) {
+        // Scroll up to show skill at top of viewport (with small margin)
+        newScrollTop = currentScrollTop + (skillRect.top - containerRect.top) - 20;
+      } else if (isBelowViewport) {
+        // Scroll down to show skill at bottom of viewport (with small margin)
+        newScrollTop = currentScrollTop + (skillRect.bottom - containerRect.bottom) + 20;
+      }
+
+      // For horizontal scrolling, we need to scroll the cell table itself
+      let newScrollLeft = currentScrollLeft;
+      if (isLeftOfViewport) {
+        newScrollLeft = currentScrollLeft + (skillRect.left - containerRect.left) - 20;
+      } else if (isRightOfViewport) {
+        newScrollLeft = currentScrollLeft + (skillRect.right - containerRect.right) + 20;
+      }
+
+      // Apply the scroll
+      if (newScrollTop !== currentScrollTop || newScrollLeft !== currentScrollLeft) {
+        countSheetContainer.scrollTo({
+          top: Math.max(0, newScrollTop),
+          left: Math.max(0, newScrollLeft),
+          behavior: 'smooth'
+        });
+      }
+    }
+  }, [selectedSkillId, placedSkills]);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -221,24 +279,24 @@ export const RoutineBuilder = () => {
         if (!selectedSkill) return;
 
         const totalLines = Math.ceil((config.length * config.bpm) / 60 / 8);
-        
+
         if (e.key === keyboardSettings.moveLeft || e.key === keyboardSettings.altMoveLeft) {
           const skill = skills.find(s => s.id === selectedSkill.skillId);
           if (!skill) return;
 
-          if (selectedSkill.startCount > 1) {
-            // Move left within the same line - check if it would fit
-            const newStartCount = selectedSkill.startCount - 1;
-            if (newStartCount + skill.counts - 1 <= 8) {
-              setPlacedSkills(prev => prev.map(ps =>
-                ps.id === selectedSkillId ? { ...ps, startCount: newStartCount } : ps
-              ));
-            }
-          } else if (selectedSkill.lineIndex > 0) {
-            // At beginning of line and not at first line - move to previous line at appropriate count
-            const newStartCount = Math.max(1, 9 - skill.counts); // Start far right enough to fit the skill
+          // Calculate absolute start position (0-indexed)
+          const absoluteStartPos = selectedSkill.lineIndex * 8 + selectedSkill.startCount - 1;
+
+          // Try to move left by 1 count
+          const newAbsoluteStartPos = absoluteStartPos - 1;
+
+          if (newAbsoluteStartPos >= 0) {
+            // Calculate new line and start count
+            const newLineIndex = Math.floor(newAbsoluteStartPos / 8);
+            const newStartCount = (newAbsoluteStartPos % 8) + 1;
+
             setPlacedSkills(prev => prev.map(ps =>
-              ps.id === selectedSkillId ? { ...ps, lineIndex: ps.lineIndex - 1, startCount: newStartCount } : ps
+              ps.id === selectedSkillId ? { ...ps, lineIndex: newLineIndex, startCount: newStartCount } : ps
             ));
           }
           e.preventDefault();
@@ -248,19 +306,23 @@ export const RoutineBuilder = () => {
           const skill = skills.find(s => s.id === selectedSkill.skillId);
           if (!skill) return;
 
-          const skillEndCount = selectedSkill.startCount + skill.counts - 1;
-          if (skillEndCount < 8) {
-            // Move right within the same line - check if it would fit
-            const newStartCount = selectedSkill.startCount + 1;
-            if (newStartCount + skill.counts - 1 <= 8) {
-              setPlacedSkills(prev => prev.map(ps =>
-                ps.id === selectedSkillId ? { ...ps, startCount: newStartCount } : ps
-              ));
-            }
-          } else if (selectedSkill.lineIndex < totalLines - 1) {
-            // At or beyond end of line and not at last line - move to next line at count 1
+          // Calculate absolute start position (0-indexed)
+          const absoluteStartPos = selectedSkill.lineIndex * 8 + selectedSkill.startCount - 1;
+
+          // Try to move right by 1 count
+          const newAbsoluteStartPos = absoluteStartPos + 1;
+
+          // Calculate total available positions
+          const totalAvailablePositions = totalLines * 8;
+          const skillEndPos = newAbsoluteStartPos + skill.counts - 1;
+
+          if (skillEndPos < totalAvailablePositions) {
+            // Calculate new line and start count
+            const newLineIndex = Math.floor(newAbsoluteStartPos / 8);
+            const newStartCount = (newAbsoluteStartPos % 8) + 1;
+
             setPlacedSkills(prev => prev.map(ps =>
-              ps.id === selectedSkillId ? { ...ps, lineIndex: ps.lineIndex + 1, startCount: 1 } : ps
+              ps.id === selectedSkillId ? { ...ps, lineIndex: newLineIndex, startCount: newStartCount } : ps
             ));
           }
           e.preventDefault();
@@ -294,46 +356,37 @@ export const RoutineBuilder = () => {
         const totalLines = Math.ceil((config.length * config.bpm) / 60 / 8);
 
         if (e.key === keyboardSettings.moveLeft || e.key === keyboardSettings.altMoveLeft) {
-          // Check if we can move left - considering all affected skills' lengths
+          // Check if we can move left - calculate absolute positions for all affected skills
           const skillsToMove = placedSkills.filter(ps =>
             ps.lineIndex > selectedSkill.lineIndex ||
             (ps.lineIndex === selectedSkill.lineIndex && ps.startCount > selectedSkill.startCount)
           );
 
-          // Check if all skills to move can be moved left without violating boundaries
+          // Check if all skills to move can be moved left by calculating their new absolute positions
           const canMoveLeft = skillsToMove.every(ps => {
             const skill = skills.find(s => s.id === ps.skillId);
             if (!skill) return false;
 
-            if (ps.startCount > 1) {
-              // Check if moving left within same line would fit
-              const newStartCount = ps.startCount - 1;
-              return newStartCount >= 1 && newStartCount + skill.counts - 1 <= 8;
-            } else if (ps.lineIndex > 0) {
-              // Would move to previous line - need to check fit
-              const newStartCount = Math.max(1, 9 - skill.counts);
-              return newStartCount >= 1 && newStartCount + skill.counts - 1 <= 8;
-            }
-            return false;
+            // Calculate absolute start position (0-indexed)
+            const absoluteStartPos = ps.lineIndex * 8 + ps.startCount - 1;
+            const newAbsoluteStartPos = absoluteStartPos - 1;
+
+            // Must be within bounds
+            return newAbsoluteStartPos >= 0;
           });
 
           if (canMoveLeft) {
             setPlacedSkills(prev => prev.map(ps => {
               if (skillsToMove.some(stm => stm.id === ps.id)) {
-                const skill = skills.find(s => s.id === ps.skillId);
-                if (!skill) return ps;
+                // Calculate absolute start position (0-indexed)
+                const absoluteStartPos = ps.lineIndex * 8 + ps.startCount - 1;
+                const newAbsoluteStartPos = absoluteStartPos - 1;
 
-                if (ps.startCount > 1) {
-                  // Move left within same line
-                  const newStartCount = ps.startCount - 1;
-                  if (newStartCount + skill.counts - 1 <= 8) {
-                    return { ...ps, startCount: newStartCount };
-                  }
-                } else if (ps.lineIndex > 0) {
-                  // Move to previous line at appropriate position
-                  const newStartCount = Math.max(1, 9 - skill.counts);
-                  return { ...ps, lineIndex: ps.lineIndex - 1, startCount: newStartCount };
-                }
+                // Calculate new line and start count
+                const newLineIndex = Math.floor(newAbsoluteStartPos / 8);
+                const newStartCount = (newAbsoluteStartPos % 8) + 1;
+
+                return { ...ps, lineIndex: newLineIndex, startCount: newStartCount };
               }
               return ps;
             }));
@@ -342,46 +395,41 @@ export const RoutineBuilder = () => {
         }
 
         if (e.key === keyboardSettings.moveRight || e.key === keyboardSettings.altMoveRight) {
-          // Check if we can move right - considering all affected skills' lengths
+          // Check if we can move right - calculate absolute positions for all affected skills
           const skillsToMove = placedSkills.filter(ps =>
             ps.lineIndex > selectedSkill.lineIndex ||
             (ps.lineIndex === selectedSkill.lineIndex && ps.startCount > selectedSkill.startCount)
           );
 
-          // Check if all skills to move can be moved right without violating boundaries
+          // Check if all skills to move can be moved right by calculating their new absolute end positions
           const canMoveRight = skillsToMove.every(ps => {
             const skill = skills.find(s => s.id === ps.skillId);
             if (!skill) return false;
 
-            const skillEndCount = ps.startCount + skill.counts - 1;
-            if (skillEndCount < 8) {
-              // Check if moving right within same line would fit
-              const newStartCount = ps.startCount + 1;
-              return newStartCount + skill.counts - 1 <= 8;
-            } else if (ps.lineIndex < totalLines - 1) {
-              // Would move to next line - check if it fits at count 1
-              return 1 + skill.counts - 1 <= 8;
-            }
-            return false;
+            // Calculate absolute start position (0-indexed) and new position
+            const absoluteStartPos = ps.lineIndex * 8 + ps.startCount - 1;
+            const newAbsoluteStartPos = absoluteStartPos + 1;
+
+            // Calculate total available positions
+            const totalAvailablePositions = totalLines * 8;
+            const skillEndPos = newAbsoluteStartPos + skill.counts - 1;
+
+            // Must not exceed total available positions
+            return skillEndPos < totalAvailablePositions;
           });
 
           if (canMoveRight) {
             setPlacedSkills(prev => prev.map(ps => {
               if (skillsToMove.some(stm => stm.id === ps.id)) {
-                const skill = skills.find(s => s.id === ps.skillId);
-                if (!skill) return ps;
+                // Calculate absolute start position (0-indexed) and new position
+                const absoluteStartPos = ps.lineIndex * 8 + ps.startCount - 1;
+                const newAbsoluteStartPos = absoluteStartPos + 1;
 
-                const skillEndCount = ps.startCount + skill.counts - 1;
-                if (skillEndCount < 8) {
-                  // Move right within same line
-                  const newStartCount = ps.startCount + 1;
-                  if (newStartCount + skill.counts - 1 <= 8) {
-                    return { ...ps, startCount: newStartCount };
-                  }
-                } else if (ps.lineIndex < totalLines - 1) {
-                  // Move to next line at count 1
-                  return { ...ps, lineIndex: ps.lineIndex + 1, startCount: 1 };
-                }
+                // Calculate new line and start count
+                const newLineIndex = Math.floor(newAbsoluteStartPos / 8);
+                const newStartCount = (newAbsoluteStartPos % 8) + 1;
+
+                return { ...ps, lineIndex: newLineIndex, startCount: newStartCount };
               }
               return ps;
             }));
@@ -432,46 +480,37 @@ export const RoutineBuilder = () => {
         const totalLines = Math.ceil((config.length * config.bpm) / 60 / 8);
 
         if (e.key === keyboardSettings.moveLeft || e.key === keyboardSettings.altMoveLeft) {
-          // Check if we can move left - considering all affected skills' lengths
+          // Check if we can move left - calculate absolute positions for all affected skills
           const skillsToMove = placedSkills.filter(ps =>
             ps.lineIndex < selectedSkill.lineIndex ||
             (ps.lineIndex === selectedSkill.lineIndex && ps.startCount < selectedSkill.startCount)
           );
 
-          // Check if all skills to move can be moved left without violating boundaries
+          // Check if all skills to move can be moved left by calculating their new absolute positions
           const canMoveLeft = skillsToMove.every(ps => {
             const skill = skills.find(s => s.id === ps.skillId);
             if (!skill) return false;
 
-            if (ps.startCount > 1) {
-              // Check if moving left within same line would fit
-              const newStartCount = ps.startCount - 1;
-              return newStartCount >= 1 && newStartCount + skill.counts - 1 <= 8;
-            } else if (ps.lineIndex > 0) {
-              // Would move to previous line - need to check fit
-              const newStartCount = Math.max(1, 9 - skill.counts);
-              return newStartCount >= 1 && newStartCount + skill.counts - 1 <= 8;
-            }
-            return false;
+            // Calculate absolute start position (0-indexed)
+            const absoluteStartPos = ps.lineIndex * 8 + ps.startCount - 1;
+            const newAbsoluteStartPos = absoluteStartPos - 1;
+
+            // Must be within bounds
+            return newAbsoluteStartPos >= 0;
           });
 
           if (canMoveLeft) {
             setPlacedSkills(prev => prev.map(ps => {
               if (skillsToMove.some(stm => stm.id === ps.id)) {
-                const skill = skills.find(s => s.id === ps.skillId);
-                if (!skill) return ps;
+                // Calculate absolute start position (0-indexed)
+                const absoluteStartPos = ps.lineIndex * 8 + ps.startCount - 1;
+                const newAbsoluteStartPos = absoluteStartPos - 1;
 
-                if (ps.startCount > 1) {
-                  // Move left within same line
-                  const newStartCount = ps.startCount - 1;
-                  if (newStartCount + skill.counts - 1 <= 8) {
-                    return { ...ps, startCount: newStartCount };
-                  }
-                } else if (ps.lineIndex > 0) {
-                  // Move to previous line at appropriate position
-                  const newStartCount = Math.max(1, 9 - skill.counts);
-                  return { ...ps, lineIndex: ps.lineIndex - 1, startCount: newStartCount };
-                }
+                // Calculate new line and start count
+                const newLineIndex = Math.floor(newAbsoluteStartPos / 8);
+                const newStartCount = (newAbsoluteStartPos % 8) + 1;
+
+                return { ...ps, lineIndex: newLineIndex, startCount: newStartCount };
               }
               return ps;
             }));
@@ -480,46 +519,41 @@ export const RoutineBuilder = () => {
         }
 
         if (e.key === keyboardSettings.moveRight || e.key === keyboardSettings.altMoveRight) {
-          // Check if we can move right - considering all affected skills' lengths
+          // Check if we can move right - calculate absolute positions for all affected skills
           const skillsToMove = placedSkills.filter(ps =>
             ps.lineIndex < selectedSkill.lineIndex ||
             (ps.lineIndex === selectedSkill.lineIndex && ps.startCount < selectedSkill.startCount)
           );
 
-          // Check if all skills to move can be moved right without violating boundaries
+          // Check if all skills to move can be moved right by calculating their new absolute end positions
           const canMoveRight = skillsToMove.every(ps => {
             const skill = skills.find(s => s.id === ps.skillId);
             if (!skill) return false;
 
-            const skillEndCount = ps.startCount + skill.counts - 1;
-            if (skillEndCount < 8) {
-              // Check if moving right within same line would fit
-              const newStartCount = ps.startCount + 1;
-              return newStartCount + skill.counts - 1 <= 8;
-            } else if (ps.lineIndex < totalLines - 1) {
-              // Would move to next line - check if it fits at count 1
-              return 1 + skill.counts - 1 <= 8;
-            }
-            return false;
+            // Calculate absolute start position (0-indexed) and new position
+            const absoluteStartPos = ps.lineIndex * 8 + ps.startCount - 1;
+            const newAbsoluteStartPos = absoluteStartPos + 1;
+
+            // Calculate total available positions
+            const totalAvailablePositions = totalLines * 8;
+            const skillEndPos = newAbsoluteStartPos + skill.counts - 1;
+
+            // Must not exceed total available positions
+            return skillEndPos < totalAvailablePositions;
           });
 
           if (canMoveRight) {
             setPlacedSkills(prev => prev.map(ps => {
               if (skillsToMove.some(stm => stm.id === ps.id)) {
-                const skill = skills.find(s => s.id === ps.skillId);
-                if (!skill) return ps;
+                // Calculate absolute start position (0-indexed) and new position
+                const absoluteStartPos = ps.lineIndex * 8 + ps.startCount - 1;
+                const newAbsoluteStartPos = absoluteStartPos + 1;
 
-                const skillEndCount = ps.startCount + skill.counts - 1;
-                if (skillEndCount < 8) {
-                  // Move right within same line
-                  const newStartCount = ps.startCount + 1;
-                  if (newStartCount + skill.counts - 1 <= 8) {
-                    return { ...ps, startCount: newStartCount };
-                  }
-                } else if (ps.lineIndex < totalLines - 1) {
-                  // Move to next line at count 1
-                  return { ...ps, lineIndex: ps.lineIndex + 1, startCount: 1 };
-                }
+                // Calculate new line and start count
+                const newLineIndex = Math.floor(newAbsoluteStartPos / 8);
+                const newStartCount = (newAbsoluteStartPos % 8) + 1;
+
+                return { ...ps, lineIndex: newLineIndex, startCount: newStartCount };
               }
               return ps;
             }));

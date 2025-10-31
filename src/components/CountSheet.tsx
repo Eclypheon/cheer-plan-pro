@@ -153,6 +153,7 @@ export const CountSheet = ({
     return (
       <td
         ref={setNodeRef}
+        data-cell={`${lineIndex}-${count}`}
         className={`border border-border min-w-[80px] h-10 p-0.5 relative text-xs ${
           isOver ? "bg-accent" : isPartOfSkillSpan ? "bg-gray-50 dark:bg-gray-800/50" : "bg-card hover:bg-accent/50"
         }`}
@@ -193,6 +194,7 @@ export const CountSheet = ({
           return (
             <div
               key={sp.placedSkill.id}
+              data-skill-id={sp.placedSkill.id}
               ref={setNodeRef}
               {...enhancedListeners}
               {...attributes}
