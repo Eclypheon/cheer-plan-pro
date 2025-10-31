@@ -223,28 +223,42 @@ export const RoutineBuilder = () => {
         const totalLines = Math.ceil((config.length * config.bpm) / 60 / 8);
         
         if (e.key === keyboardSettings.moveLeft || e.key === keyboardSettings.altMoveLeft) {
+          const skill = skills.find(s => s.id === selectedSkill.skillId);
+          if (!skill) return;
+
           if (selectedSkill.startCount > 1) {
-            // Move left within the same line
-            setPlacedSkills(prev => prev.map(ps =>
-              ps.id === selectedSkillId ? { ...ps, startCount: ps.startCount - 1 } : ps
-            ));
+            // Move left within the same line - check if it would fit
+            const newStartCount = selectedSkill.startCount - 1;
+            if (newStartCount + skill.counts - 1 <= 8) {
+              setPlacedSkills(prev => prev.map(ps =>
+                ps.id === selectedSkillId ? { ...ps, startCount: newStartCount } : ps
+              ));
+            }
           } else if (selectedSkill.lineIndex > 0) {
-            // At beginning of line and not at first line - move to previous line at count 8
+            // At beginning of line and not at first line - move to previous line at appropriate count
+            const newStartCount = Math.max(1, 9 - skill.counts); // Start far right enough to fit the skill
             setPlacedSkills(prev => prev.map(ps =>
-              ps.id === selectedSkillId ? { ...ps, lineIndex: ps.lineIndex - 1, startCount: 8 } : ps
+              ps.id === selectedSkillId ? { ...ps, lineIndex: ps.lineIndex - 1, startCount: newStartCount } : ps
             ));
           }
           e.preventDefault();
         }
 
         if (e.key === keyboardSettings.moveRight || e.key === keyboardSettings.altMoveRight) {
-          if (selectedSkill.startCount < 8) {
-            // Move right within the same line
-            setPlacedSkills(prev => prev.map(ps =>
-              ps.id === selectedSkillId ? { ...ps, startCount: ps.startCount + 1 } : ps
-            ));
+          const skill = skills.find(s => s.id === selectedSkill.skillId);
+          if (!skill) return;
+
+          const skillEndCount = selectedSkill.startCount + skill.counts - 1;
+          if (skillEndCount < 8) {
+            // Move right within the same line - check if it would fit
+            const newStartCount = selectedSkill.startCount + 1;
+            if (newStartCount + skill.counts - 1 <= 8) {
+              setPlacedSkills(prev => prev.map(ps =>
+                ps.id === selectedSkillId ? { ...ps, startCount: newStartCount } : ps
+              ));
+            }
           } else if (selectedSkill.lineIndex < totalLines - 1) {
-            // At end of line and not at last line - move to next line at count 1
+            // At or beyond end of line and not at last line - move to next line at count 1
             setPlacedSkills(prev => prev.map(ps =>
               ps.id === selectedSkillId ? { ...ps, lineIndex: ps.lineIndex + 1, startCount: 1 } : ps
             ));
@@ -280,22 +294,45 @@ export const RoutineBuilder = () => {
         const totalLines = Math.ceil((config.length * config.bpm) / 60 / 8);
 
         if (e.key === keyboardSettings.moveLeft || e.key === keyboardSettings.altMoveLeft) {
-          // Check if we can move left within current approach
-          const canMoveLeft = selectedSkill.startCount > 1 || (selectedSkill.startCount === 1 && selectedSkill.lineIndex > 0);
+          // Check if we can move left - considering all affected skills' lengths
+          const skillsToMove = placedSkills.filter(ps =>
+            ps.lineIndex > selectedSkill.lineIndex ||
+            (ps.lineIndex === selectedSkill.lineIndex && ps.startCount > selectedSkill.startCount)
+          );
+
+          // Check if all skills to move can be moved left without violating boundaries
+          const canMoveLeft = skillsToMove.every(ps => {
+            const skill = skills.find(s => s.id === ps.skillId);
+            if (!skill) return false;
+
+            if (ps.startCount > 1) {
+              // Check if moving left within same line would fit
+              const newStartCount = ps.startCount - 1;
+              return newStartCount >= 1 && newStartCount + skill.counts - 1 <= 8;
+            } else if (ps.lineIndex > 0) {
+              // Would move to previous line - need to check fit
+              const newStartCount = Math.max(1, 9 - skill.counts);
+              return newStartCount >= 1 && newStartCount + skill.counts - 1 <= 8;
+            }
+            return false;
+          });
 
           if (canMoveLeft) {
-            const skillsToMove = placedSkills.filter(ps =>
-              ps.lineIndex > selectedSkill.lineIndex ||
-              (ps.lineIndex === selectedSkill.lineIndex && ps.startCount > selectedSkill.startCount)
-            );
             setPlacedSkills(prev => prev.map(ps => {
               if (skillsToMove.some(stm => stm.id === ps.id)) {
+                const skill = skills.find(s => s.id === ps.skillId);
+                if (!skill) return ps;
+
                 if (ps.startCount > 1) {
                   // Move left within same line
-                  return { ...ps, startCount: ps.startCount - 1 };
+                  const newStartCount = ps.startCount - 1;
+                  if (newStartCount + skill.counts - 1 <= 8) {
+                    return { ...ps, startCount: newStartCount };
+                  }
                 } else if (ps.lineIndex > 0) {
-                  // Move to previous line at count 8
-                  return { ...ps, lineIndex: ps.lineIndex - 1, startCount: 8 };
+                  // Move to previous line at appropriate position
+                  const newStartCount = Math.max(1, 9 - skill.counts);
+                  return { ...ps, lineIndex: ps.lineIndex - 1, startCount: newStartCount };
                 }
               }
               return ps;
@@ -305,19 +342,42 @@ export const RoutineBuilder = () => {
         }
 
         if (e.key === keyboardSettings.moveRight || e.key === keyboardSettings.altMoveRight) {
-          // Check if we can move right within current approach
-          const canMoveRight = selectedSkill.startCount < 8 || (selectedSkill.startCount === 8 && selectedSkill.lineIndex < totalLines - 1);
+          // Check if we can move right - considering all affected skills' lengths
+          const skillsToMove = placedSkills.filter(ps =>
+            ps.lineIndex > selectedSkill.lineIndex ||
+            (ps.lineIndex === selectedSkill.lineIndex && ps.startCount > selectedSkill.startCount)
+          );
+
+          // Check if all skills to move can be moved right without violating boundaries
+          const canMoveRight = skillsToMove.every(ps => {
+            const skill = skills.find(s => s.id === ps.skillId);
+            if (!skill) return false;
+
+            const skillEndCount = ps.startCount + skill.counts - 1;
+            if (skillEndCount < 8) {
+              // Check if moving right within same line would fit
+              const newStartCount = ps.startCount + 1;
+              return newStartCount + skill.counts - 1 <= 8;
+            } else if (ps.lineIndex < totalLines - 1) {
+              // Would move to next line - check if it fits at count 1
+              return 1 + skill.counts - 1 <= 8;
+            }
+            return false;
+          });
 
           if (canMoveRight) {
-            const skillsToMove = placedSkills.filter(ps =>
-              ps.lineIndex > selectedSkill.lineIndex ||
-              (ps.lineIndex === selectedSkill.lineIndex && ps.startCount > selectedSkill.startCount)
-            );
             setPlacedSkills(prev => prev.map(ps => {
               if (skillsToMove.some(stm => stm.id === ps.id)) {
-                if (ps.startCount < 8) {
+                const skill = skills.find(s => s.id === ps.skillId);
+                if (!skill) return ps;
+
+                const skillEndCount = ps.startCount + skill.counts - 1;
+                if (skillEndCount < 8) {
                   // Move right within same line
-                  return { ...ps, startCount: ps.startCount + 1 };
+                  const newStartCount = ps.startCount + 1;
+                  if (newStartCount + skill.counts - 1 <= 8) {
+                    return { ...ps, startCount: newStartCount };
+                  }
                 } else if (ps.lineIndex < totalLines - 1) {
                   // Move to next line at count 1
                   return { ...ps, lineIndex: ps.lineIndex + 1, startCount: 1 };
@@ -330,11 +390,15 @@ export const RoutineBuilder = () => {
         }
 
         if (e.key === keyboardSettings.moveUp || e.key === keyboardSettings.altMoveUp) {
-          if (selectedSkill.lineIndex > 0) {
-            const skillsToMove = placedSkills.filter(ps =>
-              ps.lineIndex > selectedSkill.lineIndex ||
-              (ps.lineIndex === selectedSkill.lineIndex && ps.startCount > selectedSkill.startCount)
-            );
+          // Check if all skills to move can actually move up (not in first line)
+          const skillsToMove = placedSkills.filter(ps =>
+            ps.lineIndex > selectedSkill.lineIndex ||
+            (ps.lineIndex === selectedSkill.lineIndex && ps.startCount > selectedSkill.startCount)
+          );
+
+          const canAllSkillsMoveUp = skillsToMove.every(ps => ps.lineIndex > 0);
+
+          if (canAllSkillsMoveUp) {
             setPlacedSkills(prev => prev.map(ps =>
               skillsToMove.some(stm => stm.id === ps.id) ? { ...ps, lineIndex: ps.lineIndex - 1 } : ps
             ));
@@ -343,11 +407,15 @@ export const RoutineBuilder = () => {
         }
 
         if (e.key === keyboardSettings.moveDown || e.key === keyboardSettings.altMoveDown) {
-          if (selectedSkill.lineIndex < totalLines - 1) {
-            const skillsToMove = placedSkills.filter(ps =>
-              ps.lineIndex > selectedSkill.lineIndex ||
-              (ps.lineIndex === selectedSkill.lineIndex && ps.startCount > selectedSkill.startCount)
-            );
+          // Check if all skills to move can actually move down (not in last line)
+          const skillsToMove = placedSkills.filter(ps =>
+            ps.lineIndex > selectedSkill.lineIndex ||
+            (ps.lineIndex === selectedSkill.lineIndex && ps.startCount > selectedSkill.startCount)
+          );
+
+          const canAllSkillsMoveDown = skillsToMove.every(ps => ps.lineIndex < totalLines - 1);
+
+          if (canAllSkillsMoveDown) {
             setPlacedSkills(prev => prev.map(ps =>
               skillsToMove.some(stm => stm.id === ps.id) ? { ...ps, lineIndex: ps.lineIndex + 1 } : ps
             ));
@@ -364,22 +432,45 @@ export const RoutineBuilder = () => {
         const totalLines = Math.ceil((config.length * config.bpm) / 60 / 8);
 
         if (e.key === keyboardSettings.moveLeft || e.key === keyboardSettings.altMoveLeft) {
-          // Check if we can move left within current approach
-          const canMoveLeft = selectedSkill.startCount > 1 || (selectedSkill.startCount === 1 && selectedSkill.lineIndex > 0);
+          // Check if we can move left - considering all affected skills' lengths
+          const skillsToMove = placedSkills.filter(ps =>
+            ps.lineIndex < selectedSkill.lineIndex ||
+            (ps.lineIndex === selectedSkill.lineIndex && ps.startCount < selectedSkill.startCount)
+          );
+
+          // Check if all skills to move can be moved left without violating boundaries
+          const canMoveLeft = skillsToMove.every(ps => {
+            const skill = skills.find(s => s.id === ps.skillId);
+            if (!skill) return false;
+
+            if (ps.startCount > 1) {
+              // Check if moving left within same line would fit
+              const newStartCount = ps.startCount - 1;
+              return newStartCount >= 1 && newStartCount + skill.counts - 1 <= 8;
+            } else if (ps.lineIndex > 0) {
+              // Would move to previous line - need to check fit
+              const newStartCount = Math.max(1, 9 - skill.counts);
+              return newStartCount >= 1 && newStartCount + skill.counts - 1 <= 8;
+            }
+            return false;
+          });
 
           if (canMoveLeft) {
-            const skillsToMove = placedSkills.filter(ps =>
-              ps.lineIndex < selectedSkill.lineIndex ||
-              (ps.lineIndex === selectedSkill.lineIndex && ps.startCount < selectedSkill.startCount)
-            );
             setPlacedSkills(prev => prev.map(ps => {
               if (skillsToMove.some(stm => stm.id === ps.id)) {
+                const skill = skills.find(s => s.id === ps.skillId);
+                if (!skill) return ps;
+
                 if (ps.startCount > 1) {
                   // Move left within same line
-                  return { ...ps, startCount: ps.startCount - 1 };
+                  const newStartCount = ps.startCount - 1;
+                  if (newStartCount + skill.counts - 1 <= 8) {
+                    return { ...ps, startCount: newStartCount };
+                  }
                 } else if (ps.lineIndex > 0) {
-                  // Move to previous line at count 8
-                  return { ...ps, lineIndex: ps.lineIndex - 1, startCount: 8 };
+                  // Move to previous line at appropriate position
+                  const newStartCount = Math.max(1, 9 - skill.counts);
+                  return { ...ps, lineIndex: ps.lineIndex - 1, startCount: newStartCount };
                 }
               }
               return ps;
@@ -389,19 +480,42 @@ export const RoutineBuilder = () => {
         }
 
         if (e.key === keyboardSettings.moveRight || e.key === keyboardSettings.altMoveRight) {
-          // Check if we can move right within current approach
-          const canMoveRight = selectedSkill.startCount < 8 || (selectedSkill.startCount === 8 && selectedSkill.lineIndex < totalLines - 1);
+          // Check if we can move right - considering all affected skills' lengths
+          const skillsToMove = placedSkills.filter(ps =>
+            ps.lineIndex < selectedSkill.lineIndex ||
+            (ps.lineIndex === selectedSkill.lineIndex && ps.startCount < selectedSkill.startCount)
+          );
+
+          // Check if all skills to move can be moved right without violating boundaries
+          const canMoveRight = skillsToMove.every(ps => {
+            const skill = skills.find(s => s.id === ps.skillId);
+            if (!skill) return false;
+
+            const skillEndCount = ps.startCount + skill.counts - 1;
+            if (skillEndCount < 8) {
+              // Check if moving right within same line would fit
+              const newStartCount = ps.startCount + 1;
+              return newStartCount + skill.counts - 1 <= 8;
+            } else if (ps.lineIndex < totalLines - 1) {
+              // Would move to next line - check if it fits at count 1
+              return 1 + skill.counts - 1 <= 8;
+            }
+            return false;
+          });
 
           if (canMoveRight) {
-            const skillsToMove = placedSkills.filter(ps =>
-              ps.lineIndex < selectedSkill.lineIndex ||
-              (ps.lineIndex === selectedSkill.lineIndex && ps.startCount < selectedSkill.startCount)
-            );
             setPlacedSkills(prev => prev.map(ps => {
               if (skillsToMove.some(stm => stm.id === ps.id)) {
-                if (ps.startCount < 8) {
+                const skill = skills.find(s => s.id === ps.skillId);
+                if (!skill) return ps;
+
+                const skillEndCount = ps.startCount + skill.counts - 1;
+                if (skillEndCount < 8) {
                   // Move right within same line
-                  return { ...ps, startCount: ps.startCount + 1 };
+                  const newStartCount = ps.startCount + 1;
+                  if (newStartCount + skill.counts - 1 <= 8) {
+                    return { ...ps, startCount: newStartCount };
+                  }
                 } else if (ps.lineIndex < totalLines - 1) {
                   // Move to next line at count 1
                   return { ...ps, lineIndex: ps.lineIndex + 1, startCount: 1 };
@@ -414,11 +528,15 @@ export const RoutineBuilder = () => {
         }
 
         if (e.key === keyboardSettings.moveUp || e.key === keyboardSettings.altMoveUp) {
-          if (selectedSkill.lineIndex > 0) {
-            const skillsToMove = placedSkills.filter(ps =>
-              ps.lineIndex < selectedSkill.lineIndex ||
-              (ps.lineIndex === selectedSkill.lineIndex && ps.startCount < selectedSkill.startCount)
-            );
+          // Check if all skills to move can actually move up (not in first line)
+          const skillsToMove = placedSkills.filter(ps =>
+            ps.lineIndex < selectedSkill.lineIndex ||
+            (ps.lineIndex === selectedSkill.lineIndex && ps.startCount < selectedSkill.startCount)
+          );
+
+          const canAllSkillsMoveUp = skillsToMove.every(ps => ps.lineIndex > 0);
+
+          if (canAllSkillsMoveUp) {
             setPlacedSkills(prev => prev.map(ps =>
               skillsToMove.some(stm => stm.id === ps.id) ? { ...ps, lineIndex: ps.lineIndex - 1 } : ps
             ));
@@ -427,12 +545,15 @@ export const RoutineBuilder = () => {
         }
 
         if (e.key === keyboardSettings.moveDown || e.key === keyboardSettings.altMoveDown) {
-          const totalLines = Math.ceil((config.length * config.bpm) / 60 / 8);
-          if (selectedSkill.lineIndex < totalLines - 1) {
-            const skillsToMove = placedSkills.filter(ps =>
-              ps.lineIndex < selectedSkill.lineIndex ||
-              (ps.lineIndex === selectedSkill.lineIndex && ps.startCount < selectedSkill.startCount)
-            );
+          // Check if all skills to move can actually move down (not in last line)
+          const skillsToMove = placedSkills.filter(ps =>
+            ps.lineIndex < selectedSkill.lineIndex ||
+            (ps.lineIndex === selectedSkill.lineIndex && ps.startCount < selectedSkill.startCount)
+          );
+
+          const canAllSkillsMoveDown = skillsToMove.every(ps => ps.lineIndex < totalLines - 1);
+
+          if (canAllSkillsMoveDown) {
             setPlacedSkills(prev => prev.map(ps =>
               skillsToMove.some(stm => stm.id === ps.id) ? { ...ps, lineIndex: ps.lineIndex + 1 } : ps
             ));
