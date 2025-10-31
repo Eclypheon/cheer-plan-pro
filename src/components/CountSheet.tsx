@@ -80,18 +80,26 @@ const getSkillCategoryColors = (category: SkillCategory) => {
   }
 };
 
-// Resize handle component for resizing skills on the countsheet
+// Update ResizeHandleProps to include placedSkill
 interface ResizeHandleProps {
   direction: "left" | "right";
   skill: Skill;
+  placedSkill: PlacedSkill; // Add this prop
   cellsToSpan: number;
   onResizeComplete: (newCounts: number) => void;
 }
 
-const ResizeHandle = ({ direction, skill, cellsToSpan }: ResizeHandleProps) => {
+// Update ResizeHandle to use placedSkill in its drag data
+const ResizeHandle = ({ direction, skill, placedSkill, cellsToSpan }: ResizeHandleProps) => {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-    id: `resize-${direction}-${skill.id}`,
-    data: { type: "skill-resize", direction, skill, originalCellsToSpan: cellsToSpan },
+    id: `resize-${direction}-${placedSkill.id}`, // Use placedSkill.id for a unique handle
+    data: {
+      type: "skill-resize",
+      direction,
+      skill,
+      placedSkill, // Pass the specific placedSkill instance
+      originalCellsToSpan: skill.counts, // Pass the skill's total count at drag start
+    },
   });
 
   // Since handle is now positioned outside the flex container, remove flex positioning
@@ -255,12 +263,13 @@ export const CountSheet = ({
                 isDragging ? "opacity-50 shadow-xl" : "opacity-100"
               } ${selectedSkillId === sp.placedSkill.id ? "ring-2 ring-accent ring-offset-1" : ""} ${containerClass}`}
             >
-              {/* Left resize handle - positioned absolutely at left edge */}
+{/* Left resize handle - positioned absolutely at left edge */}
               <div className="absolute -left-2 top-1/2 -translate-y-1/2 z-[2100]">
                 <ResizeHandle
                   direction="left"
                   skill={sp.skill}
-                  cellsToSpan={cellsToSpan}
+                  placedSkill={sp.placedSkill} // Pass the placedSkill
+                  cellsToSpan={sp.skill.counts} // Pass the skill's total counts
                   onResizeComplete={(newCounts) => onUpdateSkillCounts?.(sp.skill.id, newCounts)}
                 />
               </div>
@@ -277,12 +286,13 @@ export const CountSheet = ({
               >
                 <X className="h-3 w-3" />
               </button>
-              {/* Right resize handle - positioned absolutely at right edge */}
+{/* Right resize handle - positioned absolutely at right edge */}
               <div className="absolute -right-2 top-1/2 -translate-y-1/2 z-[2100]">
                 <ResizeHandle
                   direction="right"
                   skill={sp.skill}
-                  cellsToSpan={cellsToSpan}
+                  placedSkill={sp.placedSkill} // Pass the placedSkill
+                  cellsToSpan={sp.skill.counts} // Pass the skill's total counts
                   onResizeComplete={(newCounts) => onUpdateSkillCounts?.(sp.skill.id, newCounts)}
                 />
               </div>

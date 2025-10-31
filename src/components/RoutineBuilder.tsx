@@ -930,12 +930,70 @@ export const RoutineBuilder = () => {
     }
   }, [positionIcons, selectedLine, loadedSaveStateSlot, config.category]);
 
-  const handleDragMove = (event: DragMoveEvent) => {
+const handleDragMove = (event: DragMoveEvent) => {
     console.log(`Drag Move: Type='${event.active.data?.current?.type || (skills.find(s => s.id === event.active.id) ? 'new skill' : 'unknown')}', ID='${event.active.id}'`);
-    const { active, delta } = event;
+    const { active, delta, over } = event; // Add 'over' here
     
     if (active.data?.current?.type === "position-icon") {
       setDragOffset({ x: delta.x, y: delta.y });
+    }
+
+    // --- Add This New Logic Block for Skill Resize ---
+    if (active.data?.current?.type === "skill-resize" && over && over.id.toString().startsWith("cell-")) {
+      const { skill, placedSkill, direction } = active.data.current as { skill: Skill, placedSkill: PlacedSkill, direction: 'left' | 'right', originalCellsToSpan: number };
+      const { lineIndex: overLine, count: overCount } = over.data.current as { lineIndex: number, count: number };
+
+      // Find the placed skill's starting position *at the beginning of the drag*
+      const { lineIndex: startLine, startCount: startCol } = placedSkill;
+      
+      // Calculate the absolute start position (0-indexed) *at the beginning of the drag*
+      const absoluteStartPos = startLine * 8 + (startCol - 1);
+      
+      // Calculate the absolute position of the cell we're hovering over (0-indexed)
+      const absoluteOverPos = overLine * 8 + (overCount - 1);
+
+      let newCounts: number;
+      let newAbsoluteStartPos = -1; // -1 to indicate no change unless left handle
+
+      if (direction === "right") {
+        // New count is the difference from the start pos to the over pos
+        newCounts = absoluteOverPos - absoluteStartPos + 1;
+      } else { // direction === "left"
+        // The skill's original end position (at drag start)
+        const originalAbsoluteEndPos = absoluteStartPos + skill.counts - 1;
+        
+        // New count is the difference from the original end pos to the new start pos
+        newCounts = originalAbsoluteEndPos - absoluteOverPos + 1;
+        
+        // The new start position is the cell we're over
+        newAbsoluteStartPos = absoluteOverPos;
+      }
+
+      // Clamp newCounts to be at least 1
+      newCounts = Math.max(1, newCounts);
+
+      // --- Update State (with checks to prevent thrashing) ---
+
+      // 1. Update the base skill's counts if it has changed
+      const currentSkill = skills.find(s => s.id === skill.id);
+      if (currentSkill && currentSkill.counts !== newCounts) {
+        updateSkillCounts(skill.id, newCounts);
+      }
+
+      // 2. If it's the left handle, update the placedSkill's position if it has changed
+      if (direction === "left" && newAbsoluteStartPos !== -1) {
+        const currentPlacedSkill = placedSkills.find(ps => ps.id === placedSkill.id);
+        const newLineIndex = Math.floor(newAbsoluteStartPos / 8);
+        const newStartCount = (newAbsoluteStartPos % 8) + 1;
+
+        if (currentPlacedSkill && (currentPlacedSkill.lineIndex !== newLineIndex || currentPlacedSkill.startCount !== newStartCount)) {
+          setPlacedSkills(prev => prev.map(ps =>
+            ps.id === placedSkill.id
+              ? { ...ps, lineIndex: newLineIndex, startCount: newStartCount }
+              : ps
+          ));
+        }
+      }
     }
   };
 
@@ -993,58 +1051,11 @@ const handleDragEnd = (event: DragEndEvent) => {
     // Exit if dropped outside a droppable area
     if (!over) return;
 
-    // --- Skill Resize Handle Logic ---
+// --- Skill Resize Handle Logic ---
     if (active.data?.current?.type === "skill-resize") {
-      const { skill: resizeSkill, originalCellsToSpan, direction } = active.data.current;
-
-      // Get the count sheet table to dynamically calculate cell width
-      const firstDataCell = document.querySelector("#count-sheet-table tbody tr:first-child td:nth-child(2)");
-
-      let dynamicCellWidth = 80; // Default fallback
-      if (firstDataCell) {
-        dynamicCellWidth = firstDataCell.clientWidth;
-      } else {
-        console.warn("Could not find count sheet cell to calculate width. Using fallback 80px.");
-      }
-
-      if (resizeSkill && typeof originalCellsToSpan === "number") {
-        // Calculate drag distance (pixels) and convert to count change
-        // Only use horizontal movement, ignore vertical component
-        const CELL_WIDTH = dynamicCellWidth; // Use the dynamic width
-        const horizontalDelta = { x: delta.x, y: 0 }; // Lock vertical movement
-        const dragDistance = direction === "right" ? horizontalDelta.x : -horizontalDelta.x;
-
-        // Only calculate countChange if CELL_WIDTH is valid
-        let countChange = 0;
-        if (CELL_WIDTH > 0) {
-          countChange = Math.round(dragDistance / CELL_WIDTH);
-        }
-
-        // Calculate new counts, ensuring minimum of 1
-        const newCounts = Math.max(1, originalCellsToSpan + countChange);
-
-        // Only update if the count actually changed
-        if (newCounts !== originalCellsToSpan && newCounts !== resizeSkill.counts) {
-          updateSkillCounts(resizeSkill.id, newCounts);
-
-          // For left handle: move the placed skill by the count change amount
-          if (direction === "left") {
-            // Find the placed skill for this skill
-            const placedSkill = placedSkills.find(ps => ps.skillId === resizeSkill.id);
-            if (placedSkill) {
-              // Positive countChange (left drag): move skill left by countChange amount
-              // Negative countChange (right drag): move skill right by -countChange amount
-              const newStartCount = Math.max(1, placedSkill.startCount - countChange);
-              setPlacedSkills(prev => prev.map(ps =>
-                ps.id === placedSkill.id
-                  ? { ...ps, startCount: newStartCount }
-                  : ps
-              ));
-            }
-          }
-        }
-      }
-      return; // Stop further processing for resize handles
+      // All logic is now handled in onDragMove.
+      // We just need to stop further processing here.
+      return; 
     }
 
     // --- Trash Zone Logic ---
