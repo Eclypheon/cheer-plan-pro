@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
   import { DndContext, DragEndEvent, DragOverlay, useSensor, useSensors, PointerSensor, DragStartEvent, DragMoveEvent, CollisionDetection, rectIntersection, closestCenter } from "@dnd-kit/core";
+import { snapCenterToCursor } from "@dnd-kit/modifiers";
 import type { PlacedSkill, RoutineConfig, Skill, PositionIcon, CategoryStateData, SaveStateData } from "@/types/routine";
 import { useSkills } from "@/hooks/useSkills";
 import { SkillsPanel } from "./SkillsPanel";
@@ -1291,6 +1292,7 @@ const handleDragEnd = (event: DragEndEvent) => {
         onDragMove={handleDragMove}
         onDragEnd={handleDragEnd}
         autoScroll={false}
+        modifiers={[snapCenterToCursor]}
       >
         <ResizablePanelGroup direction="horizontal" className="flex-1 w-full">
           <ResizablePanel defaultSize={25} minSize={10} maxSize={40} collapsible>
