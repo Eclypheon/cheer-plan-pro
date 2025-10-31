@@ -1,9 +1,10 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useCallback } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import type { PositionIcon } from "@/types/routine";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Undo, Redo, ToggleLeft, ToggleRight, Square, Circle, X } from "lucide-react";
+import { Slider } from "@/components/ui/slider";
+import { Plus, Undo, Redo, ToggleLeft, ToggleRight, Square, Circle, X, ZoomIn, ZoomOut } from "lucide-react";
 import { PositionIcon as PositionIconComponent } from "./PositionIcon";
 import { PositionIconNameDialog } from "./PositionIconNameDialog";
 
@@ -65,6 +66,10 @@ export const PositionSheet = ({
   const [selectionStart, setSelectionStart] = useState<{ x: number; y: number } | null>(null);
   const [selectionEnd, setSelectionEnd] = useState<{ x: number; y: number } | null>(null);
   const [isDraggingSelection, setIsDraggingSelection] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState(0.55); // Default zoom level (55%)
+  const [isPinching, setIsPinching] = useState(false);
+  const [initialPinchDistance, setInitialPinchDistance] = useState(0);
+  const [initialZoomLevel, setInitialZoomLevel] = useState(1.0);
   const sheetRef = useRef<HTMLDivElement>(null);
 
   // Set up droppable area for the position sheet grid
@@ -73,14 +78,93 @@ export const PositionSheet = ({
     data: { type: "position-sheet-grid" },
   });
 
+  // Zoom handlers
+  const handleZoomChange = useCallback((value: number[]) => {
+    setZoomLevel(value[0]);
+  }, []);
+
+  const handleZoomIn = useCallback(() => {
+    setZoomLevel(prev => Math.min(1.0, prev + 0.1));
+  }, []);
+
+  const handleZoomOut = useCallback(() => {
+    setZoomLevel(prev => Math.max(0.25, prev - 0.1));
+  }, []);
+
+  // Pinch gesture handlers
+  const getTouchDistance = useCallback((touches: React.TouchList) => {
+    if (touches.length < 2) return 0;
+    const touch1 = touches[0];
+    const touch2 = touches[1];
+    return Math.sqrt(
+      Math.pow(touch2.clientX - touch1.clientX, 2) +
+      Math.pow(touch2.clientY - touch1.clientY, 2)
+    );
+  }, []);
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      e.preventDefault();
+      setIsPinching(true);
+      setInitialPinchDistance(getTouchDistance(e.touches));
+      setInitialZoomLevel(zoomLevel);
+    }
+  }, [getTouchDistance, zoomLevel]);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (isPinching && e.touches.length === 2) {
+      e.preventDefault();
+      const currentDistance = getTouchDistance(e.touches);
+      if (initialPinchDistance > 0) {
+        const scale = currentDistance / initialPinchDistance;
+        const newZoomLevel = Math.max(0.25, Math.min(1.0, initialZoomLevel * scale));
+        setZoomLevel(newZoomLevel);
+      }
+    }
+  }, [isPinching, initialPinchDistance, initialZoomLevel, getTouchDistance]);
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length < 2) {
+      setIsPinching(false);
+      setInitialPinchDistance(0);
+    }
+  }, []);
+
+  // Convert screen coordinates to zoom-adjusted coordinates
+  const getZoomedCoordinates = useCallback((clientX: number, clientY: number) => {
+    if (!sheetRef.current) return { x: 0, y: 0 };
+
+    const rect = sheetRef.current.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+
+    // Calculate the position relative to the center
+    const relativeX = clientX - centerX;
+    const relativeY = clientY - centerY;
+
+    // Adjust for zoom scaling - divide to get the zoomed-in coordinate
+    const zoomedX = relativeX / zoomLevel;
+    const zoomedY = relativeY / zoomLevel;
+
+    // Convert back to absolute position within the 800x600 area
+    const x = zoomedX + 400; // 800/2 = 400 (center offset)
+    const y = zoomedY + 300; // 600/2 = 300 (center offset)
+
+    // Clamp to the actual sheet boundaries
+    return {
+      x: Math.max(0, Math.min(800, x)),
+      y: Math.max(0, Math.min(600, y))
+    };
+  }, [zoomLevel]);
+
   const handleSelectionMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement;
     const isIcon = target.closest('[data-position-icon]');
 
     // Only start selection if clicking on empty space (not on an icon)
     if (!isIcon && (e.target === e.currentTarget || target.closest('.sheet-background'))) {
-      const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
-      setSelectionStart({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+      const coords = getZoomedCoordinates(e.clientX, e.clientY);
+      setSelectionStart(coords);
       setSelectionEnd(null);
       setIsDraggingSelection(true);
     }
@@ -89,8 +173,8 @@ export const PositionSheet = ({
   const handleSelectionMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     // Only update selection rectangle if we're in selection mode (not dragging an icon)
     if (selectionStart && isDraggingSelection) {
-      const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
-      setSelectionEnd({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+      const coords = getZoomedCoordinates(e.clientX, e.clientY);
+      setSelectionEnd(coords);
     }
   };
 
@@ -187,6 +271,7 @@ export const PositionSheet = ({
 return (
   <>
     <Card className="h-full flex flex-col relative z-10" id="position-sheet">
+      {/* Header */}
       <div className="p-1.5 border-b relative z-10">
         <div className="flex items-center justify-between gap-1.5">
           <h3 className="text-sm font-semibold">Line {selectedLine + 1}</h3>
@@ -257,86 +342,153 @@ return (
         </div>
       </div>
 
-      <div className="flex-1 p-1.5 flex justify-center overflow-auto">
-        <div
-          ref={(node) => {
-            sheetRef.current = node;
-            setNodeRef(node);
-          }}
-          className={`sheet-background relative bg-background border border-border rounded ${
-            isOver ? "bg-accent/10" : ""
-          }`}
-          style={{ width: '800px', height: '600px', flexShrink: 0 }}
-          onMouseDown={handleSelectionMouseDown}
-          onMouseMove={handleSelectionMouseMove}
-          onMouseUp={handleSelectionMouseUp}
-          onClick={handleSheetClick}
-        >
-          {/* Grid overlay - 36x36 grid */}
-          {(showGrid || isDraggingIcon) && (
-            <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 5 }}>
-              {Array.from({ length: 37 }, (_, i) => (
-                <line
-                  key={`v-${i}`}
-                  x1={`${(i / 36) * 100}%`}
-                  y1="0"
-                  x2={`${(i / 36) * 100}%`}
-                  y2="100%"
-                  stroke="currentColor"
-                  strokeOpacity="0.2"
-                  strokeWidth="0.5"
-                />
-              ))}
-              {Array.from({ length: 37 }, (_, i) => (
-                <line
-                  key={`h-${i}`}
-                  x1="0"
-                  y1={`${(i / 36) * 100}%`}
-                  x2="100%"
-                  y2={`${(i / 36) * 100}%`}
-                  stroke="currentColor"
-                  strokeOpacity="0.2"
-                  strokeWidth="0.5"
-                />
-              ))}
-            </svg>
-          )}
-
-          {/* 9 vertical lines representing roll mats */}
-          {Array.from({ length: 9 }, (_, i) => (
-            <div
-              key={i}
-              className="absolute top-0 bottom-0 border-l border-muted pointer-events-none"
-              style={{ left: `${(i / 9) * 100}%`, zIndex: 1 }}
+      {/* Content area with zoom controls and position sheet */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Zoom controls sidebar */}
+        <div className="flex flex-col items-center justify-center p-2 border-r border-border bg-muted/20" style={{ width: '30px' }}>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-6 w-6 p-0 mb-1"
+            onClick={handleZoomIn}
+            disabled={zoomLevel >= 1.0}
+            title="Zoom in"
+          >
+            <ZoomIn className="h-3 w-3" />
+          </Button>
+          <div className="flex flex-col items-center gap-2">
+            <Slider
+              value={[zoomLevel]}
+              onValueChange={handleZoomChange}
+              min={0.25}
+              max={1.0}
+              step={0.05}
+              orientation="vertical"
+              className="h-32 w-2"
             />
-          ))}
+            <span className="text-xs text-muted-foreground leading-none font-medium">
+              {Math.round(zoomLevel * 100)}%
+            </span>
+          </div>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-6 w-6 p-0 mt-1"
+            onClick={handleZoomOut}
+            disabled={zoomLevel <= 0.25}
+            title="Zoom out"
+          >
+            <ZoomOut className="h-3 w-3" />
+          </Button>
+        </div>
 
-          {/* Selection rectangle - only show when dragging on empty space */}
-          {selectionStart && selectionEnd && isDraggingSelection && (
+ {/* Position sheet */}
+        <div className="flex-1 p-1.5 flex justify-center overflow-auto">
+          {/* This is the wrapper div that fixes the scroll issue.
+            Its size is what the scroll-container "sees".
+            It shrinks and grows with the zoomLevel, eliminating empty scroll space.
+          */}
+          <div
+            style={{
+              width: `${800 * zoomLevel}px`,
+              height: `${600 * zoomLevel}px`,
+              flexShrink: 0,
+              transition: 'width 0.1s ease-out, height 0.1s ease-out'
+            }}
+          >
             <div
-              className="absolute border-2 border-accent bg-accent/20 pointer-events-none"
-              style={{
-                left: Math.min(selectionStart.x, selectionEnd.x),
-                top: Math.min(selectionStart.y, selectionEnd.y),
-                width: Math.abs(selectionEnd.x - selectionStart.x),
-                height: Math.abs(selectionEnd.y - selectionStart.y),
-                zIndex: 10,
+              ref={(node) => {
+                sheetRef.current = node;
+                setNodeRef(node);
               }}
-            />
-          )}
+              className={`sheet-background relative bg-background border border-border rounded ${
+                isOver ? "bg-accent/10" : ""
+              }`}
+              style={{
+                width: '800px',
+                height: '600px',
+                flexShrink: 0,
+                transform: `scale(${zoomLevel})`,
+                transformOrigin: 'top left', // Scale from the top-left corner
+                transition: 'transform 0.1s ease-out'
+              }}
+              onMouseDown={handleSelectionMouseDown}
+              onMouseMove={handleSelectionMouseMove}
+              onMouseUp={handleSelectionMouseUp}
+              onClick={handleSheetClick}
+              onTouchStart={handleTouchStart}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
+            >
+              {/* Grid overlay - 36x36 grid */}
+              {(showGrid || isDraggingIcon) && (
+                <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 5 }}>
+                  {Array.from({ length: 37 }, (_, i) => (
+                    <line
+                      key={`v-${i}`}
+                      x1={`${(i / 36) * 100}%`}
+                      y1="0"
+                      x2={`${(i / 36) * 100}%`}
+                      y2="100%"
+                      stroke="currentColor"
+                      strokeOpacity="0.2"
+                      strokeWidth="0.5"
+                    />
+                  ))}
+                  {Array.from({ length: 37 }, (_, i) => (
+                    <line
+                      key={`h-${i}`}
+                      x1="0"
+                      y1={`${(i / 36) * 100}%`}
+                      x2="100%"
+                      y2={`${(i / 36) * 100}%`}
+                      stroke="currentColor"
+                      strokeOpacity="0.2"
+                      strokeWidth="0.5"
+                    />
+                  ))}
+                </svg>
+              )}
 
-          {/* Position icons */}
-          {lineIcons.map((icon) => (
-            <PositionIconComponent
-              key={icon.id}
-              icon={icon}
-              onUpdate={(x, y) => onUpdateIcon(icon.id, x, y)}
-              onClick={() => handleIconClick(icon.id)}
-              onRemove={onRemoveIcon}
-              dragOffset={dragOffset}
-              isMultiDrag={isMultiDrag}
-            />
-          ))}
+              {/* 9 vertical lines representing roll mats */}
+              {Array.from({ length: 9 }, (_, i) => (
+                <div
+                  key={i}
+                  className="absolute top-0 bottom-0 border-l border-muted pointer-events-none"
+                  style={{ left: `${(i / 9) * 100}%`, zIndex: 1 }}
+                />
+              ))}
+
+              {/* Selection rectangle - only show when dragging on empty space */}
+              {selectionStart && selectionEnd && isDraggingSelection && (
+                <div
+                  className="absolute border-2 border-accent bg-accent/20 pointer-events-none"
+                  style={{
+                    left: Math.min(selectionStart.x, selectionEnd.x),
+                    top: Math.min(selectionStart.y, selectionEnd.y),
+                    width: Math.abs(selectionEnd.x - selectionStart.x),
+                    height: Math.abs(selectionEnd.y - selectionStart.y),
+                    zIndex: 10,
+                  }}
+                />
+              )}
+
+              {/* Position icons */}
+              {lineIcons.map((icon) => (
+                <PositionIconComponent
+                  key={icon.id}
+                  icon={icon}
+                  onUpdate={(x, y) => onUpdateIcon(icon.id, x, y)}
+                  onClick={() => handleIconClick(icon.id)}
+                  onRemove={onRemoveIcon}
+                  dragOffset={dragOffset}
+                  isMultiDrag={isMultiDrag}
+                  zoomLevel={zoomLevel}
+                  getZoomedCoordinates={getZoomedCoordinates}
+                />
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </Card>

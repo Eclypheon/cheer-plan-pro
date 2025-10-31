@@ -1262,7 +1262,7 @@ const handleDragEnd = (event: DragEndEvent) => {
           <ResizablePanel defaultSize={75}>
             {(config.category === "team-16" || config.category === "team-24") ? (
               <ResizablePanelGroup direction="vertical" className="h-full">
-                <ResizablePanel defaultSize={60}>
+                <ResizablePanel defaultSize={50}>
                   <CountSheet
                     routineLength={config.length}
                     bpm={config.bpm}
@@ -1283,7 +1283,7 @@ const handleDragEnd = (event: DragEndEvent) => {
 
                 <ResizableHandle withHandle />
 
-                <ResizablePanel defaultSize={40} minSize={30}>
+                <ResizablePanel defaultSize={50} minSize={30}>
                   <PositionSheet
                     icons={positionIcons}
                     selectedLine={selectedLine}
