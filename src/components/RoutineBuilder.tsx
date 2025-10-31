@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
   import { DndContext, DragEndEvent, DragOverlay, useSensor, useSensors, PointerSensor, DragStartEvent, DragMoveEvent, CollisionDetection, rectIntersection, closestCenter } from "@dnd-kit/core";
+import { snapCenterToCursor } from "@dnd-kit/modifiers";
 import type { PlacedSkill, RoutineConfig, Skill, PositionIcon, CategoryStateData, SaveStateData } from "@/types/routine";
 import { useSkills } from "@/hooks/useSkills";
 import { SkillsPanel } from "./SkillsPanel";
@@ -32,6 +33,7 @@ export const RoutineBuilder = () => {
   const [lineHistories, setLineHistories] = useState<{ [saveStateSlot: number]: { [category: string]: { [lineIndex: number]: { history: PositionIcon[][], index: number } } } }>({});
   const [draggedSkill, setDraggedSkill] = useState<Skill | null>(null);
   const [isDraggingPlacedSkill, setIsDraggingPlacedSkill] = useState(false);
+  const [isResizing, setIsResizing] = useState(false);
   const [draggedPlacedSkillId, setDraggedPlacedSkillId] = useState<string | null>(null);
   const [selectedSkillId, setSelectedSkillId] = useState<string | null>(null);
   const [showGrid, setShowGrid] = useState(false);
@@ -164,6 +166,64 @@ export const RoutineBuilder = () => {
     }
   }, [placedSkills, positionIcons, config, loadedSaveStateSlot, hasLoadedState]);
 
+  // Auto-scroll to keep selected skill in view after keyboard movement
+  useEffect(() => {
+    if (!selectedSkillId) return;
+
+    const selectedSkill = placedSkills.find(ps => ps.id === selectedSkillId);
+    if (!selectedSkill) return;
+
+    // Find the count sheet container (the scrollable div)
+    const countSheetContainer = document.querySelector('.flex-1.overflow-auto.relative') as HTMLElement;
+    if (!countSheetContainer) return;
+
+    // Find the specific skill element for the selected skill
+    const skillElement = document.querySelector(`[data-skill-id="${selectedSkillId}"]`) as HTMLElement;
+    if (!skillElement) return;
+
+    const containerRect = countSheetContainer.getBoundingClientRect();
+    const skillRect = skillElement.getBoundingClientRect();
+
+    // Calculate if the skill is outside the visible area
+    const isAboveViewport = skillRect.top < containerRect.top;
+    const isBelowViewport = skillRect.bottom > containerRect.bottom;
+    const isLeftOfViewport = skillRect.left < containerRect.left;
+    const isRightOfViewport = skillRect.right > containerRect.right;
+
+    // If any part of the skill is outside the viewport, scroll to bring it into view
+    if (isAboveViewport || isBelowViewport || isLeftOfViewport || isRightOfViewport) {
+      const currentScrollTop = countSheetContainer.scrollTop;
+      const currentScrollLeft = countSheetContainer.scrollLeft;
+
+      // Calculate how much to scroll to center the skill vertically
+      let newScrollTop = currentScrollTop;
+      if (isAboveViewport) {
+        // Scroll up to show skill at top of viewport (with small margin)
+        newScrollTop = currentScrollTop + (skillRect.top - containerRect.top) - 20;
+      } else if (isBelowViewport) {
+        // Scroll down to show skill at bottom of viewport (with small margin)
+        newScrollTop = currentScrollTop + (skillRect.bottom - containerRect.bottom) + 20;
+      }
+
+      // For horizontal scrolling, we need to scroll the cell table itself
+      let newScrollLeft = currentScrollLeft;
+      if (isLeftOfViewport) {
+        newScrollLeft = currentScrollLeft + (skillRect.left - containerRect.left) - 20;
+      } else if (isRightOfViewport) {
+        newScrollLeft = currentScrollLeft + (skillRect.right - containerRect.right) + 20;
+      }
+
+      // Apply the scroll
+      if (newScrollTop !== currentScrollTop || newScrollLeft !== currentScrollLeft) {
+        countSheetContainer.scrollTo({
+          top: Math.max(0, newScrollTop),
+          left: Math.max(0, newScrollLeft),
+          behavior: 'smooth'
+        });
+      }
+    }
+  }, [selectedSkillId, placedSkills]);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -218,22 +278,52 @@ export const RoutineBuilder = () => {
       if (selectedSkillId) {
         const selectedSkill = placedSkills.find(ps => ps.id === selectedSkillId);
         if (!selectedSkill) return;
-        
+
         const totalLines = Math.ceil((config.length * config.bpm) / 60 / 8);
-        
+
         if (e.key === keyboardSettings.moveLeft || e.key === keyboardSettings.altMoveLeft) {
-          if (selectedSkill.startCount > 1) {
+          const skill = skills.find(s => s.id === selectedSkill.skillId);
+          if (!skill) return;
+
+          // Calculate absolute start position (0-indexed)
+          const absoluteStartPos = selectedSkill.lineIndex * 8 + selectedSkill.startCount - 1;
+
+          // Try to move left by 1 count
+          const newAbsoluteStartPos = absoluteStartPos - 1;
+
+          if (newAbsoluteStartPos >= 0) {
+            // Calculate new line and start count
+            const newLineIndex = Math.floor(newAbsoluteStartPos / 8);
+            const newStartCount = (newAbsoluteStartPos % 8) + 1;
+
             setPlacedSkills(prev => prev.map(ps =>
-              ps.id === selectedSkillId ? { ...ps, startCount: ps.startCount - 1 } : ps
+              ps.id === selectedSkillId ? { ...ps, lineIndex: newLineIndex, startCount: newStartCount } : ps
             ));
           }
           e.preventDefault();
         }
-        
+
         if (e.key === keyboardSettings.moveRight || e.key === keyboardSettings.altMoveRight) {
-          if (selectedSkill.startCount < 8) {
+          const skill = skills.find(s => s.id === selectedSkill.skillId);
+          if (!skill) return;
+
+          // Calculate absolute start position (0-indexed)
+          const absoluteStartPos = selectedSkill.lineIndex * 8 + selectedSkill.startCount - 1;
+
+          // Try to move right by 1 count
+          const newAbsoluteStartPos = absoluteStartPos + 1;
+
+          // Calculate total available positions
+          const totalAvailablePositions = totalLines * 8;
+          const skillEndPos = newAbsoluteStartPos + skill.counts - 1;
+
+          if (skillEndPos < totalAvailablePositions) {
+            // Calculate new line and start count
+            const newLineIndex = Math.floor(newAbsoluteStartPos / 8);
+            const newStartCount = (newAbsoluteStartPos % 8) + 1;
+
             setPlacedSkills(prev => prev.map(ps =>
-              ps.id === selectedSkillId ? { ...ps, startCount: ps.startCount + 1 } : ps
+              ps.id === selectedSkillId ? { ...ps, lineIndex: newLineIndex, startCount: newStartCount } : ps
             ));
           }
           e.preventDefault();
@@ -264,38 +354,100 @@ export const RoutineBuilder = () => {
         const selectedSkill = placedSkills.find(ps => ps.id === selectedSkillId);
         if (!selectedSkill) return;
 
+        const totalLines = Math.ceil((config.length * config.bpm) / 60 / 8);
+
         if (e.key === keyboardSettings.moveLeft || e.key === keyboardSettings.altMoveLeft) {
-          if (selectedSkill.startCount > 1) {
-            const skillsToMove = placedSkills.filter(ps =>
-              ps.lineIndex > selectedSkill.lineIndex ||
-              (ps.lineIndex === selectedSkill.lineIndex && ps.startCount > selectedSkill.startCount)
-            );
-            setPlacedSkills(prev => prev.map(ps =>
-              skillsToMove.some(stm => stm.id === ps.id) ? { ...ps, startCount: ps.startCount - 1 } : ps
-            ));
+          // Check if we can move left - calculate absolute positions for all affected skills
+          const skillsToMove = placedSkills.filter(ps =>
+            ps.lineIndex > selectedSkill.lineIndex ||
+            (ps.lineIndex === selectedSkill.lineIndex && ps.startCount > selectedSkill.startCount)
+          );
+
+          // Check if all skills to move can be moved left by calculating their new absolute positions
+          const canMoveLeft = skillsToMove.every(ps => {
+            const skill = skills.find(s => s.id === ps.skillId);
+            if (!skill) return false;
+
+            // Calculate absolute start position (0-indexed)
+            const absoluteStartPos = ps.lineIndex * 8 + ps.startCount - 1;
+            const newAbsoluteStartPos = absoluteStartPos - 1;
+
+            // Must be within bounds
+            return newAbsoluteStartPos >= 0;
+          });
+
+          if (canMoveLeft) {
+            setPlacedSkills(prev => prev.map(ps => {
+              if (skillsToMove.some(stm => stm.id === ps.id)) {
+                // Calculate absolute start position (0-indexed)
+                const absoluteStartPos = ps.lineIndex * 8 + ps.startCount - 1;
+                const newAbsoluteStartPos = absoluteStartPos - 1;
+
+                // Calculate new line and start count
+                const newLineIndex = Math.floor(newAbsoluteStartPos / 8);
+                const newStartCount = (newAbsoluteStartPos % 8) + 1;
+
+                return { ...ps, lineIndex: newLineIndex, startCount: newStartCount };
+              }
+              return ps;
+            }));
           }
           e.preventDefault();
         }
 
         if (e.key === keyboardSettings.moveRight || e.key === keyboardSettings.altMoveRight) {
-          if (selectedSkill.startCount < 8) {
-            const skillsToMove = placedSkills.filter(ps =>
-              ps.lineIndex > selectedSkill.lineIndex ||
-              (ps.lineIndex === selectedSkill.lineIndex && ps.startCount > selectedSkill.startCount)
-            );
-            setPlacedSkills(prev => prev.map(ps =>
-              skillsToMove.some(stm => stm.id === ps.id) ? { ...ps, startCount: ps.startCount + 1 } : ps
-            ));
+          // Check if we can move right - calculate absolute positions for all affected skills
+          const skillsToMove = placedSkills.filter(ps =>
+            ps.lineIndex > selectedSkill.lineIndex ||
+            (ps.lineIndex === selectedSkill.lineIndex && ps.startCount > selectedSkill.startCount)
+          );
+
+          // Check if all skills to move can be moved right by calculating their new absolute end positions
+          const canMoveRight = skillsToMove.every(ps => {
+            const skill = skills.find(s => s.id === ps.skillId);
+            if (!skill) return false;
+
+            // Calculate absolute start position (0-indexed) and new position
+            const absoluteStartPos = ps.lineIndex * 8 + ps.startCount - 1;
+            const newAbsoluteStartPos = absoluteStartPos + 1;
+
+            // Calculate total available positions
+            const totalAvailablePositions = totalLines * 8;
+            const skillEndPos = newAbsoluteStartPos + skill.counts - 1;
+
+            // Must not exceed total available positions
+            return skillEndPos < totalAvailablePositions;
+          });
+
+          if (canMoveRight) {
+            setPlacedSkills(prev => prev.map(ps => {
+              if (skillsToMove.some(stm => stm.id === ps.id)) {
+                // Calculate absolute start position (0-indexed) and new position
+                const absoluteStartPos = ps.lineIndex * 8 + ps.startCount - 1;
+                const newAbsoluteStartPos = absoluteStartPos + 1;
+
+                // Calculate new line and start count
+                const newLineIndex = Math.floor(newAbsoluteStartPos / 8);
+                const newStartCount = (newAbsoluteStartPos % 8) + 1;
+
+                return { ...ps, lineIndex: newLineIndex, startCount: newStartCount };
+              }
+              return ps;
+            }));
           }
           e.preventDefault();
         }
 
         if (e.key === keyboardSettings.moveUp || e.key === keyboardSettings.altMoveUp) {
-          if (selectedSkill.lineIndex > 0) {
-            const skillsToMove = placedSkills.filter(ps =>
-              ps.lineIndex > selectedSkill.lineIndex ||
-              (ps.lineIndex === selectedSkill.lineIndex && ps.startCount > selectedSkill.startCount)
-            );
+          // Check if all skills to move can actually move up (not in first line)
+          const skillsToMove = placedSkills.filter(ps =>
+            ps.lineIndex > selectedSkill.lineIndex ||
+            (ps.lineIndex === selectedSkill.lineIndex && ps.startCount > selectedSkill.startCount)
+          );
+
+          const canAllSkillsMoveUp = skillsToMove.every(ps => ps.lineIndex > 0);
+
+          if (canAllSkillsMoveUp) {
             setPlacedSkills(prev => prev.map(ps =>
               skillsToMove.some(stm => stm.id === ps.id) ? { ...ps, lineIndex: ps.lineIndex - 1 } : ps
             ));
@@ -304,12 +456,15 @@ export const RoutineBuilder = () => {
         }
 
         if (e.key === keyboardSettings.moveDown || e.key === keyboardSettings.altMoveDown) {
-          const totalLines = Math.ceil((config.length * config.bpm) / 60 / 8);
-          if (selectedSkill.lineIndex < totalLines - 1) {
-            const skillsToMove = placedSkills.filter(ps =>
-              ps.lineIndex > selectedSkill.lineIndex ||
-              (ps.lineIndex === selectedSkill.lineIndex && ps.startCount > selectedSkill.startCount)
-            );
+          // Check if all skills to move can actually move down (not in last line)
+          const skillsToMove = placedSkills.filter(ps =>
+            ps.lineIndex > selectedSkill.lineIndex ||
+            (ps.lineIndex === selectedSkill.lineIndex && ps.startCount > selectedSkill.startCount)
+          );
+
+          const canAllSkillsMoveDown = skillsToMove.every(ps => ps.lineIndex < totalLines - 1);
+
+          if (canAllSkillsMoveDown) {
             setPlacedSkills(prev => prev.map(ps =>
               skillsToMove.some(stm => stm.id === ps.id) ? { ...ps, lineIndex: ps.lineIndex + 1 } : ps
             ));
@@ -323,38 +478,100 @@ export const RoutineBuilder = () => {
         const selectedSkill = placedSkills.find(ps => ps.id === selectedSkillId);
         if (!selectedSkill) return;
 
+        const totalLines = Math.ceil((config.length * config.bpm) / 60 / 8);
+
         if (e.key === keyboardSettings.moveLeft || e.key === keyboardSettings.altMoveLeft) {
-          if (selectedSkill.startCount > 1) {
-            const skillsToMove = placedSkills.filter(ps =>
-              ps.lineIndex < selectedSkill.lineIndex ||
-              (ps.lineIndex === selectedSkill.lineIndex && ps.startCount < selectedSkill.startCount)
-            );
-            setPlacedSkills(prev => prev.map(ps =>
-              skillsToMove.some(stm => stm.id === ps.id) ? { ...ps, startCount: ps.startCount - 1 } : ps
-            ));
+          // Check if we can move left - calculate absolute positions for all affected skills
+          const skillsToMove = placedSkills.filter(ps =>
+            ps.lineIndex < selectedSkill.lineIndex ||
+            (ps.lineIndex === selectedSkill.lineIndex && ps.startCount < selectedSkill.startCount)
+          );
+
+          // Check if all skills to move can be moved left by calculating their new absolute positions
+          const canMoveLeft = skillsToMove.every(ps => {
+            const skill = skills.find(s => s.id === ps.skillId);
+            if (!skill) return false;
+
+            // Calculate absolute start position (0-indexed)
+            const absoluteStartPos = ps.lineIndex * 8 + ps.startCount - 1;
+            const newAbsoluteStartPos = absoluteStartPos - 1;
+
+            // Must be within bounds
+            return newAbsoluteStartPos >= 0;
+          });
+
+          if (canMoveLeft) {
+            setPlacedSkills(prev => prev.map(ps => {
+              if (skillsToMove.some(stm => stm.id === ps.id)) {
+                // Calculate absolute start position (0-indexed)
+                const absoluteStartPos = ps.lineIndex * 8 + ps.startCount - 1;
+                const newAbsoluteStartPos = absoluteStartPos - 1;
+
+                // Calculate new line and start count
+                const newLineIndex = Math.floor(newAbsoluteStartPos / 8);
+                const newStartCount = (newAbsoluteStartPos % 8) + 1;
+
+                return { ...ps, lineIndex: newLineIndex, startCount: newStartCount };
+              }
+              return ps;
+            }));
           }
           e.preventDefault();
         }
 
         if (e.key === keyboardSettings.moveRight || e.key === keyboardSettings.altMoveRight) {
-          if (selectedSkill.startCount < 8) {
-            const skillsToMove = placedSkills.filter(ps =>
-              ps.lineIndex < selectedSkill.lineIndex ||
-              (ps.lineIndex === selectedSkill.lineIndex && ps.startCount < selectedSkill.startCount)
-            );
-            setPlacedSkills(prev => prev.map(ps =>
-              skillsToMove.some(stm => stm.id === ps.id) ? { ...ps, startCount: ps.startCount + 1 } : ps
-            ));
+          // Check if we can move right - calculate absolute positions for all affected skills
+          const skillsToMove = placedSkills.filter(ps =>
+            ps.lineIndex < selectedSkill.lineIndex ||
+            (ps.lineIndex === selectedSkill.lineIndex && ps.startCount < selectedSkill.startCount)
+          );
+
+          // Check if all skills to move can be moved right by calculating their new absolute end positions
+          const canMoveRight = skillsToMove.every(ps => {
+            const skill = skills.find(s => s.id === ps.skillId);
+            if (!skill) return false;
+
+            // Calculate absolute start position (0-indexed) and new position
+            const absoluteStartPos = ps.lineIndex * 8 + ps.startCount - 1;
+            const newAbsoluteStartPos = absoluteStartPos + 1;
+
+            // Calculate total available positions
+            const totalAvailablePositions = totalLines * 8;
+            const skillEndPos = newAbsoluteStartPos + skill.counts - 1;
+
+            // Must not exceed total available positions
+            return skillEndPos < totalAvailablePositions;
+          });
+
+          if (canMoveRight) {
+            setPlacedSkills(prev => prev.map(ps => {
+              if (skillsToMove.some(stm => stm.id === ps.id)) {
+                // Calculate absolute start position (0-indexed) and new position
+                const absoluteStartPos = ps.lineIndex * 8 + ps.startCount - 1;
+                const newAbsoluteStartPos = absoluteStartPos + 1;
+
+                // Calculate new line and start count
+                const newLineIndex = Math.floor(newAbsoluteStartPos / 8);
+                const newStartCount = (newAbsoluteStartPos % 8) + 1;
+
+                return { ...ps, lineIndex: newLineIndex, startCount: newStartCount };
+              }
+              return ps;
+            }));
           }
           e.preventDefault();
         }
 
         if (e.key === keyboardSettings.moveUp || e.key === keyboardSettings.altMoveUp) {
-          if (selectedSkill.lineIndex > 0) {
-            const skillsToMove = placedSkills.filter(ps =>
-              ps.lineIndex < selectedSkill.lineIndex ||
-              (ps.lineIndex === selectedSkill.lineIndex && ps.startCount < selectedSkill.startCount)
-            );
+          // Check if all skills to move can actually move up (not in first line)
+          const skillsToMove = placedSkills.filter(ps =>
+            ps.lineIndex < selectedSkill.lineIndex ||
+            (ps.lineIndex === selectedSkill.lineIndex && ps.startCount < selectedSkill.startCount)
+          );
+
+          const canAllSkillsMoveUp = skillsToMove.every(ps => ps.lineIndex > 0);
+
+          if (canAllSkillsMoveUp) {
             setPlacedSkills(prev => prev.map(ps =>
               skillsToMove.some(stm => stm.id === ps.id) ? { ...ps, lineIndex: ps.lineIndex - 1 } : ps
             ));
@@ -363,12 +580,15 @@ export const RoutineBuilder = () => {
         }
 
         if (e.key === keyboardSettings.moveDown || e.key === keyboardSettings.altMoveDown) {
-          const totalLines = Math.ceil((config.length * config.bpm) / 60 / 8);
-          if (selectedSkill.lineIndex < totalLines - 1) {
-            const skillsToMove = placedSkills.filter(ps =>
-              ps.lineIndex < selectedSkill.lineIndex ||
-              (ps.lineIndex === selectedSkill.lineIndex && ps.startCount < selectedSkill.startCount)
-            );
+          // Check if all skills to move can actually move down (not in last line)
+          const skillsToMove = placedSkills.filter(ps =>
+            ps.lineIndex < selectedSkill.lineIndex ||
+            (ps.lineIndex === selectedSkill.lineIndex && ps.startCount < selectedSkill.startCount)
+          );
+
+          const canAllSkillsMoveDown = skillsToMove.every(ps => ps.lineIndex < totalLines - 1);
+
+          if (canAllSkillsMoveDown) {
             setPlacedSkills(prev => prev.map(ps =>
               skillsToMove.some(stm => stm.id === ps.id) ? { ...ps, lineIndex: ps.lineIndex + 1 } : ps
             ));
@@ -607,7 +827,8 @@ export const RoutineBuilder = () => {
    * Custom collision detection function that prioritizes:
    * 1. Trash zone collisions using rectIntersection
    * 2. Position sheet grid when dragging position icons (uses rectIntersection)
-   * 3. Falls back to closestCenter for count sheet cells
+   * 3. Left-edge collision for placed skills being dragged back onto countsheet
+   * 4. Falls back to rectIntersection for count sheet cells (new skills) and other scenarios
    */
   const customCollisionDetection: CollisionDetection = (args) => {
     // 1. Check for collisions using rectIntersection (for trash zone and prioritized areas)
@@ -634,8 +855,29 @@ export const RoutineBuilder = () => {
       }
     }
 
-    // 3. Fall back to closestCenter for count sheet cells and other scenarios
-    return closestCenter(args);
+    // 3. Use left-edge collision detection only for placed skills being dragged back onto countsheet
+    if (setIsDraggingPlacedSkill) {
+      return rectCollisions.filter(collision => {
+        const activeRect = args.active.rect.current?.translated;
+        const droppableRect = args.droppableRects.get(collision.id);
+
+        if (!activeRect || !droppableRect) return false;
+
+        // Check if the left edge (vertical line at activeRect.left) intersects with the droppable
+        // This means the left edge x-position is within the droppable's bounds
+        const leftEdgeX = activeRect.left;
+
+        // The left edge intersects if its x-position is within the droppable's width
+        // and the active rect overlaps with the droppable in the y-direction
+        const xIntersects = leftEdgeX >= droppableRect.left && leftEdgeX <= droppableRect.right;
+        const yIntersects = activeRect.top < droppableRect.bottom && activeRect.bottom > droppableRect.top;
+
+        return xIntersects && yIntersects;
+      });
+    }
+
+    // 4. Fall back to closestCenter for count sheet cells (new skills) and other scenarios
+    return rectIntersection(args);
   };
 
   // Auto-populate position icons for Team categories (only when not loaded from saved state)
@@ -689,12 +931,70 @@ export const RoutineBuilder = () => {
     }
   }, [positionIcons, selectedLine, loadedSaveStateSlot, config.category]);
 
-  const handleDragMove = (event: DragMoveEvent) => {
+const handleDragMove = (event: DragMoveEvent) => {
     console.log(`Drag Move: Type='${event.active.data?.current?.type || (skills.find(s => s.id === event.active.id) ? 'new skill' : 'unknown')}', ID='${event.active.id}'`);
-    const { active, delta } = event;
+    const { active, delta, over } = event; // Add 'over' here
     
     if (active.data?.current?.type === "position-icon") {
       setDragOffset({ x: delta.x, y: delta.y });
+    }
+
+    // --- Add This New Logic Block for Skill Resize ---
+    if (active.data?.current?.type === "skill-resize" && over && over.id.toString().startsWith("cell-")) {
+      const { skill, placedSkill, direction } = active.data.current as { skill: Skill, placedSkill: PlacedSkill, direction: 'left' | 'right', originalCellsToSpan: number };
+      const { lineIndex: overLine, count: overCount } = over.data.current as { lineIndex: number, count: number };
+
+      // Find the placed skill's starting position *at the beginning of the drag*
+      const { lineIndex: startLine, startCount: startCol } = placedSkill;
+      
+      // Calculate the absolute start position (0-indexed) *at the beginning of the drag*
+      const absoluteStartPos = startLine * 8 + (startCol - 1);
+      
+      // Calculate the absolute position of the cell we're hovering over (0-indexed)
+      const absoluteOverPos = overLine * 8 + (overCount - 1);
+
+      let newCounts: number;
+      let newAbsoluteStartPos = -1; // -1 to indicate no change unless left handle
+
+      if (direction === "right") {
+        // New count is the difference from the start pos to the over pos
+        newCounts = absoluteOverPos - absoluteStartPos + 1;
+      } else { // direction === "left"
+        // The skill's original end position (at drag start)
+        const originalAbsoluteEndPos = absoluteStartPos + skill.counts - 1;
+        
+        // New count is the difference from the original end pos to the new start pos
+        newCounts = originalAbsoluteEndPos - absoluteOverPos + 1;
+        
+        // The new start position is the cell we're over
+        newAbsoluteStartPos = absoluteOverPos;
+      }
+
+      // Clamp newCounts to be at least 1
+      newCounts = Math.max(1, newCounts);
+
+      // --- Update State (with checks to prevent thrashing) ---
+
+      // 1. Update the base skill's counts if it has changed
+      const currentSkill = skills.find(s => s.id === skill.id);
+      if (currentSkill && currentSkill.counts !== newCounts) {
+        updateSkillCounts(skill.id, newCounts);
+      }
+
+      // 2. If it's the left handle, update the placedSkill's position if it has changed
+      if (direction === "left" && newAbsoluteStartPos !== -1) {
+        const currentPlacedSkill = placedSkills.find(ps => ps.id === placedSkill.id);
+        const newLineIndex = Math.floor(newAbsoluteStartPos / 8);
+        const newStartCount = (newAbsoluteStartPos % 8) + 1;
+
+        if (currentPlacedSkill && (currentPlacedSkill.lineIndex !== newLineIndex || currentPlacedSkill.startCount !== newStartCount)) {
+          setPlacedSkills(prev => prev.map(ps =>
+            ps.id === placedSkill.id
+              ? { ...ps, lineIndex: newLineIndex, startCount: newStartCount }
+              : ps
+          ));
+        }
+      }
     }
   };
 
@@ -722,6 +1022,11 @@ export const RoutineBuilder = () => {
       setDraggedIconId(event.active.id as string);
       setDragOffset({ x: 0, y: 0 });
     }
+
+    if (event.active.data?.current?.type === "skill-resize") {
+      // Skill resize drag started - no special handling needed at start
+      setIsResizing(true);
+    }
   };
 
 const handleDragEnd = (event: DragEndEvent) => {
@@ -736,6 +1041,7 @@ const handleDragEnd = (event: DragEndEvent) => {
     // Reset drag state immediately
     setDraggedSkill(null);
     setIsDraggingPlacedSkill(false);
+    setIsResizing(false);
     setDraggedPlacedSkillId(null);
     setShowGrid(false);
     setIsDraggingIcon(false);
@@ -747,6 +1053,13 @@ const handleDragEnd = (event: DragEndEvent) => {
     const { active, over, delta } = event;
     // Exit if dropped outside a droppable area
     if (!over) return;
+
+// --- Skill Resize Handle Logic ---
+    if (active.data?.current?.type === "skill-resize") {
+      // All logic is now handled in onDragMove.
+      // We just need to stop further processing here.
+      return; 
+    }
 
     // --- Trash Zone Logic ---
     // Check for trash zone drop with robust detection
@@ -1291,6 +1604,7 @@ const handleDragEnd = (event: DragEndEvent) => {
         onDragMove={handleDragMove}
         onDragEnd={handleDragEnd}
         autoScroll={false}
+        modifiers={[snapCenterToCursor]}
       >
         <ResizablePanelGroup direction="horizontal" className="flex-1 w-full">
           <ResizablePanel defaultSize={25} minSize={10} maxSize={40} collapsible>
@@ -1328,6 +1642,7 @@ const handleDragEnd = (event: DragEndEvent) => {
                         ps.id === id ? { ...ps, lineIndex: newLineIndex, startCount: newStartCount } : ps
                       ));
                     }}
+                    onUpdateSkillCounts={updateSkillCounts}
                   />
                 </ResizablePanel>
 
@@ -1404,14 +1719,20 @@ const handleDragEnd = (event: DragEndEvent) => {
                     ps.id === id ? { ...ps, lineIndex: newLineIndex, startCount: newStartCount } : ps
                   ));
                 }}
+                onUpdateSkillCounts={updateSkillCounts}
               />
             )}
           </ResizablePanel>
         </ResizablePanelGroup>
 
-        <DragOverlay className="z-[3000]">
-          {draggedSkill ? <SkillCard skill={draggedSkill} /> : null}
-        </DragOverlay>
+<DragOverlay className="z-[3000]">
+
+{draggedSkill ? (
+<div className={isDraggingPlacedSkill ? "" : ""}>
+<SkillCard skill={draggedSkill} showDescription={false} />
+</div>
+) : null}
+</DragOverlay>
         <TrashDropZone isDragging={isDraggingPlacedSkill || draggedSkill !== null} />
       </DndContext>
     </div>

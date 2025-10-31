@@ -8,9 +8,10 @@ import type { Skill } from "@/types/routine";
 interface SkillCardProps {
   skill: Skill;
   onUpdateCounts?: (id: string, counts: number) => void;
+  showDescription?: boolean;
 }
 
-export const SkillCard = ({ skill, onUpdateCounts }: SkillCardProps) => {
+export const SkillCard = ({ skill, onUpdateCounts, showDescription = true, }: SkillCardProps) => {
   const [isEditingCounts, setIsEditingCounts] = useState(false);
   const [editedCounts, setEditedCounts] = useState(skill.counts.toString());
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
@@ -38,7 +39,7 @@ export const SkillCard = ({ skill, onUpdateCounts }: SkillCardProps) => {
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1">
           <h3 className="font-medium text-sm">{skill.name}</h3>
-          {skill.description && (
+          {skill.description && showDescription && (
             <p className="text-xs text-muted-foreground mt-1">{skill.description}</p>
           )}
         </div>
