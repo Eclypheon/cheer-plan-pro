@@ -25,10 +25,11 @@ export const RoutineBuilder = () => {
     level: "premier",
     bpm: 154,
   });
-  
+
   const [placedSkills, setPlacedSkills] = useState<PlacedSkill[]>([]);
   const [positionIcons, setPositionIcons] = useState<PositionIcon[]>([]);
   const [selectedLine, setSelectedLine] = useState<number | null>(null);
+  const [lineHistories, setLineHistories] = useState<{ [saveStateSlot: number]: { [category: string]: { [lineIndex: number]: { history: PositionIcon[][], index: number } } } }>({});
   const [draggedSkill, setDraggedSkill] = useState<Skill | null>(null);
   const [isDraggingPlacedSkill, setIsDraggingPlacedSkill] = useState(false);
   const [draggedPlacedSkillId, setDraggedPlacedSkillId] = useState<string | null>(null);
@@ -38,6 +39,7 @@ export const RoutineBuilder = () => {
   const [isDraggingIcon, setIsDraggingIcon] = useState(false);
   const [dragOffset, setDragOffset] = useState<{ x: number; y: number } | null>(null);
   const [draggedIconId, setDraggedIconId] = useState<string | null>(null);
+  const [currentZoomLevel, setCurrentZoomLevel] = useState<number>(0.55);
   const [hasLoadedState, setHasLoadedState] = useState(false);
   const initialLoadedCategoryRef = useRef<string | null>(null);
   const [currentSaveState, setCurrentSaveState] = useState<SaveStateData | null>(null);
@@ -97,6 +99,23 @@ export const RoutineBuilder = () => {
     // Save current category state before switching (only for user-initiated changes)
     if (initialLoadedCategoryRef.current !== null && initialLoadedCategoryRef.current !== config.category) {
       saveCategoryState(initialLoadedCategoryRef.current as RoutineConfig['category']);
+    }
+
+    // Always start with fresh history when changing categories to ensure complete isolation
+    if (loadedSaveStateSlot) {
+      setLineHistories(prev => {
+        if (!prev[loadedSaveStateSlot]) {
+          return prev;
+        }
+        const newSaveStateHistories = { ...prev[loadedSaveStateSlot] };
+        // Clear history for all categories in this save state to ensure complete isolation
+        delete newSaveStateHistories[initialLoadedCategoryRef.current as string];
+        delete newSaveStateHistories[config.category]; // Clear new category history too
+        return {
+          ...prev,
+          [loadedSaveStateSlot]: newSaveStateHistories
+        };
+      });
     }
 
     // Load saved state for new category if it exists
@@ -166,6 +185,17 @@ export const RoutineBuilder = () => {
 
       if (e.key === keyboardSettings.toggleAutoFollow) {
         setAutoFollow(!autoFollow);
+        e.preventDefault();
+      }
+
+      // Undo/Redo shortcuts (no modifier keys required)
+      if (e.key === keyboardSettings.undo && selectedLine !== null) {
+        handleUndoLine(selectedLine);
+        e.preventDefault();
+      }
+
+      if (e.key === keyboardSettings.redo && selectedLine !== null) {
+        handleRedoLine(selectedLine);
         e.preventDefault();
       }
 
@@ -462,6 +492,35 @@ export const RoutineBuilder = () => {
   };
 
   /**
+   * Helper functions for scoped history management
+   * History is now scoped by saveStateSlot -> category -> lineIndex to avoid conflicts between contexts
+   */
+  const getScopedHistory = (saveStateSlot: number, category: string, lineIndex: number): { history: PositionIcon[][], index: number } | undefined => {
+    return lineHistories[saveStateSlot]?.[category]?.[lineIndex];
+  };
+
+  const setScopedHistory = (saveStateSlot: number, category: string, lineIndex: number, history: { history: PositionIcon[][], index: number }) => {
+    setLineHistories(prev => ({
+      ...prev,
+      [saveStateSlot]: {
+        ...prev[saveStateSlot],
+        [category]: {
+          ...prev[saveStateSlot]?.[category],
+          [lineIndex]: history
+        }
+      }
+    }));
+  };
+
+  const getCurrentScopedHistory = (lineIndex: number): { history: PositionIcon[][], index: number } | undefined => {
+    if (!loadedSaveStateSlot) return undefined;
+    return getScopedHistory(loadedSaveStateSlot, config.category, lineIndex);
+  };
+
+  // Computed history data for the current context (save state + category)
+  const currentContextLineHistories = loadedSaveStateSlot ? lineHistories[loadedSaveStateSlot]?.[config.category] || {} : {};
+
+  /**
    * Helper functions for category-based state management
    * Category states are now scoped per save state to avoid conflicts
    */
@@ -594,6 +653,42 @@ export const RoutineBuilder = () => {
     }
   }, [hasLoadedState, config.category, config.length, config.bpm, positionIcons.length]);
 
+  // Initialize history for the selected line when it changes
+  useEffect(() => {
+    if (selectedLine !== null && loadedSaveStateSlot && !getCurrentScopedHistory(selectedLine)) {
+      const currentLineIcons = positionIcons.filter(i => i.lineIndex === selectedLine);
+      setScopedHistory(loadedSaveStateSlot, config.category, selectedLine, {
+        history: [currentLineIcons],
+        index: 0
+      });
+    }
+  }, [selectedLine, positionIcons, loadedSaveStateSlot, config.category]);
+
+  // Record history state whenever icons change for the current line
+  useEffect(() => {
+    if (selectedLine !== null && loadedSaveStateSlot) {
+      const lineHistory = getCurrentScopedHistory(selectedLine);
+      if (!lineHistory) return;
+
+      const currentState = positionIcons.filter(i => i.lineIndex === selectedLine);
+
+      // Don't record if state hasn't changed from current history position
+      const lastState = lineHistory.history[lineHistory.index];
+      if (lastState && JSON.stringify(lastState) === JSON.stringify(currentState)) {
+        // If states are identical, check if we got here because of undo - don't record in that case
+        return;
+      }
+
+      // If states are different, add a new history entry
+      const newHistory = [...lineHistory.history.slice(0, lineHistory.index + 1), currentState];
+
+      setScopedHistory(loadedSaveStateSlot, config.category, selectedLine, {
+        history: newHistory,
+        index: newHistory.length - 1
+      });
+    }
+  }, [positionIcons, selectedLine, loadedSaveStateSlot, config.category]);
+
   const handleDragMove = (event: DragMoveEvent) => {
     console.log(`Drag Move: Type='${event.active.data?.current?.type || (skills.find(s => s.id === event.active.id) ? 'new skill' : 'unknown')}', ID='${event.active.id}'`);
     const { active, delta } = event;
@@ -680,14 +775,19 @@ const handleDragEnd = (event: DragEndEvent) => {
         // Multi-icon drag - update all selected icons and propagate if autoFollow is on
         selectedIcons.forEach(selectedIcon => {
           // Calculate new position based on delta, ensuring it stays within bounds (e.g., 0 to 800/600)
-          const newX = Math.max(0, Math.min(800, selectedIcon.x + delta.x)); // Assuming 800 width
-          const newY = Math.max(0, Math.min(600, selectedIcon.y + delta.y)); // Assuming 600 height
+          // Scale delta by zoom level to account for visual scaling
+          const scaledDeltaX = delta.x * (1 / currentZoomLevel);
+          const scaledDeltaY = delta.y * (1 / currentZoomLevel);
+          const newX = Math.max(0, Math.min(800, selectedIcon.x + scaledDeltaX)); // Assuming 800 width
+          const newY = Math.max(0, Math.min(600, selectedIcon.y + scaledDeltaY)); // Assuming 600 height
           handleUpdatePositionIcon(selectedIcon.id, newX, newY, autoFollow);
         });
       } else {
-        // Single icon drag
-        const newX = Math.max(0, Math.min(800, icon.x + delta.x));
-        const newY = Math.max(0, Math.min(600, icon.y + delta.y));
+        // Single icon drag - scale delta by zoom level to account for visual scaling
+        const scaledDeltaX = delta.x * (1 / currentZoomLevel);
+        const scaledDeltaY = delta.y * (1 / currentZoomLevel);
+        const newX = Math.max(0, Math.min(800, icon.x + scaledDeltaX));
+        const newY = Math.max(0, Math.min(600, icon.y + scaledDeltaY));
         handleUpdatePositionIcon(active.id as string, newX, newY, autoFollow);
       }
       // PositionSheet handles history, no need to add here.
@@ -778,26 +878,53 @@ const handleDragEnd = (event: DragEndEvent) => {
   };
 
   const handleAddPositionIcon = (type: PositionIcon["type"]) => {
-    if (selectedLine === null) return;
-    
+    console.log(`handleAddPositionIcon called with type: ${type}, selectedLine: ${selectedLine}`);
+    if (selectedLine === null) {
+      console.log("selectedLine is null, returning early");
+      return;
+    }
+
     const gridSize = 800 / 36;
     const lineIcons = positionIcons.filter(i => i.lineIndex === selectedLine);
+    console.log(`Found ${lineIcons.length} icons already on line ${selectedLine}`);
     const occupied = new Set(lineIcons.map(i => `${i.x},${i.y}`));
-    
-    let x = 100, y = 100;
-    for (let row = 0; row < 36; row++) {
-      for (let col = 0; col < 36; col++) {
+
+    // Start from a visible middle-left area, like where team formations typically start
+    let x = Math.round(2 * gridSize); // Column 2 - left side but not edge
+    let y = Math.round(6 * gridSize); // Row 6 - top formation row
+    let found = false;
+
+    // Try common formation positions first (rows 6, 12, 17, 22)
+    const preferredRows = [6, 12, 17, 22, 9, 15, 21, 27];
+    for (let rowIndex = 0; rowIndex < preferredRows.length && !found; rowIndex++) {
+      const row = preferredRows[rowIndex];
+      for (let col = 1; col < 35 && !found; col++) {
         const testX = Math.round(col * gridSize);
         const testY = Math.round(row * gridSize);
         if (!occupied.has(`${testX},${testY}`)) {
           x = testX;
           y = testY;
-          row = 36;
-          break;
+          found = true;
         }
       }
     }
-    
+
+    // If still not found, search anywhere from row 1 onward (avoiding very top edge)
+    if (!found) {
+      for (let row = 1; row < 36 && !found; row++) {
+        for (let col = 0; col < 36 && !found; col++) {
+          const testX = Math.round(col * gridSize);
+          const testY = Math.round(row * gridSize);
+          if (!occupied.has(`${testX},${testY}`)) {
+            x = testX;
+            y = testY;
+            found = true;
+          }
+        }
+      }
+    }
+
+    console.log(`Adding icon at position (${x}, ${y}) for line ${selectedLine}. Found free position: ${found}`);
     const newIcon: PositionIcon = {
       id: `icon-${Date.now()}-${Math.random()}`,
       type,
@@ -805,7 +932,11 @@ const handleDragEnd = (event: DragEndEvent) => {
       y,
       lineIndex: selectedLine,
     };
-    setPositionIcons([...positionIcons, newIcon]);
+    setPositionIcons(prev => {
+      const newIcons = [...prev, newIcon];
+      console.log(`Total positionIcons after adding: ${newIcons.length}`);
+      return newIcons;
+    });
   };
 
   const handleUpdatePositionIcon = (id: string, x: number, y: number, shouldPropagate: boolean = false) => {
@@ -854,6 +985,98 @@ const handleDragEnd = (event: DragEndEvent) => {
     setPositionIcons(positionIcons.filter((icon) => icon.id !== id));
   };
 
+  const handleRestoreLineState = (lineIndex: number, newLineIcons: PositionIcon[]) => {
+    // Replace all icons for the specified line with the new state
+    setPositionIcons(prev => {
+      // Remove all existing icons for this line
+      const filteredIcons = prev.filter(icon => icon.lineIndex !== lineIndex);
+      // Add the new line icons
+      return [...filteredIcons, ...newLineIcons];
+    });
+  };
+
+  const handleUndoLine = (lineIndex: number) => {
+    if (!loadedSaveStateSlot) return;
+    const lineHistory = getCurrentScopedHistory(lineIndex);
+    if (!lineHistory || lineHistory.index <= 0) return;
+
+    // Get the previous state for this line
+    const prevState = lineHistory.history[lineHistory.index - 1];
+    if (!prevState) return;
+
+    // Restore the state
+    handleRestoreLineState(lineIndex, prevState);
+
+    // If auto-follow is enabled, propagate the undo to subsequent lines
+    if (autoFollow) {
+      const totalLines = Math.ceil((config.length * config.bpm) / 60 / 8);
+      const currentLineIcons = prevState;
+
+      // Restore subsequent lines to match the undone state
+      for (let subsequentLine = lineIndex + 1; subsequentLine < totalLines; subsequentLine++) {
+        // Create copied icons for this subsequent line
+        const copiedIcons = currentLineIcons.map(icon => ({
+          ...icon,
+          id: `icon-${Date.now()}-${Math.random()}-${subsequentLine}`,
+          lineIndex: subsequentLine,
+        }));
+
+        // Replace icons for this line
+        setPositionIcons(prev => {
+          const otherIcons = prev.filter(icon => icon.lineIndex !== subsequentLine);
+          return [...otherIcons, ...copiedIcons];
+        });
+      }
+    }
+
+    // Update history index
+    setScopedHistory(loadedSaveStateSlot, config.category, lineIndex, {
+      ...lineHistory,
+      index: lineHistory.index - 1
+    });
+  };
+
+  const handleRedoLine = (lineIndex: number) => {
+    if (!loadedSaveStateSlot) return;
+    const lineHistory = getCurrentScopedHistory(lineIndex);
+    if (!lineHistory || lineHistory.index >= lineHistory.history.length - 1) return;
+
+    // Get the next state for this line
+    const nextState = lineHistory.history[lineHistory.index + 1];
+    if (!nextState) return;
+
+    // Restore the state
+    handleRestoreLineState(lineIndex, nextState);
+
+    // If auto-follow is enabled, propagate the redo to subsequent lines
+    if (autoFollow) {
+      const totalLines = Math.ceil((config.length * config.bpm) / 60 / 8);
+      const currentLineIcons = nextState;
+
+      // Restore subsequent lines to match the redone state
+      for (let subsequentLine = lineIndex + 1; subsequentLine < totalLines; subsequentLine++) {
+        // Create copied icons for this subsequent line
+        const copiedIcons = currentLineIcons.map(icon => ({
+          ...icon,
+          id: `icon-${Date.now()}-${Math.random()}-${subsequentLine}`,
+          lineIndex: subsequentLine,
+        }));
+
+        // Replace icons for this line
+        setPositionIcons(prev => {
+          const otherIcons = prev.filter(icon => icon.lineIndex !== subsequentLine);
+          return [...otherIcons, ...copiedIcons];
+        });
+      }
+    }
+
+    // Update history index
+    setScopedHistory(loadedSaveStateSlot, config.category, lineIndex, {
+      ...lineHistory,
+      index: lineHistory.index + 1
+    });
+  };
+
   const handleRemoveMultiplePositionIcons = (ids: string[]) => {
     setPositionIcons(positionIcons.filter((icon) => !ids.includes(icon.id)));
   };
@@ -899,6 +1122,7 @@ const handleDragEnd = (event: DragEndEvent) => {
     setPlacedSkills([]);
     setSelectedLine(null);
     setSelectedSkillId(null);
+    setLineHistories({}); // Clear all history states
 
     // For team categories, reset icons to default positions
     if (config.category === "team-16" || config.category === "team-24") {
@@ -1088,7 +1312,7 @@ const handleDragEnd = (event: DragEndEvent) => {
           <ResizablePanel defaultSize={75}>
             {(config.category === "team-16" || config.category === "team-24") ? (
               <ResizablePanelGroup direction="vertical" className="h-full">
-                <ResizablePanel defaultSize={60}>
+                <ResizablePanel defaultSize={50}>
                   <CountSheet
                     routineLength={config.length}
                     bpm={config.bpm}
@@ -1109,7 +1333,7 @@ const handleDragEnd = (event: DragEndEvent) => {
 
                 <ResizableHandle withHandle />
 
-                <ResizablePanel defaultSize={40} minSize={30}>
+                <ResizablePanel defaultSize={50} minSize={30}>
                   <PositionSheet
                     icons={positionIcons}
                     selectedLine={selectedLine}
@@ -1118,6 +1342,10 @@ const handleDragEnd = (event: DragEndEvent) => {
                     onRemoveIcon={handleRemovePositionIcon}
                     onRemoveMultipleIcons={handleRemoveMultiplePositionIcons}
                     onNameIcon={handleNamePositionIcon}
+                    onRestoreLineState={handleRestoreLineState}
+                    lineHistories={currentContextLineHistories}
+                    onUndoLine={handleUndoLine}
+                    onRedoLine={handleRedoLine}
                     showGrid={showGrid}
                     autoFollow={autoFollow}
                     onToggleAutoFollow={() => setAutoFollow(!autoFollow)}
@@ -1152,6 +1380,10 @@ const handleDragEnd = (event: DragEndEvent) => {
                     onIconDragEnd={() => {
                       setShowGrid(false);
                       setIsDraggingIcon(false);
+                    }}
+                    onIconDrop={(event) => {
+                      // Receive zoom level info and potentially handle scaled drag end
+                      setCurrentZoomLevel(event.zoomLevel);
                     }}
                   />
                 </ResizablePanel>
