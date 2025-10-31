@@ -1409,9 +1409,14 @@ const handleDragEnd = (event: DragEndEvent) => {
           </ResizablePanel>
         </ResizablePanelGroup>
 
-        <DragOverlay className="z-[3000]">
-          {draggedSkill ? <SkillCard skill={draggedSkill} /> : null}
-        </DragOverlay>
+ <DragOverlay className="z-[3000]">
+
+{draggedSkill ? (
+<div className={isDraggingPlacedSkill ? "w-[120px]" : ""}>
+<SkillCard skill={draggedSkill} showDescription={false} />
+</div>
+) : null}
+</DragOverlay> 
         <TrashDropZone isDragging={isDraggingPlacedSkill || draggedSkill !== null} />
       </DndContext>
     </div>
