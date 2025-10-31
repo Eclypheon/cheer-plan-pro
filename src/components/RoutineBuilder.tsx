@@ -987,8 +987,10 @@ const handleDragEnd = (event: DragEndEvent) => {
 
       if (resizeSkill && typeof originalCellsToSpan === "number") {
         // Calculate drag distance (pixels) and convert to count change
+        // Only use horizontal movement, ignore vertical component
         const CELL_WIDTH = dynamicCellWidth; // Use the dynamic width
-        const dragDistance = direction === "right" ? delta.x : -delta.x;
+        const horizontalDelta = { x: delta.x, y: 0 }; // Lock vertical movement
+        const dragDistance = direction === "right" ? horizontalDelta.x : -horizontalDelta.x;
 
         // Only calculate countChange if CELL_WIDTH is valid
         let countChange = 0;

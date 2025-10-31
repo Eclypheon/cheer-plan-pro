@@ -110,7 +110,7 @@ const ResizeHandle = ({ direction, skill, cellsToSpan }: ResizeHandleProps) => {
       {...attributes}
       {...listeners}
       style={transform ? {
-        transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+        transform: `translate3d(${transform.x}px, 0px, 0)`, // Lock to horizontal only movement
       } : undefined}
       className={`${baseClasses} ${positionClasses}`}
       title={`${direction === "left" ? "Decrease" : "Increase"} skill counts`}
