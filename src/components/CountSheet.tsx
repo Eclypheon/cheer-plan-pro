@@ -14,6 +14,7 @@ interface CountSheetProps {
   onSelectSkill?: (id: string | null) => void;
   onMoveSkill?: (id: string, newLineIndex: number, newStartCount: number) => void;
   onUpdateSkillCounts?: (id: string, counts: number) => void;
+  isResizing?: boolean;
 }
 
 interface SkillPlacement {
@@ -87,10 +88,11 @@ interface ResizeHandleProps {
   placedSkill: PlacedSkill; // Add this prop
   cellsToSpan: number;
   onResizeComplete: (newCounts: number) => void;
+  isResizing?: boolean;
 }
 
 // Update ResizeHandle to use placedSkill in its drag data
-const ResizeHandle = ({ direction, skill, placedSkill, cellsToSpan }: ResizeHandleProps) => {
+const ResizeHandle = ({ direction, skill, placedSkill, cellsToSpan, isResizing }: ResizeHandleProps) => {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `resize-${direction}-${placedSkill.id}`, // Use placedSkill.id for a unique handle
     data: {
@@ -102,9 +104,16 @@ const ResizeHandle = ({ direction, skill, placedSkill, cellsToSpan }: ResizeHand
     },
   });
 
+  // This handle is being dragged**
+  const isThisHandleDragging = isDragging;
+  // Another handle is being dragged**
+  const isAnotherHandleDragging = isResizing && !isThisHandleDragging;
+
   // Since handle is now positioned outside the flex container, remove flex positioning
-  const baseClasses = `w-3 h-3 rounded flex items-center justify-center text-gray-600 hover:text-gray-900 hover:bg-white/50 cursor-ew-resize opacity-0 group-hover:opacity-100 transition-opacity ${
-    isDragging ? "opacity-100 shadow-sm" : ""
+const baseClasses = `w-3 h-3 rounded flex items-center justify-center text-gray-600 hover:text-gray-900 hover:bg-white/50 cursor-ew-resize transition-opacity ${
+    isThisHandleDragging ? "opacity-0" : "opacity-0 group-hover:opacity-100"
+  } ${
+    isAnotherHandleDragging ? "opacity-0" : "" // Force hide if another handle is active
   }`;
 
   // Position differently based on direction
@@ -140,6 +149,7 @@ export const CountSheet = ({
   onSelectSkill,
   onMoveSkill,
   onUpdateSkillCounts,
+  isResizing,
 }: CountSheetProps) => {
   // Calculate total lines needed
   const totalBeats = Math.ceil((routineLength * bpm) / 60);
@@ -271,6 +281,7 @@ export const CountSheet = ({
                   placedSkill={sp.placedSkill} // Pass the placedSkill
                   cellsToSpan={sp.skill.counts} // Pass the skill's total counts
                   onResizeComplete={(newCounts) => onUpdateSkillCounts?.(sp.skill.id, newCounts)}
+                  isResizing={isResizing}
                 />
               </div>
               <span className={`flex-1 font-semibold ${colors.text}`}>
@@ -294,6 +305,7 @@ export const CountSheet = ({
                   placedSkill={sp.placedSkill} // Pass the placedSkill
                   cellsToSpan={sp.skill.counts} // Pass the skill's total counts
                   onResizeComplete={(newCounts) => onUpdateSkillCounts?.(sp.skill.id, newCounts)}
+                  isResizing={isResizing}
                 />
               </div>
             </div>
@@ -354,3 +366,4 @@ export const CountSheet = ({
     </div>
   );
 };
+

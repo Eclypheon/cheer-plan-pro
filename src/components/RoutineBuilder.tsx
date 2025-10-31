@@ -33,6 +33,7 @@ export const RoutineBuilder = () => {
   const [lineHistories, setLineHistories] = useState<{ [saveStateSlot: number]: { [category: string]: { [lineIndex: number]: { history: PositionIcon[][], index: number } } } }>({});
   const [draggedSkill, setDraggedSkill] = useState<Skill | null>(null);
   const [isDraggingPlacedSkill, setIsDraggingPlacedSkill] = useState(false);
+  const [isResizing, setIsResizing] = useState(false);
   const [draggedPlacedSkillId, setDraggedPlacedSkillId] = useState<string | null>(null);
   const [selectedSkillId, setSelectedSkillId] = useState<string | null>(null);
   const [showGrid, setShowGrid] = useState(false);
@@ -1024,6 +1025,7 @@ const handleDragMove = (event: DragMoveEvent) => {
 
     if (event.active.data?.current?.type === "skill-resize") {
       // Skill resize drag started - no special handling needed at start
+      setIsResizing(true);
     }
   };
 
@@ -1039,6 +1041,7 @@ const handleDragEnd = (event: DragEndEvent) => {
     // Reset drag state immediately
     setDraggedSkill(null);
     setIsDraggingPlacedSkill(false);
+    setIsResizing(false);
     setDraggedPlacedSkillId(null);
     setShowGrid(false);
     setIsDraggingIcon(false);
