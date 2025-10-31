@@ -1001,6 +1001,28 @@ const handleDragEnd = (event: DragEndEvent) => {
     // Restore the state
     handleRestoreLineState(lineIndex, prevState);
 
+    // If auto-follow is enabled, propagate the undo to subsequent lines
+    if (autoFollow) {
+      const totalLines = Math.ceil((config.length * config.bpm) / 60 / 8);
+      const currentLineIcons = prevState;
+
+      // Restore subsequent lines to match the undone state
+      for (let subsequentLine = lineIndex + 1; subsequentLine < totalLines; subsequentLine++) {
+        // Create copied icons for this subsequent line
+        const copiedIcons = currentLineIcons.map(icon => ({
+          ...icon,
+          id: `icon-${Date.now()}-${Math.random()}-${subsequentLine}`,
+          lineIndex: subsequentLine,
+        }));
+
+        // Replace icons for this line
+        setPositionIcons(prev => {
+          const otherIcons = prev.filter(icon => icon.lineIndex !== subsequentLine);
+          return [...otherIcons, ...copiedIcons];
+        });
+      }
+    }
+
     // Update history index
     setScopedHistory(loadedSaveStateSlot, config.category, lineIndex, {
       ...lineHistory,
@@ -1019,6 +1041,28 @@ const handleDragEnd = (event: DragEndEvent) => {
 
     // Restore the state
     handleRestoreLineState(lineIndex, nextState);
+
+    // If auto-follow is enabled, propagate the redo to subsequent lines
+    if (autoFollow) {
+      const totalLines = Math.ceil((config.length * config.bpm) / 60 / 8);
+      const currentLineIcons = nextState;
+
+      // Restore subsequent lines to match the redone state
+      for (let subsequentLine = lineIndex + 1; subsequentLine < totalLines; subsequentLine++) {
+        // Create copied icons for this subsequent line
+        const copiedIcons = currentLineIcons.map(icon => ({
+          ...icon,
+          id: `icon-${Date.now()}-${Math.random()}-${subsequentLine}`,
+          lineIndex: subsequentLine,
+        }));
+
+        // Replace icons for this line
+        setPositionIcons(prev => {
+          const otherIcons = prev.filter(icon => icon.lineIndex !== subsequentLine);
+          return [...otherIcons, ...copiedIcons];
+        });
+      }
+    }
 
     // Update history index
     setScopedHistory(loadedSaveStateSlot, config.category, lineIndex, {
