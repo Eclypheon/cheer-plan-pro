@@ -1,6 +1,6 @@
 import { useDroppable, useDraggable } from "@dnd-kit/core";
 import type { PlacedSkill, Skill, SkillCategory } from "@/types/routine";
-import { X } from "lucide-react";
+import { X, ChevronLeft, ChevronRight } from "lucide-react";
 
 interface CountSheetProps {
   routineLength: number;
@@ -13,6 +13,8 @@ interface CountSheetProps {
   selectedSkillId?: string | null;
   onSelectSkill?: (id: string | null) => void;
   onMoveSkill?: (id: string, newLineIndex: number, newStartCount: number) => void;
+  onUpdateSkillCounts?: (id: string, counts: number) => void;
+  isResizing?: boolean;
 }
 
 interface SkillPlacement {
@@ -79,6 +81,62 @@ const getSkillCategoryColors = (category: SkillCategory) => {
   }
 };
 
+// Update ResizeHandleProps to include placedSkill
+interface ResizeHandleProps {
+  direction: "left" | "right";
+  skill: Skill;
+  placedSkill: PlacedSkill; // Add this prop
+  cellsToSpan: number;
+  onResizeComplete: (newCounts: number) => void;
+  isResizing?: boolean;
+}
+
+// Update ResizeHandle to use placedSkill in its drag data
+const ResizeHandle = ({ direction, skill, placedSkill, cellsToSpan, isResizing }: ResizeHandleProps) => {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: `resize-${direction}-${placedSkill.id}`, // Use placedSkill.id for a unique handle
+    data: {
+      type: "skill-resize",
+      direction,
+      skill,
+      placedSkill, // Pass the specific placedSkill instance
+      originalCellsToSpan: skill.counts, // Pass the skill's total count at drag start
+    },
+  });
+
+  // This handle is being dragged**
+  const isThisHandleDragging = isDragging;
+  // Another handle is being dragged**
+  const isAnotherHandleDragging = isResizing && !isThisHandleDragging;
+
+  // Since handle is now positioned outside the flex container, remove flex positioning
+const baseClasses = `w-3 h-3 rounded flex items-center justify-center text-gray-600 hover:text-gray-900 hover:bg-white/50 cursor-ew-resize transition-opacity ${
+    isThisHandleDragging ? "opacity-0" : "opacity-0 group-hover:opacity-100"
+  } ${
+    isAnotherHandleDragging ? "opacity-0" : "" // Force hide if another handle is active
+  }`;
+
+  // Position differently based on direction
+  const positionClasses = direction === "left"
+    ? "bg-gray-100 hover:bg-white border border-gray-300"
+    : "bg-gray-100 hover:bg-white border border-gray-300";
+
+  return (
+    <div
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
+      style={transform ? {
+        transform: `translate3d(${transform.x}px, 0px, 0)`, // Lock to horizontal only movement
+      } : undefined}
+      className={`${baseClasses} ${positionClasses}`}
+      title={`${direction === "left" ? "Decrease" : "Increase"} skill counts`}
+    >
+      {direction === "left" ? <ChevronLeft className="h-2.5 w-2.5" /> : <ChevronRight className="h-2.5 w-2.5" />}
+    </div>
+  );
+};
+
 export const CountSheet = ({
   routineLength,
   bpm,
@@ -90,6 +148,8 @@ export const CountSheet = ({
   selectedSkillId,
   onSelectSkill,
   onMoveSkill,
+  onUpdateSkillCounts,
+  isResizing,
 }: CountSheetProps) => {
   // Calculate total lines needed
   const totalBeats = Math.ceil((routineLength * bpm) / 60);
@@ -153,6 +213,7 @@ export const CountSheet = ({
     return (
       <td
         ref={setNodeRef}
+        data-cell={`${lineIndex}-${count}`}
         className={`border border-border min-w-[80px] h-10 p-0.5 relative text-xs ${
           isOver ? "bg-accent" : isPartOfSkillSpan ? "bg-gray-50 dark:bg-gray-800/50" : "bg-card hover:bg-accent/50"
         }`}
@@ -181,7 +242,7 @@ export const CountSheet = ({
           };
 
           
-          const style = transform
+          const style = transform && !isDragging
             ? {
                 transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
                 width: `${100 * cellsToSpan}%`
@@ -190,9 +251,16 @@ export const CountSheet = ({
 
           const colors = getSkillCategoryColors(sp.skill.category);
 
+          // Use responsive padding and gaps based on cell span
+          const isCompact = cellsToSpan <= 2;
+          const containerClass = isCompact
+            ? "p-1 gap-0.5" // Normal padding for compact cells with resize handles
+            : "p-1 gap-0.5"; // Normal padding for larger cells with resize handles
+
           return (
             <div
               key={sp.placedSkill.id}
+              data-skill-id={sp.placedSkill.id}
               ref={setNodeRef}
               {...enhancedListeners}
               {...attributes}
@@ -201,10 +269,21 @@ export const CountSheet = ({
                 e.stopPropagation();
                 onSelectSkill?.(sp.placedSkill.id);
               }}
-              className={`${colors.background} ${colors.border} border-2 rounded-md shadow-md p-2 absolute inset-0 flex items-center gap-2 cursor-grab active:cursor-grabbing z-[2000] text-sm transition-all duration-200 hover:shadow-lg ${
+              className={`${colors.background} ${colors.border} border-2 rounded-md shadow-md absolute inset-0 flex items-center cursor-grab active:cursor-grabbing z-[2000] text-sm transition-all duration-200 hover:shadow-lg overflow-visible group ${
                 isDragging ? "opacity-50 shadow-xl" : "opacity-100"
-              } ${selectedSkillId === sp.placedSkill.id ? "ring-2 ring-accent ring-offset-1" : ""}`}
+              } ${selectedSkillId === sp.placedSkill.id ? "ring-2 ring-accent ring-offset-1" : ""} ${containerClass}`}
             >
+{/* Left resize handle - positioned absolutely at left edge */}
+              <div className="absolute -left-2 top-1/2 -translate-y-1/2 z-[2100]">
+                <ResizeHandle
+                  direction="left"
+                  skill={sp.skill}
+                  placedSkill={sp.placedSkill} // Pass the placedSkill
+                  cellsToSpan={sp.skill.counts} // Pass the skill's total counts
+                  onResizeComplete={(newCounts) => onUpdateSkillCounts?.(sp.skill.id, newCounts)}
+                  isResizing={isResizing}
+                />
+              </div>
               <span className={`flex-1 font-semibold ${colors.text}`}>
                 {sp.skill.name}
               </span>
@@ -213,11 +292,22 @@ export const CountSheet = ({
                   e.stopPropagation();
                   onRemoveSkill(sp.placedSkill.id);
                 }}
-                className="p-0.5 rounded-full hover:bg-black/10 text-gray-500 hover:text-gray-700 transition-colors shrink-0"
+                className={`p-0.5 rounded-full hover:bg-black/10 text-gray-500 hover:text-gray-700 transition-colors shrink-0 ${isCompact ? 'ml-2' : 'ml-2'}`}
                 title="Remove skill"
               >
                 <X className="h-3 w-3" />
               </button>
+{/* Right resize handle - positioned absolutely at right edge */}
+              <div className="absolute -right-2 top-1/2 -translate-y-1/2 z-[2100]">
+                <ResizeHandle
+                  direction="right"
+                  skill={sp.skill}
+                  placedSkill={sp.placedSkill} // Pass the placedSkill
+                  cellsToSpan={sp.skill.counts} // Pass the skill's total counts
+                  onResizeComplete={(newCounts) => onUpdateSkillCounts?.(sp.skill.id, newCounts)}
+                  isResizing={isResizing}
+                />
+              </div>
             </div>
           );
         })}
@@ -276,3 +366,4 @@ export const CountSheet = ({
     </div>
   );
 };
+
