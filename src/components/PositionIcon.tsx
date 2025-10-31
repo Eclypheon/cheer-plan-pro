@@ -16,6 +16,9 @@ interface PositionIconProps {
   onRemove?: (id: string) => void;
   dragOffset?: { x: number; y: number } | null;
   isMultiDrag?: boolean;
+  zoomLevel?: number;
+  getZoomedCoordinates?: (clientX: number, clientY: number) => { x: number; y: number };
+  onDragEnd?: (event: { active: any, delta: { x: number, y: number } }) => void;
 }
 
 const IconComponent = ({ type }: { type: PositionIconType["type"] }) => {
@@ -29,7 +32,7 @@ const IconComponent = ({ type }: { type: PositionIconType["type"] }) => {
   }
 };
 
-export const PositionIcon = ({ icon, onUpdate, onClick, onRemove, dragOffset, isMultiDrag = false }: PositionIconProps) => {
+export const PositionIcon = ({ icon, onUpdate, onClick, onRemove, dragOffset, isMultiDrag = false, zoomLevel = 1.0, getZoomedCoordinates, onDragEnd }: PositionIconProps) => {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: icon.id,
     data: { type: "position-icon", icon },
@@ -39,13 +42,13 @@ export const PositionIcon = ({ icon, onUpdate, onClick, onRemove, dragOffset, is
 
   const style = transform
     ? {
-        left: `${icon.x + transform.x}px`,
-        top: `${icon.y + transform.y}px`,
+        left: `${icon.x + transform.x * (1 / zoomLevel)}px`,
+        top: `${icon.y + transform.y * (1 / zoomLevel)}px`,
       }
     : dragOffset && icon.selected
     ? {
-        left: `${icon.x + dragOffset.x}px`,
-        top: `${icon.y + dragOffset.y}px`,
+        left: `${icon.x + dragOffset.x * (1 / zoomLevel)}px`,
+        top: `${icon.y + dragOffset.y * (1 / zoomLevel)}px`,
       }
     : {
         left: `${icon.x}px`,
