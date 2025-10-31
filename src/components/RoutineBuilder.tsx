@@ -219,22 +219,34 @@ export const RoutineBuilder = () => {
       if (selectedSkillId) {
         const selectedSkill = placedSkills.find(ps => ps.id === selectedSkillId);
         if (!selectedSkill) return;
-        
+
         const totalLines = Math.ceil((config.length * config.bpm) / 60 / 8);
         
         if (e.key === keyboardSettings.moveLeft || e.key === keyboardSettings.altMoveLeft) {
           if (selectedSkill.startCount > 1) {
+            // Move left within the same line
             setPlacedSkills(prev => prev.map(ps =>
               ps.id === selectedSkillId ? { ...ps, startCount: ps.startCount - 1 } : ps
+            ));
+          } else if (selectedSkill.lineIndex > 0) {
+            // At beginning of line and not at first line - move to previous line at count 8
+            setPlacedSkills(prev => prev.map(ps =>
+              ps.id === selectedSkillId ? { ...ps, lineIndex: ps.lineIndex - 1, startCount: 8 } : ps
             ));
           }
           e.preventDefault();
         }
-        
+
         if (e.key === keyboardSettings.moveRight || e.key === keyboardSettings.altMoveRight) {
           if (selectedSkill.startCount < 8) {
+            // Move right within the same line
             setPlacedSkills(prev => prev.map(ps =>
               ps.id === selectedSkillId ? { ...ps, startCount: ps.startCount + 1 } : ps
+            ));
+          } else if (selectedSkill.lineIndex < totalLines - 1) {
+            // At end of line and not at last line - move to next line at count 1
+            setPlacedSkills(prev => prev.map(ps =>
+              ps.id === selectedSkillId ? { ...ps, lineIndex: ps.lineIndex + 1, startCount: 1 } : ps
             ));
           }
           e.preventDefault();
@@ -265,28 +277,54 @@ export const RoutineBuilder = () => {
         const selectedSkill = placedSkills.find(ps => ps.id === selectedSkillId);
         if (!selectedSkill) return;
 
+        const totalLines = Math.ceil((config.length * config.bpm) / 60 / 8);
+
         if (e.key === keyboardSettings.moveLeft || e.key === keyboardSettings.altMoveLeft) {
-          if (selectedSkill.startCount > 1) {
+          // Check if we can move left within current approach
+          const canMoveLeft = selectedSkill.startCount > 1 || (selectedSkill.startCount === 1 && selectedSkill.lineIndex > 0);
+
+          if (canMoveLeft) {
             const skillsToMove = placedSkills.filter(ps =>
               ps.lineIndex > selectedSkill.lineIndex ||
               (ps.lineIndex === selectedSkill.lineIndex && ps.startCount > selectedSkill.startCount)
             );
-            setPlacedSkills(prev => prev.map(ps =>
-              skillsToMove.some(stm => stm.id === ps.id) ? { ...ps, startCount: ps.startCount - 1 } : ps
-            ));
+            setPlacedSkills(prev => prev.map(ps => {
+              if (skillsToMove.some(stm => stm.id === ps.id)) {
+                if (ps.startCount > 1) {
+                  // Move left within same line
+                  return { ...ps, startCount: ps.startCount - 1 };
+                } else if (ps.lineIndex > 0) {
+                  // Move to previous line at count 8
+                  return { ...ps, lineIndex: ps.lineIndex - 1, startCount: 8 };
+                }
+              }
+              return ps;
+            }));
           }
           e.preventDefault();
         }
 
         if (e.key === keyboardSettings.moveRight || e.key === keyboardSettings.altMoveRight) {
-          if (selectedSkill.startCount < 8) {
+          // Check if we can move right within current approach
+          const canMoveRight = selectedSkill.startCount < 8 || (selectedSkill.startCount === 8 && selectedSkill.lineIndex < totalLines - 1);
+
+          if (canMoveRight) {
             const skillsToMove = placedSkills.filter(ps =>
               ps.lineIndex > selectedSkill.lineIndex ||
               (ps.lineIndex === selectedSkill.lineIndex && ps.startCount > selectedSkill.startCount)
             );
-            setPlacedSkills(prev => prev.map(ps =>
-              skillsToMove.some(stm => stm.id === ps.id) ? { ...ps, startCount: ps.startCount + 1 } : ps
-            ));
+            setPlacedSkills(prev => prev.map(ps => {
+              if (skillsToMove.some(stm => stm.id === ps.id)) {
+                if (ps.startCount < 8) {
+                  // Move right within same line
+                  return { ...ps, startCount: ps.startCount + 1 };
+                } else if (ps.lineIndex < totalLines - 1) {
+                  // Move to next line at count 1
+                  return { ...ps, lineIndex: ps.lineIndex + 1, startCount: 1 };
+                }
+              }
+              return ps;
+            }));
           }
           e.preventDefault();
         }
@@ -305,7 +343,6 @@ export const RoutineBuilder = () => {
         }
 
         if (e.key === keyboardSettings.moveDown || e.key === keyboardSettings.altMoveDown) {
-          const totalLines = Math.ceil((config.length * config.bpm) / 60 / 8);
           if (selectedSkill.lineIndex < totalLines - 1) {
             const skillsToMove = placedSkills.filter(ps =>
               ps.lineIndex > selectedSkill.lineIndex ||
@@ -324,28 +361,54 @@ export const RoutineBuilder = () => {
         const selectedSkill = placedSkills.find(ps => ps.id === selectedSkillId);
         if (!selectedSkill) return;
 
+        const totalLines = Math.ceil((config.length * config.bpm) / 60 / 8);
+
         if (e.key === keyboardSettings.moveLeft || e.key === keyboardSettings.altMoveLeft) {
-          if (selectedSkill.startCount > 1) {
+          // Check if we can move left within current approach
+          const canMoveLeft = selectedSkill.startCount > 1 || (selectedSkill.startCount === 1 && selectedSkill.lineIndex > 0);
+
+          if (canMoveLeft) {
             const skillsToMove = placedSkills.filter(ps =>
               ps.lineIndex < selectedSkill.lineIndex ||
               (ps.lineIndex === selectedSkill.lineIndex && ps.startCount < selectedSkill.startCount)
             );
-            setPlacedSkills(prev => prev.map(ps =>
-              skillsToMove.some(stm => stm.id === ps.id) ? { ...ps, startCount: ps.startCount - 1 } : ps
-            ));
+            setPlacedSkills(prev => prev.map(ps => {
+              if (skillsToMove.some(stm => stm.id === ps.id)) {
+                if (ps.startCount > 1) {
+                  // Move left within same line
+                  return { ...ps, startCount: ps.startCount - 1 };
+                } else if (ps.lineIndex > 0) {
+                  // Move to previous line at count 8
+                  return { ...ps, lineIndex: ps.lineIndex - 1, startCount: 8 };
+                }
+              }
+              return ps;
+            }));
           }
           e.preventDefault();
         }
 
         if (e.key === keyboardSettings.moveRight || e.key === keyboardSettings.altMoveRight) {
-          if (selectedSkill.startCount < 8) {
+          // Check if we can move right within current approach
+          const canMoveRight = selectedSkill.startCount < 8 || (selectedSkill.startCount === 8 && selectedSkill.lineIndex < totalLines - 1);
+
+          if (canMoveRight) {
             const skillsToMove = placedSkills.filter(ps =>
               ps.lineIndex < selectedSkill.lineIndex ||
               (ps.lineIndex === selectedSkill.lineIndex && ps.startCount < selectedSkill.startCount)
             );
-            setPlacedSkills(prev => prev.map(ps =>
-              skillsToMove.some(stm => stm.id === ps.id) ? { ...ps, startCount: ps.startCount + 1 } : ps
-            ));
+            setPlacedSkills(prev => prev.map(ps => {
+              if (skillsToMove.some(stm => stm.id === ps.id)) {
+                if (ps.startCount < 8) {
+                  // Move right within same line
+                  return { ...ps, startCount: ps.startCount + 1 };
+                } else if (ps.lineIndex < totalLines - 1) {
+                  // Move to next line at count 1
+                  return { ...ps, lineIndex: ps.lineIndex + 1, startCount: 1 };
+                }
+              }
+              return ps;
+            }));
           }
           e.preventDefault();
         }
