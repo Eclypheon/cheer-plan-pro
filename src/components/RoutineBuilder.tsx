@@ -856,7 +856,7 @@ export const RoutineBuilder = () => {
     }
 
     // 3. Use left-edge collision detection only for placed skills being dragged back onto countsheet
-    if (args.active.data?.current?.type === "placed-skill") {
+    if (setIsDraggingPlacedSkill) {
       return rectCollisions.filter(collision => {
         const activeRect = args.active.rect.current?.translated;
         const droppableRect = args.droppableRects.get(collision.id);
