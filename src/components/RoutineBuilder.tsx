@@ -826,7 +826,8 @@ export const RoutineBuilder = () => {
    * Custom collision detection function that prioritizes:
    * 1. Trash zone collisions using rectIntersection
    * 2. Position sheet grid when dragging position icons (uses rectIntersection)
-   * 3. Falls back to closestCenter for count sheet cells
+   * 3. Left-edge collision for placed skills being dragged back onto countsheet
+   * 4. Falls back to rectIntersection for count sheet cells (new skills) and other scenarios
    */
   const customCollisionDetection: CollisionDetection = (args) => {
     // 1. Check for collisions using rectIntersection (for trash zone and prioritized areas)
@@ -853,7 +854,28 @@ export const RoutineBuilder = () => {
       }
     }
 
-    // 3. Fall back to closestCenter for count sheet cells and other scenarios
+    // 3. Use left-edge collision detection only for placed skills being dragged back onto countsheet
+    if (args.active.data?.current?.type === "placed-skill") {
+      return rectCollisions.filter(collision => {
+        const activeRect = args.active.rect.current?.translated;
+        const droppableRect = args.droppableRects.get(collision.id);
+
+        if (!activeRect || !droppableRect) return false;
+
+        // Check if the left edge (vertical line at activeRect.left) intersects with the droppable
+        // This means the left edge x-position is within the droppable's bounds
+        const leftEdgeX = activeRect.left;
+
+        // The left edge intersects if its x-position is within the droppable's width
+        // and the active rect overlaps with the droppable in the y-direction
+        const xIntersects = leftEdgeX >= droppableRect.left && leftEdgeX <= droppableRect.right;
+        const yIntersects = activeRect.top < droppableRect.bottom && activeRect.bottom > droppableRect.top;
+
+        return xIntersects && yIntersects;
+      });
+    }
+
+    // 4. Fall back to closestCenter for count sheet cells (new skills) and other scenarios
     return rectIntersection(args);
   };
 
