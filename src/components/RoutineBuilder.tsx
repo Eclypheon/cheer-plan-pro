@@ -854,7 +854,7 @@ export const RoutineBuilder = () => {
     }
 
     // 3. Fall back to closestCenter for count sheet cells and other scenarios
-    return closestCenter(args);
+    return rectIntersection(args);
   };
 
   // Auto-populate position icons for Team categories (only when not loaded from saved state)
@@ -1689,14 +1689,14 @@ const handleDragEnd = (event: DragEndEvent) => {
           </ResizablePanel>
         </ResizablePanelGroup>
 
- <DragOverlay className="z-[3000]">
+<DragOverlay className="z-[3000]">
 
 {draggedSkill ? (
-<div className={isDraggingPlacedSkill ? "w-[120px]" : ""}>
+<div className={isDraggingPlacedSkill ? "" : ""}>
 <SkillCard skill={draggedSkill} showDescription={false} />
 </div>
 ) : null}
-</DragOverlay> 
+</DragOverlay>
         <TrashDropZone isDragging={isDraggingPlacedSkill || draggedSkill !== null} />
       </DndContext>
     </div>
