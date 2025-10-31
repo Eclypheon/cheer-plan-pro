@@ -32,6 +32,7 @@ interface PositionSheetProps {
   onPrevLine?: () => void;
   onIconDragStart?: () => void;
   onIconDragEnd?: () => void;
+  onIconDrop?: (event: { active: any, delta: { x: number, y: number }, zoomLevel: number }) => void;
 }
 
 export const PositionSheet = ({
@@ -58,6 +59,7 @@ export const PositionSheet = ({
   onPrevLine,
   onIconDragStart,
   onIconDragEnd,
+  onIconDrop,
 }: PositionSheetProps) => {
   const [selectedIconId, setSelectedIconId] = useState<string | null>(null);
   const [nameDialogOpen, setNameDialogOpen] = useState(false);
@@ -488,6 +490,11 @@ return (
                   isMultiDrag={isMultiDrag}
                   zoomLevel={zoomLevel}
                   getZoomedCoordinates={getZoomedCoordinates}
+                  onDragEnd={(event) => {
+                    if (onIconDrop) {
+                      onIconDrop({ active: event.active, delta: event.delta, zoomLevel });
+                    }
+                  }}
                 />
               ))}
             </div>

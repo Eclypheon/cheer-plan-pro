@@ -18,6 +18,7 @@ interface PositionIconProps {
   isMultiDrag?: boolean;
   zoomLevel?: number;
   getZoomedCoordinates?: (clientX: number, clientY: number) => { x: number; y: number };
+  onDragEnd?: (event: { active: any, delta: { x: number, y: number } }) => void;
 }
 
 const IconComponent = ({ type }: { type: PositionIconType["type"] }) => {
@@ -31,7 +32,7 @@ const IconComponent = ({ type }: { type: PositionIconType["type"] }) => {
   }
 };
 
-export const PositionIcon = ({ icon, onUpdate, onClick, onRemove, dragOffset, isMultiDrag = false, zoomLevel = 1.0, getZoomedCoordinates }: PositionIconProps) => {
+export const PositionIcon = ({ icon, onUpdate, onClick, onRemove, dragOffset, isMultiDrag = false, zoomLevel = 1.0, getZoomedCoordinates, onDragEnd }: PositionIconProps) => {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: icon.id,
     data: { type: "position-icon", icon },

@@ -39,6 +39,7 @@ export const RoutineBuilder = () => {
   const [isDraggingIcon, setIsDraggingIcon] = useState(false);
   const [dragOffset, setDragOffset] = useState<{ x: number; y: number } | null>(null);
   const [draggedIconId, setDraggedIconId] = useState<string | null>(null);
+  const [currentZoomLevel, setCurrentZoomLevel] = useState<number>(0.55);
   const [hasLoadedState, setHasLoadedState] = useState(false);
   const initialLoadedCategoryRef = useRef<string | null>(null);
   const [currentSaveState, setCurrentSaveState] = useState<SaveStateData | null>(null);
@@ -774,14 +775,19 @@ const handleDragEnd = (event: DragEndEvent) => {
         // Multi-icon drag - update all selected icons and propagate if autoFollow is on
         selectedIcons.forEach(selectedIcon => {
           // Calculate new position based on delta, ensuring it stays within bounds (e.g., 0 to 800/600)
-          const newX = Math.max(0, Math.min(800, selectedIcon.x + delta.x)); // Assuming 800 width
-          const newY = Math.max(0, Math.min(600, selectedIcon.y + delta.y)); // Assuming 600 height
+          // Scale delta by zoom level to account for visual scaling
+          const scaledDeltaX = delta.x * (1 / currentZoomLevel);
+          const scaledDeltaY = delta.y * (1 / currentZoomLevel);
+          const newX = Math.max(0, Math.min(800, selectedIcon.x + scaledDeltaX)); // Assuming 800 width
+          const newY = Math.max(0, Math.min(600, selectedIcon.y + scaledDeltaY)); // Assuming 600 height
           handleUpdatePositionIcon(selectedIcon.id, newX, newY, autoFollow);
         });
       } else {
-        // Single icon drag
-        const newX = Math.max(0, Math.min(800, icon.x + delta.x));
-        const newY = Math.max(0, Math.min(600, icon.y + delta.y));
+        // Single icon drag - scale delta by zoom level to account for visual scaling
+        const scaledDeltaX = delta.x * (1 / currentZoomLevel);
+        const scaledDeltaY = delta.y * (1 / currentZoomLevel);
+        const newX = Math.max(0, Math.min(800, icon.x + scaledDeltaX));
+        const newY = Math.max(0, Math.min(600, icon.y + scaledDeltaY));
         handleUpdatePositionIcon(active.id as string, newX, newY, autoFollow);
       }
       // PositionSheet handles history, no need to add here.
@@ -1374,6 +1380,10 @@ const handleDragEnd = (event: DragEndEvent) => {
                     onIconDragEnd={() => {
                       setShowGrid(false);
                       setIsDraggingIcon(false);
+                    }}
+                    onIconDrop={(event) => {
+                      // Receive zoom level info and potentially handle scaled drag end
+                      setCurrentZoomLevel(event.zoomLevel);
                     }}
                   />
                 </ResizablePanel>
