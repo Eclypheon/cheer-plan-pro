@@ -300,7 +300,7 @@ export const CountSheet = ({
         ref={setNodeRef}
         data-cell={`${lineIndex}-${count}`}
         className={`border border-border min-w-[80px] h-10 p-0.5 relative text-xs ${
-          isDropTarget ? "bg-accent" : isPartOfSkillSpan ? "bg-gray-50 dark:bg-gray-800/50" : "bg-card hover:bg-accent/50"
+          isDropTarget ? "bg-accent" : isPartOfSkillSpan ? "bg-card" : "bg-card hover:bg-accent/50"
         }`}
       >
         {isFirstCountOfSkill.map((sp) => {
