@@ -1615,9 +1615,36 @@ const handleDragEnd = (event: DragEndEvent) => {
   };
 
   const handleNamePositionIcon = (id: string, name: string) => {
-    setPositionIcons(
-      positionIcons.map((icon) => (icon.id === id ? { ...icon, name } : icon))
-    );
+    setPositionIcons(prev => {
+      const updated = prev.map((icon) => (icon.id === id ? { ...icon, name } : icon));
+
+      if (autoFollow) {
+        const namedIcon = updated.find(i => i.id === id);
+        if (!namedIcon) return updated;
+
+        const totalLines = Math.ceil((config.length * config.bpm) / 60 / 8);
+        const currentLine = namedIcon.lineIndex;
+
+        // For each subsequent line, find icons with matching position and type
+        const result = [...updated];
+        for (let line = currentLine + 1; line < totalLines; line++) {
+          const matchingIconIndex = result.findIndex(i =>
+            i.lineIndex === line &&
+            i.x === namedIcon.x &&
+            i.y === namedIcon.y &&
+            i.type === namedIcon.type
+          );
+
+          if (matchingIconIndex !== -1) {
+            result[matchingIconIndex] = { ...result[matchingIconIndex], name };
+          }
+        }
+
+        return result;
+      }
+
+      return updated;
+    });
   };
 
   const handleExportPDF = () => {

@@ -2,12 +2,6 @@ import { useDraggable } from "@dnd-kit/core";
 import { Circle, Square, X, Triangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { PositionIcon as PositionIconType } from "@/types/routine";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 
 interface PositionIconProps {
   icon: PositionIconType;
@@ -78,21 +72,15 @@ export const PositionIcon = ({ icon, onUpdate, onClick, onRemove, dragOffset, is
       style={style}
     >
       <IconComponent type={icon.type} />
+      {icon.name && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <span className="text-white text-xl font-medium text-center leading-tight max-w-full px-1">
+            {icon.name}
+          </span>
+        </div>
+      )}
     </div>
   );
-
-  if (icon.name) {
-    return (
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>{iconContent}</TooltipTrigger>
-          <TooltipContent>
-            <p>{icon.name}</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-    );
-  }
 
   return iconContent;
 };
