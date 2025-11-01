@@ -17,6 +17,7 @@ import { Download, Info, Library, RotateCcw, Settings as SettingsIcon } from "lu
 import { Link } from "react-router-dom";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { lineBreak } from "html2canvas/dist/types/css/property-descriptors/line-break";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 
 export const RoutineBuilder = () => {
   const { skills, exportToCSV, addCustomSkill, deleteSkill, updateSkillCounts } = useSkills();
@@ -46,6 +47,11 @@ export const RoutineBuilder = () => {
   const initialLoadedCategoryRef = useRef<string | null>(null);
   const [currentSaveState, setCurrentSaveState] = useState<SaveStateData | null>(null);
   const [loadedSaveStateSlot, setLoadedSaveStateSlot] = useState<null | 1 | 2 | 3>(null);
+  const [showPdfPreview, setShowPdfPreview] = useState(false);
+  const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
+  const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [shouldGeneratePdf, setShouldGeneratePdf] = useState(false);
 
   // Load keyboard settings
   const [keyboardSettings] = useState(() => {
@@ -92,6 +98,121 @@ export const RoutineBuilder = () => {
     // Mark that we've attempted to load saved state
     setHasLoadedState(true);
   }, []);
+
+  // Manage PDF blob URL creation and cleanup
+  useEffect(() => {
+    if (pdfBlob && !pdfBlobUrl) {
+      const url = URL.createObjectURL(pdfBlob);
+      setPdfBlobUrl(url);
+    }
+
+    // Cleanup function
+    return () => {
+      if (pdfBlobUrl) {
+        URL.revokeObjectURL(pdfBlobUrl);
+      }
+    };
+  }, [pdfBlob, pdfBlobUrl]);
+
+  // Cleanup blob URL when dialog closes
+  useEffect(() => {
+    if (!showPdfPreview && pdfBlobUrl) {
+      URL.revokeObjectURL(pdfBlobUrl);
+      setPdfBlobUrl(null);
+      setPdfBlob(null);
+    }
+  }, [showPdfPreview, pdfBlobUrl]);
+
+  // Generate PDF when shouldGeneratePdf flag is set
+  useEffect(() => {
+    if (shouldGeneratePdf) {
+      const generatePDF = async () => {
+        try {
+          const jsPDF = (await import("jspdf")).default;
+          const html2canvas = (await import("html2canvas")).default;
+
+          // Use portrait A4 (210mm x 297mm)
+          const pdf = new jsPDF("p", "mm", "a4");
+          const pageWidth = 210;
+          const pageHeight = 297;
+          const margin = 10;
+
+          const countSheetElement = document.getElementById("count-sheet-table");
+          if (countSheetElement) {
+            const canvas = await html2canvas(countSheetElement, {
+              scale: 2, // Higher quality
+              useCORS: true,
+              allowTaint: true,
+              backgroundColor: '#ffffff',
+            });
+            const imgData = canvas.toDataURL("image/png");
+
+            // Calculate scaling to fit within portrait page
+            const availableWidth = pageWidth - (margin * 2);
+            const availableHeight = pageHeight - (margin * 2);
+
+            const scaleX = availableWidth / canvas.width;
+            const scaleY = availableHeight / canvas.height;
+            const scale = Math.min(scaleX, scaleY);
+
+            const imgWidth = canvas.width * scale;
+            const imgHeight = canvas.height * scale;
+
+            // Center the image on the page
+            const x = (pageWidth - imgWidth) / 2;
+            const y = (pageHeight - imgHeight) / 2;
+
+            pdf.addImage(imgData, "PNG", x, y, imgWidth, imgHeight);
+          }
+
+          if (config.category === "team-16" || config.category === "team-24") {
+            const positionSheetElement = document.getElementById("position-sheet-visual");
+            if (positionSheetElement) {
+              pdf.addPage();
+              const canvas = await html2canvas(positionSheetElement, {
+                scale: 2, // Higher quality
+                useCORS: true,
+                allowTaint: true,
+                backgroundColor: '#ffffff',
+              });
+              const imgData = canvas.toDataURL("image/png");
+
+              // Calculate scaling to fit within portrait page
+              const availableWidth = pageWidth - (margin * 2);
+              const availableHeight = pageHeight - (margin * 2);
+
+              const scaleX = availableWidth / canvas.width;
+              const scaleY = availableHeight / canvas.height;
+              const scale = Math.min(scaleX, scaleY);
+
+              const imgWidth = canvas.width * scale;
+              const imgHeight = canvas.height * scale;
+
+              // Center the image on the page
+              const x = (pageWidth - imgWidth) / 2;
+              const y = (pageHeight - imgHeight) / 2;
+
+              pdf.addImage(imgData, "PNG", x, y, imgWidth, imgHeight);
+            }
+          }
+
+          // Generate blob for preview - use arraybuffer first then convert to blob
+          const pdfArrayBuffer = pdf.output('arraybuffer');
+          const pdfBlob = new Blob([pdfArrayBuffer], { type: 'application/pdf; charset=utf-8' });
+
+          setPdfBlob(pdfBlob);
+          setShowPdfPreview(true);
+        } catch (error) {
+          console.error('Error generating PDF:', error);
+        } finally {
+          setIsGeneratingPdf(false);
+          setShouldGeneratePdf(false);
+        }
+      };
+
+      generatePDF();
+    }
+  }, [shouldGeneratePdf, config.category]);
 
   // Handle category changes - auto-save/load category states
   useEffect(() => {
@@ -1400,34 +1521,9 @@ const handleDragEnd = (event: DragEndEvent) => {
     );
   };
 
-  const handleExportPDF = async () => {
-    const jsPDF = (await import("jspdf")).default;
-    const html2canvas = (await import("html2canvas")).default;
-
-    const pdf = new jsPDF("l", "mm", "a4");
-
-    const countSheetElement = document.getElementById("count-sheet-table");
-    if (countSheetElement) {
-      const canvas = await html2canvas(countSheetElement);
-      const imgData = canvas.toDataURL("image/png");
-      const imgWidth = 280;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      pdf.addImage(imgData, "PNG", 10, 10, imgWidth, imgHeight);
-    }
-
-    if (config.category === "team-16" || config.category === "team-24") {
-      const positionSheetElement = document.getElementById("position-sheet");
-      if (positionSheetElement) {
-        pdf.addPage();
-        const canvas = await html2canvas(positionSheetElement);
-        const imgData = canvas.toDataURL("image/png");
-        const imgWidth = 280;
-        const imgHeight = (canvas.height * imgWidth) / canvas.width;
-        pdf.addImage(imgData, "PNG", 10, 10, imgWidth, imgHeight);
-      }
-    }
-
-    pdf.save("routine.pdf");
+  const handleExportPDF = () => {
+    setIsGeneratingPdf(true);
+    setShouldGeneratePdf(true);
   };
 
   const handleReset = () => {
@@ -1484,9 +1580,14 @@ const handleDragEnd = (event: DragEndEvent) => {
                 About
               </Button>
             </Link>
-            <Button variant="outline" size="sm" onClick={handleExportPDF}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportPDF}
+              disabled={isGeneratingPdf}
+            >
               <Download className="h-4 w-4 mr-1" />
-              Export PDF
+              {isGeneratingPdf ? "Generating..." : "Export PDF"}
             </Button>
             <ThemeToggle />
           </div>
@@ -1735,6 +1836,48 @@ const handleDragEnd = (event: DragEndEvent) => {
 </DragOverlay>
         <TrashDropZone isDragging={isDraggingPlacedSkill || draggedSkill !== null} />
       </DndContext>
+
+      {/* PDF Preview Dialog */}
+      <Dialog open={showPdfPreview} onOpenChange={setShowPdfPreview}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
+          <DialogHeader>
+            <DialogTitle>PDF Preview</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col items-center space-y-4">
+            {pdfBlobUrl && (
+              <object
+                data={pdfBlobUrl}
+                type="application/pdf"
+                className="w-full h-[600px] border rounded"
+                title="PDF Preview"
+              >
+                <p>Your browser doesn't support PDF preview. <a href={pdfBlobUrl} download="routine.pdf">Download the PDF</a> instead.</p>
+              </object>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPdfPreview(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (pdfBlobUrl) {
+                  const a = document.createElement('a');
+                  a.href = pdfBlobUrl;
+                  a.download = 'routine.pdf';
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+                  setShowPdfPreview(false);
+                }
+              }}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Download PDF
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

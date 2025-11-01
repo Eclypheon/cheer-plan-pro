@@ -402,6 +402,7 @@ return (
             }}
           >
             <div
+              id="position-sheet-visual"
               ref={(node) => {
                 sheetRef.current = node;
                 setNodeRef(node);
