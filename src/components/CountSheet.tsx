@@ -164,6 +164,7 @@ export const CountSheet = ({
   const [countSheetWidth, setCountSheetWidth] = React.useState(60); // percentage
   const [isResizingPanels, setIsResizingPanels] = React.useState(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
+  const [editingNoteLine, setEditingNoteLine] = React.useState<number | null>(null);
 
   // Handle panel resizing
   const handleMouseDown = React.useCallback((e: React.MouseEvent) => {
@@ -399,8 +400,21 @@ export const CountSheet = ({
     );
   };
 
-  const NotesCell = ({ lineIndex }: { lineIndex: number }) => {
-    const [isEditing, setIsEditing] = React.useState(false);
+  const NotesCell = ({
+  lineIndex,
+  isEditing, // Added
+  onSetEditingNoteLine, // Added
+  onLineClick, // Pass down
+  notes, // Pass down
+  onUpdateNote, // Pass down
+}: {
+  lineIndex: number;
+  isEditing: boolean; // Added
+  onSetEditingNoteLine: (line: number | null) => void; // Added
+  onLineClick: (lineIndex: number) => void; // Pass down
+  notes: Record<number, string>; // Pass down
+  onUpdateNote?: (lineIndex: number, note: string) => void; // Pass down
+}) => {
     const [editValue, setEditValue] = React.useState(notes[lineIndex] || "");
     const textareaRef = React.useRef<HTMLTextAreaElement>(null);
 
@@ -411,21 +425,24 @@ export const CountSheet = ({
       }
     }, [isEditing]);
 
-    const handleClick = () => {
-      if (!isEditing) {
-        setIsEditing(true);
-        setEditValue(notes[lineIndex] || "");
-      }
-    };
+const handleClick = (e: React.MouseEvent) => {
+  e.stopPropagation(); // Stop the click from bubbling to the <tr>
+  onLineClick(lineIndex); // Explicitly select the line
+
+  if (!isEditing) {
+    setEditValue(notes[lineIndex] || "");
+    onSetEditingNoteLine(lineIndex); // Set this line as editing in the parent
+  }
+};
 
     const handleSave = () => {
       onUpdateNote?.(lineIndex, editValue.trim());
-      setIsEditing(false);
+      onSetEditingNoteLine(null);;
     };
 
     const handleCancel = () => {
       setEditValue(notes[lineIndex] || "");
-      setIsEditing(false);
+      onSetEditingNoteLine(null);;
     };
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -497,7 +514,14 @@ export const CountSheet = ({
           isSelected ? "bg-accent/30" : "hover:bg-accent/20"
         }`}
       >
-        <NotesCell lineIndex={lineIndex} />
+        <NotesCell
+  lineIndex={lineIndex}
+  isEditing={editingNoteLine === lineIndex}
+  onSetEditingNoteLine={setEditingNoteLine}
+  onLineClick={onLineClick}
+  notes={notes}
+  onUpdateNote={onUpdateNote}
+/>
       </tr>
     );
   };
