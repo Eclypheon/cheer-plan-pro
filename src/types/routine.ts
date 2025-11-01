@@ -81,6 +81,7 @@ export interface RoutineConfig {
 export interface CategoryStateData {
   placedSkills: PlacedSkill[];
   positionIcons: PositionIcon[];
+  notes: Record<number, string>;
   timestamp: number;
 }
 

@@ -305,9 +305,11 @@ export const RoutineBuilder = () => {
     if (savedCategoryData) {
       setPlacedSkills(savedCategoryData.placedSkills);
       setPositionIcons(savedCategoryData.positionIcons);
+      setNotes(savedCategoryData.notes || {});
     } else {
       // No saved state - create default state for category
       setPlacedSkills([]);
+      setNotes({});
       if (config.category === "team-16" || config.category === "team-24") {
         // Generate default team icons
         const totalLines = Math.ceil((config.length * config.bpm) / 60 / 8);
@@ -931,7 +933,9 @@ export const RoutineBuilder = () => {
     const data: CategoryStateData = {
       placedSkills: [...placedSkills],
       positionIcons: [...positionIcons],
+      notes: { ...notes },
       timestamp: Date.now()
+
     };
     localStorage.setItem(key, JSON.stringify(data));
   };
