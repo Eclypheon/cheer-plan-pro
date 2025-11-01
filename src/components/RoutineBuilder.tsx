@@ -180,16 +180,32 @@ export const RoutineBuilder = () => {
           const pdf = new jsPDF("p", "mm", "a4");
           const pageWidth = 210;
           const pageHeight = 297;
-          const margin = 10;
+          const margin = 2; // Minimal margin for maximum content fit
 
           const countSheetElement = document.getElementById("count-sheet-container");
           if (countSheetElement) {
+            // Store original styles to restore later
+            const originalOverflow = countSheetElement.style.overflow;
+            const originalHeight = countSheetElement.style.height;
+
+            // Temporarily make all content visible without scrolling
+            countSheetElement.style.overflow = 'visible';
+            countSheetElement.style.height = 'auto';
+
             const canvas = await html2canvas(countSheetElement, {
               scale: 2, // Higher quality
               useCORS: true,
               allowTaint: true,
               backgroundColor: '#ffffff',
+              // Capture the full scrollable area
+              height: countSheetElement.scrollHeight,
+              width: countSheetElement.scrollWidth,
             });
+
+            // Restore original styles
+            countSheetElement.style.overflow = originalOverflow;
+            countSheetElement.style.height = originalHeight;
+
             const imgData = canvas.toDataURL("image/png");
 
             // Calculate scaling to fit within portrait page

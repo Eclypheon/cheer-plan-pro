@@ -477,7 +477,7 @@ const handleClick = (e: React.MouseEvent) => {
           />
         ) : (
           <div className={`whitespace-pre-wrap ${currentNote ? "text-foreground" : "text-muted-foreground"}`}>
-            {currentNote || "Click to add note..."}
+            {currentNote || ""}
           </div>
         )}
       </td>
