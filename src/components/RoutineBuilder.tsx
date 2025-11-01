@@ -52,6 +52,7 @@ export const RoutineBuilder = () => {
   const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [shouldGeneratePdf, setShouldGeneratePdf] = useState(false);
+  const [pdfIcons, setPdfIcons] = useState<PositionIcon[] | undefined>(undefined);
 
   // Load keyboard settings
   const [keyboardSettings] = useState(() => {
@@ -123,6 +124,42 @@ export const RoutineBuilder = () => {
     }
   }, [showPdfPreview, pdfBlobUrl]);
 
+  // Helper function to get unique position sheet configurations
+  const getUniquePositionConfigurations = (): PositionIcon[][] => {
+    const totalLines = Math.ceil((config.length * config.bpm) / 60 / 8);
+    const configurations: PositionIcon[][] = [];
+    const seenConfigurations = new Set<string>();
+
+    for (let lineIndex = 0; lineIndex < totalLines; lineIndex++) {
+      const lineIcons = positionIcons.filter(icon => icon.lineIndex === lineIndex);
+
+      // Create a normalized representation of the configuration
+      // Sort icons by position and create a hash string
+      const normalizedIcons = lineIcons
+        .map(icon => ({
+          type: icon.type,
+          x: icon.x,
+          y: icon.y,
+          name: icon.name || ''
+        }))
+        .sort((a, b) => {
+          if (a.y !== b.y) return a.y - b.y;
+          if (a.x !== b.x) return a.x - b.x;
+          return a.type.localeCompare(b.type);
+        });
+
+      const configHash = JSON.stringify(normalizedIcons);
+
+      // Only add if we haven't seen this configuration before
+      if (!seenConfigurations.has(configHash)) {
+        seenConfigurations.add(configHash);
+        configurations.push(lineIcons);
+      }
+    }
+
+    return configurations;
+  };
+
   // Generate PDF when shouldGeneratePdf flag is set
   useEffect(() => {
     if (shouldGeneratePdf) {
@@ -166,34 +203,48 @@ export const RoutineBuilder = () => {
           }
 
           if (config.category === "team-16" || config.category === "team-24") {
-            const positionSheetElement = document.getElementById("position-sheet-visual");
-            if (positionSheetElement) {
+            const uniqueConfigurations = getUniquePositionConfigurations();
+
+            for (const configIcons of uniqueConfigurations) {
               pdf.addPage();
-              const canvas = await html2canvas(positionSheetElement, {
-                scale: 2, // Higher quality
-                useCORS: true,
-                allowTaint: true,
-                backgroundColor: '#ffffff',
-              });
-              const imgData = canvas.toDataURL("image/png");
 
-              // Calculate scaling to fit within portrait page
-              const availableWidth = pageWidth - (margin * 2);
-              const availableHeight = pageHeight - (margin * 2);
+              // Temporarily set the pdfIcons to show this configuration
+              setPdfIcons(configIcons);
 
-              const scaleX = availableWidth / canvas.width;
-              const scaleY = availableHeight / canvas.height;
-              const scale = Math.min(scaleX, scaleY);
+              // Wait for React to update the DOM
+              await new Promise(resolve => setTimeout(resolve, 100));
 
-              const imgWidth = canvas.width * scale;
-              const imgHeight = canvas.height * scale;
+              const positionSheetElement = document.getElementById("position-sheet-visual");
+              if (positionSheetElement) {
+                const canvas = await html2canvas(positionSheetElement, {
+                  scale: 2, // Higher quality
+                  useCORS: true,
+                  allowTaint: true,
+                  backgroundColor: '#ffffff',
+                });
+                const imgData = canvas.toDataURL("image/png");
 
-              // Center the image on the page
-              const x = (pageWidth - imgWidth) / 2;
-              const y = (pageHeight - imgHeight) / 2;
+                // Calculate scaling to fit within portrait page
+                const availableWidth = pageWidth - (margin * 2);
+                const availableHeight = pageHeight - (margin * 2);
 
-              pdf.addImage(imgData, "PNG", x, y, imgWidth, imgHeight);
+                const scaleX = availableWidth / canvas.width;
+                const scaleY = availableHeight / canvas.height;
+                const scale = Math.min(scaleX, scaleY);
+
+                const imgWidth = canvas.width * scale;
+                const imgHeight = canvas.height * scale;
+
+                // Center the image on the page
+                const x = (pageWidth - imgWidth) / 2;
+                const y = (pageHeight - imgHeight) / 2;
+
+                pdf.addImage(imgData, "PNG", x, y, imgWidth, imgHeight);
+              }
             }
+
+            // Clear the pdfIcons to restore normal operation
+            setPdfIcons(undefined);
           }
 
           // Generate blob for preview - use arraybuffer first then convert to blob
@@ -212,7 +263,7 @@ export const RoutineBuilder = () => {
 
       generatePDF();
     }
-  }, [shouldGeneratePdf, config.category]);
+  }, [shouldGeneratePdf, config.category, config.length, config.bpm, positionIcons, selectedLine]);
 
   // Handle category changes - auto-save/load category states
   useEffect(() => {
@@ -1801,6 +1852,7 @@ const handleDragEnd = (event: DragEndEvent) => {
                       // Receive zoom level info and potentially handle scaled drag end
                       setCurrentZoomLevel(event.zoomLevel);
                     }}
+                    pdfIcons={pdfIcons}
                   />
                 </ResizablePanel>
               </ResizablePanelGroup>

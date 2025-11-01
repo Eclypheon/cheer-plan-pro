@@ -32,7 +32,8 @@ interface PositionSheetProps {
   onPrevLine?: () => void;
   onIconDragStart?: () => void;
   onIconDragEnd?: () => void;
-  onIconDrop?: (event: { active: any, delta: { x: number, y: number }, zoomLevel: number }) => void;
+  onIconDrop?: (event: { active: any, delta: { x: number; y: number }, zoomLevel: number }) => void;
+  pdfIcons?: PositionIcon[]; // Override icons for PDF generation
 }
 
 export const PositionSheet = ({
@@ -60,6 +61,7 @@ export const PositionSheet = ({
   onIconDragStart,
   onIconDragEnd,
   onIconDrop,
+  pdfIcons,
 }: PositionSheetProps) => {
   const [selectedIconId, setSelectedIconId] = useState<string | null>(null);
   const [nameDialogOpen, setNameDialogOpen] = useState(false);
@@ -265,7 +267,7 @@ export const PositionSheet = ({
     );
   }
 
-  const lineIcons = icons.filter((i) => i.lineIndex === selectedLine);
+  const lineIcons = pdfIcons || icons.filter((i) => i.lineIndex === selectedLine);
   const selectedIcon = icons.find((i) => i.id === selectedIconId);
   const selectedIconsCount = lineIcons.filter(i => i.selected).length;
   const isMultiDrag = selectedIconsCount > 1 && dragOffset !== null;
