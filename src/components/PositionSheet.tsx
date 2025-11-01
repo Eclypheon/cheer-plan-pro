@@ -403,7 +403,7 @@ return (
         </div>
 
  {/* Position sheet */}
-        <div className="flex-1 p-1.5 flex justify-center overflow-auto">
+        <div id="position-sheet-container" className="flex-1 p-1.5 flex justify-center overflow-auto">
           {/* This is the wrapper div that fixes the scroll issue.
             Its size is what the scroll-container "sees".
             It shrinks and grows with the zoomLevel, eliminating empty scroll space.

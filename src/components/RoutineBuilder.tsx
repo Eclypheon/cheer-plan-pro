@@ -238,14 +238,29 @@ export const RoutineBuilder = () => {
               // Wait for React to update the DOM
               await new Promise(resolve => setTimeout(resolve, 100));
 
-              const positionSheetElement = document.getElementById("position-sheet-visual");
+              const positionSheetElement = document.getElementById("position-sheet-container");
               if (positionSheetElement) {
+                // Store original styles to restore later
+                const originalOverflow = positionSheetElement.style.overflow;
+                const originalHeight = positionSheetElement.style.height;
+
+                // Temporarily make all content visible without scrolling
+                positionSheetElement.style.overflow = 'visible';
+                positionSheetElement.style.height = 'auto';
+
                 const canvas = await html2canvas(positionSheetElement, {
                   scale: 2, // Higher quality
                   useCORS: true,
                   allowTaint: true,
                   backgroundColor: '#ffffff',
+                  // Capture the full scrollable area
+                  height: positionSheetElement.scrollHeight,
+                  width: positionSheetElement.scrollWidth,
                 });
+
+                // Restore original styles
+                positionSheetElement.style.overflow = originalOverflow;
+                positionSheetElement.style.height = originalHeight;
                 const imgData = canvas.toDataURL("image/png");
 
                 // Calculate scaling to fit within portrait page
