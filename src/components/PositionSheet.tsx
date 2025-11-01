@@ -4,7 +4,7 @@ import type { PositionIcon } from "@/types/routine";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
-import { Plus, Undo, Redo, ToggleLeft, ToggleRight, Square, Circle, X, ZoomIn, ZoomOut } from "lucide-react";
+import { Plus, Undo, Redo, ToggleLeft, ToggleRight, Square, Circle, Triangle, X, ZoomIn, ZoomOut } from "lucide-react";
 import { PositionIcon as PositionIconComponent } from "./PositionIcon";
 import { PositionIconNameDialog } from "./PositionIconNameDialog";
 
@@ -302,7 +302,7 @@ return (
               Mid
             </Button>
             <Button size="sm" variant="ghost" className="h-6 px-1.5 text-xs" onClick={() => onAddIcon("x")}>
-              <X className="h-3 w-3 mr-0.5" />
+              <Triangle className="h-3 w-3 mr-0.5" />
               Fly
             </Button>
           </div>
