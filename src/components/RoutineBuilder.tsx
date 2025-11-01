@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
   import { DndContext, DragEndEvent, DragOverlay, useSensor, useSensors, PointerSensor, DragStartEvent, DragMoveEvent, CollisionDetection, rectIntersection, closestCenter } from "@dnd-kit/core";
 import { snapCenterToCursor } from "@dnd-kit/modifiers";
 import type { PlacedSkill, RoutineConfig, Skill, PositionIcon, CategoryStateData, SaveStateData } from "@/types/routine";
@@ -43,6 +43,11 @@ export const RoutineBuilder = () => {
   const [dragOffset, setDragOffset] = useState<{ x: number; y: number } | null>(null);
   const [draggedIconId, setDraggedIconId] = useState<string | null>(null);
   const [currentZoomLevel, setCurrentZoomLevel] = useState<number>(0.55);
+
+  // Handle zoom level changes from PositionSheet
+  const handleZoomChange = useCallback((zoomLevel: number) => {
+    setCurrentZoomLevel(zoomLevel);
+  }, []);
   const [hasLoadedState, setHasLoadedState] = useState(false);
   const initialLoadedCategoryRef = useRef<string | null>(null);
   const [currentSaveState, setCurrentSaveState] = useState<SaveStateData | null>(null);
@@ -1852,6 +1857,7 @@ const handleDragEnd = (event: DragEndEvent) => {
                       // Receive zoom level info and potentially handle scaled drag end
                       setCurrentZoomLevel(event.zoomLevel);
                     }}
+                    onZoomChange={(zoomLevel) => setCurrentZoomLevel(zoomLevel)}
                     pdfIcons={pdfIcons}
                   />
                 </ResizablePanel>

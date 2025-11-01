@@ -33,6 +33,7 @@ interface PositionSheetProps {
   onIconDragStart?: () => void;
   onIconDragEnd?: () => void;
   onIconDrop?: (event: { active: any, delta: { x: number; y: number }, zoomLevel: number }) => void;
+  onZoomChange?: (zoomLevel: number) => void;
   pdfIcons?: PositionIcon[]; // Override icons for PDF generation
 }
 
@@ -61,6 +62,7 @@ export const PositionSheet = ({
   onIconDragStart,
   onIconDragEnd,
   onIconDrop,
+  onZoomChange,
   pdfIcons,
 }: PositionSheetProps) => {
   const [selectedIconId, setSelectedIconId] = useState<string | null>(null);
@@ -84,16 +86,26 @@ export const PositionSheet = ({
 
   // Zoom handlers
   const handleZoomChange = useCallback((value: number[]) => {
-    setZoomLevel(value[0]);
-  }, []);
+    const newZoomLevel = value[0];
+    setZoomLevel(newZoomLevel);
+    onZoomChange?.(newZoomLevel);
+  }, [onZoomChange]);
 
   const handleZoomIn = useCallback(() => {
-    setZoomLevel(prev => Math.min(1.0, prev + 0.1));
-  }, []);
+    setZoomLevel(prev => {
+      const newZoomLevel = Math.min(1.0, prev + 0.1);
+      onZoomChange?.(newZoomLevel);
+      return newZoomLevel;
+    });
+  }, [onZoomChange]);
 
   const handleZoomOut = useCallback(() => {
-    setZoomLevel(prev => Math.max(0.25, prev - 0.1));
-  }, []);
+    setZoomLevel(prev => {
+      const newZoomLevel = Math.max(0.25, prev - 0.1);
+      onZoomChange?.(newZoomLevel);
+      return newZoomLevel;
+    });
+  }, [onZoomChange]);
 
   // Pinch gesture handlers
   const getTouchDistance = useCallback((touches: React.TouchList) => {
@@ -123,9 +135,10 @@ export const PositionSheet = ({
         const scale = currentDistance / initialPinchDistance;
         const newZoomLevel = Math.max(0.25, Math.min(1.0, initialZoomLevel * scale));
         setZoomLevel(newZoomLevel);
+        onZoomChange?.(newZoomLevel);
       }
     }
-  }, [isPinching, initialPinchDistance, initialZoomLevel, getTouchDistance]);
+  }, [isPinching, initialPinchDistance, initialZoomLevel, getTouchDistance, onZoomChange]);
 
   const handleTouchEnd = useCallback((e: React.TouchEvent) => {
     if (e.touches.length < 2) {
