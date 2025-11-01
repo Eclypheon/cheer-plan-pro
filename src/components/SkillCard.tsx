@@ -49,7 +49,7 @@ export const SkillCard = ({ skill, onUpdateCounts, showDescription = true, }: Sk
               type="number"
               value={editedCounts}
               onChange={(e) => setEditedCounts(e.target.value)}
-              className="w-12 h-6 text-xs"
+              className="w-14 h-6 text-xs"
               onBlur={handleCountsUpdate}
               onKeyDown={(e) => {
                 if (e.key === "Enter") handleCountsUpdate();
@@ -71,7 +71,7 @@ export const SkillCard = ({ skill, onUpdateCounts, showDescription = true, }: Sk
               setIsEditingCounts(true);
             }}
           >
-            {skill.counts}ct
+            {skill.counts}-count
           </Badge>
         )}
       </div>
