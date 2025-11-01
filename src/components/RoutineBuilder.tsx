@@ -1764,7 +1764,7 @@ const handleDragEnd = (event: DragEndEvent) => {
         modifiers={[snapCenterToCursor]}
       >
         <ResizablePanelGroup direction="horizontal" className="flex-1 w-full">
-          <ResizablePanel defaultSize={25} minSize={10} maxSize={40} collapsible>
+          <ResizablePanel defaultSize={15} minSize={10} maxSize={40} collapsible>
             <SkillsPanel
               skills={skills}
               onAddCustomSkill={addCustomSkill}
@@ -1892,7 +1892,7 @@ const handleDragEnd = (event: DragEndEvent) => {
 </div>
 ) : null}
 </DragOverlay>
-        <TrashDropZone isDragging={isDraggingPlacedSkill || draggedSkill !== null} />
+        <TrashDropZone isDragging={isDraggingPlacedSkill} />
       </DndContext>
 
       {/* PDF Preview Dialog */}
