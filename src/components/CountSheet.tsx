@@ -346,7 +346,7 @@ export const CountSheet = ({
 
       <div className="flex-1 overflow-auto relative">
         <table className="w-full border-collapse relative z-10" id="count-sheet-table">
-          <thead>
+          <thead className="sticky top-0 bg-card z-20">
             <tr>
               <th className="border border-border bg-muted font-bold text-center px-2 py-1 text-xs">#</th>
               {Array.from({ length: 8 }, (_, i) => (
@@ -366,4 +366,3 @@ export const CountSheet = ({
     </div>
   );
 };
-
