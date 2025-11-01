@@ -426,6 +426,12 @@ export const RoutineBuilder = () => {
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Skip keyboard shortcuts if user is typing in an input field
+      const activeElement = document.activeElement;
+      if (activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA' || (activeElement as HTMLElement).contentEditable === 'true')) {
+        return;
+      }
+
       // Position sheet shortcuts
       if (e.key === keyboardSettings.nextLine && !e.ctrlKey && !e.shiftKey) {
         const totalLines = Math.ceil((config.length * config.bpm) / 60 / 8);
