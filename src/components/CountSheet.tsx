@@ -160,6 +160,54 @@ export const CountSheet = ({
   notes = {},
   onUpdateNote,
 }: CountSheetProps) => {
+  // State for resizable panels
+  const [countSheetWidth, setCountSheetWidth] = React.useState(60); // percentage
+  const [isResizingPanels, setIsResizingPanels] = React.useState(false);
+  const containerRef = React.useRef<HTMLDivElement>(null);
+
+  // Handle panel resizing
+  const handleMouseDown = React.useCallback((e: React.MouseEvent) => {
+    setIsResizingPanels(true);
+    e.preventDefault();
+  }, []);
+
+  const handleMouseMove = React.useCallback((e: MouseEvent) => {
+    if (!isResizingPanels || !containerRef.current) return;
+
+    const container = containerRef.current;
+    const rect = container.getBoundingClientRect();
+    const newWidth = ((e.clientX - rect.left) / rect.width) * 100;
+
+    // Constrain between 30% and 80%
+    const constrainedWidth = Math.max(60, Math.min(85, newWidth));
+    setCountSheetWidth(constrainedWidth);
+  }, [isResizingPanels]);
+
+  const handleMouseUp = React.useCallback(() => {
+    setIsResizingPanels(false);
+  }, []);
+
+  React.useEffect(() => {
+    if (isResizingPanels) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    } else {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [isResizingPanels, handleMouseMove, handleMouseUp]);
+
   // Calculate total lines needed
   const totalBeats = Math.ceil((routineLength * bpm) / 60);
   const totalLines = Math.ceil(totalBeats / 8);
@@ -464,39 +512,52 @@ export const CountSheet = ({
       </div>
 
       <div className="flex-1 overflow-auto relative" id="count-sheet-container">
-        <div className="flex gap-2 min-w-max">
+        <div ref={containerRef} className="flex min-w-max relative">
           {/* Count Sheet Table */}
-          <table className="border-collapse relative z-10" id="count-sheet-table">
-            <thead className="sticky top-0 bg-card z-20">
-              <tr>
-                <th className="border border-border bg-muted font-bold text-center px-2 py-1 text-xs">#</th>
-                {Array.from({ length: 8 }, (_, i) => (
-                  <th key={i} className="border border-border bg-muted font-bold text-center px-2 py-1 text-xs">
-                    {i + 1}
-                  </th>
+          <div style={{ width: `${countSheetWidth}%` }} className="flex-shrink-0">
+            <table className="border-collapse relative z-10 w-full" id="count-sheet-table">
+              <thead className="sticky top-0 bg-card z-20">
+                <tr>
+                  <th className="border border-border bg-muted font-bold text-center px-2 py-1 text-xs">#</th>
+                  {Array.from({ length: 8 }, (_, i) => (
+                    <th key={i} className="border border-border bg-muted font-bold text-center px-2 py-1 text-xs">
+                      {i + 1}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {Array.from({ length: totalLines }, (_, i) => (
+                  <CountLine key={i} lineIndex={i} />
                 ))}
-              </tr>
-            </thead>
-            <tbody>
-              {Array.from({ length: totalLines }, (_, i) => (
-                <CountLine key={i} lineIndex={i} />
-              ))}
-            </tbody>
-          </table>
+              </tbody>
+            </table>
+          </div>
+
+          {/* Resize Handle */}
+          <div
+            className="w-0.5 bg-border hover:bg-accent cursor-col-resize flex-shrink-0 relative z-30"
+            onMouseDown={handleMouseDown}
+            title="Drag to resize panels"
+          >
+            <div className="absolute inset-y-0 left-1/2 w-0.5 -translate-x-1/2 bg-border hover:bg-accent transition-colors" />
+          </div>
 
           {/* Notes Table */}
-          <table className="border-collapse relative z-10 w-[400px]">
-            <thead className="sticky top-0 bg-card z-20">
-              <tr>
-                <th className="border border-border bg-muted font-bold text-center px-2 py-1 text-xs">Notes</th>
-              </tr>
-            </thead>
-            <tbody>
-              {Array.from({ length: totalLines }, (_, i) => (
-                <NotesLine key={i} lineIndex={i} />
-              ))}
-            </tbody>
-          </table>
+          <div style={{ width: `${100 - countSheetWidth}%` }} className="flex-shrink-0">
+            <table className="border-collapse relative z-10 w-full">
+              <thead className="sticky top-0 bg-card z-20">
+                <tr>
+                  <th className="border border-border bg-muted font-bold text-center px-2 py-1 text-xs">Notes</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Array.from({ length: totalLines }, (_, i) => (
+                  <NotesLine key={i} lineIndex={i} />
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
