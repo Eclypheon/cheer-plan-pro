@@ -15,6 +15,8 @@ interface CountSheetProps {
   onMoveSkill?: (id: string, newLineIndex: number, newStartCount: number) => void;
   onUpdateSkillCounts?: (id: string, counts: number) => void;
   isResizing?: boolean;
+  draggedSkill?: Skill | null; 
+  overCellId?: string | null;  
 }
 
 interface SkillPlacement {
@@ -149,6 +151,8 @@ export const CountSheet = ({
   onSelectSkill,
   onMoveSkill,
   onUpdateSkillCounts,
+  draggedSkill = null,
+  overCellId = null,
   isResizing,
 }: CountSheetProps) => {
   // Calculate total lines needed
@@ -187,6 +191,27 @@ export const CountSheet = ({
     return placements;
   };
 
+//Determine the highlight span
+  let hoverLineIndex = -1;
+  let hoverStartCount = -1;
+  let skillSpan = 0;
+
+  if (draggedSkill && overCellId && overCellId.startsWith('cell-')) {
+    try {
+      // Parse "cell-5-3" into line 5, count 3
+      const [_, lineStr, countStr] = overCellId.split('-');
+      hoverLineIndex = parseInt(lineStr);
+      hoverStartCount = parseInt(countStr);
+      skillSpan = draggedSkill.counts;
+    } catch (e) {
+      // If parsing fails, reset values
+      hoverLineIndex = -1;
+      hoverStartCount = -1;
+      skillSpan = 0;
+    }
+  }
+  // END of new logic
+
   const skillPlacements = getSkillPlacements();
 
   const getSkillsInCell = (lineIndex: number, count: number) => {
@@ -210,12 +235,18 @@ export const CountSheet = ({
     // Check if this cell is part of a skill span but not the first cell
     const isPartOfSkillSpan = cellSkills.length > 0 && isFirstCountOfSkill.length === 0;
 
+    const isDropTarget = 
+      skillSpan > 0 && // Is a skill being dragged?
+      lineIndex === hoverLineIndex && // Is this cell on the correct line?
+      count >= hoverStartCount && // Is this cell at or after the start?
+      count < (hoverStartCount + skillSpan); // Is this cell within the skill's count?
+
     return (
       <td
         ref={setNodeRef}
         data-cell={`${lineIndex}-${count}`}
         className={`border border-border min-w-[80px] h-10 p-0.5 relative text-xs ${
-          isOver ? "bg-accent" : isPartOfSkillSpan ? "bg-gray-50 dark:bg-gray-800/50" : "bg-card hover:bg-accent/50"
+          isDropTarget ? "bg-accent" : isPartOfSkillSpan ? "bg-gray-50 dark:bg-gray-800/50" : "bg-card hover:bg-accent/50"
         }`}
       >
         {isFirstCountOfSkill.map((sp) => {

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-  import { DndContext, DragEndEvent, DragOverlay, useSensor, useSensors, PointerSensor, DragStartEvent, DragMoveEvent, CollisionDetection, rectIntersection, closestCenter } from "@dnd-kit/core";
+  import { DndContext, DragEndEvent, DragOverlay, useSensor, useSensors, PointerSensor, DragStartEvent, DragMoveEvent, CollisionDetection, rectIntersection, closestCenter, DragOverEvent } from "@dnd-kit/core";
 import { snapCenterToCursor } from "@dnd-kit/modifiers";
 import type { PlacedSkill, RoutineConfig, Skill, PositionIcon, CategoryStateData, SaveStateData } from "@/types/routine";
 import { useSkills } from "@/hooks/useSkills";
@@ -43,6 +43,7 @@ export const RoutineBuilder = () => {
   const [dragOffset, setDragOffset] = useState<{ x: number; y: number } | null>(null);
   const [draggedIconId, setDraggedIconId] = useState<string | null>(null);
   const [currentZoomLevel, setCurrentZoomLevel] = useState<number>(0.55);
+  const [overCellId, setOverCellId] = useState<string | null>(null);
 
   // Handle zoom level changes from PositionSheet
   const handleZoomChange = useCallback((zoomLevel: number) => {
@@ -1206,6 +1207,15 @@ const handleDragMove = (event: DragMoveEvent) => {
     }
   };
 
+const handleDragOver = (event: DragOverEvent) => {
+    const overId = event.over?.id.toString();
+    if (overId && overId.startsWith('cell-')) {
+      setOverCellId(overId);
+    } else {
+      setOverCellId(null);
+    }
+  };
+
 const handleDragEnd = (event: DragEndEvent) => {
     // Console log using state variables for accurate type reporting
     console.log(`Drag End: Type='${isDraggingPlacedSkill ? 'placed skill' : isDraggingIcon ? 'position icon' : (skills.find(s => s.id === event.active.id) ? 'new skill' : 'unknown')}', ID='${event.active.id}', Over='${event.over?.id}', Over Data Type='${event.over?.data?.current?.type || 'N/A'}'`);
@@ -1224,6 +1234,7 @@ const handleDragEnd = (event: DragEndEvent) => {
     setIsDraggingIcon(false);
     setDragOffset(null);
     setDraggedIconId(null);
+    setOverCellId(null);
     // Re-enable scrolling
     document.body.style.overflow = '';
 
@@ -1359,6 +1370,7 @@ const handleDragEnd = (event: DragEndEvent) => {
     }
     // No further actions if not dropped on a cell or trash
   };
+
 
   const handleRemoveSkill = (id: string) => {
     setPlacedSkills(placedSkills.filter((ps) => ps.id !== id));
@@ -1759,6 +1771,7 @@ const handleDragEnd = (event: DragEndEvent) => {
         collisionDetection={customCollisionDetection}
         onDragStart={handleDragStart}
         onDragMove={handleDragMove}
+        onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
         autoScroll={false}
         modifiers={[snapCenterToCursor]}
@@ -1800,6 +1813,8 @@ const handleDragEnd = (event: DragEndEvent) => {
                       ));
                     }}
                     onUpdateSkillCounts={updateSkillCounts}
+                    draggedSkill={draggedSkill}
+                    overCellId={overCellId}
                   />
                 </ResizablePanel>
 
@@ -1879,6 +1894,8 @@ const handleDragEnd = (event: DragEndEvent) => {
                   ));
                 }}
                 onUpdateSkillCounts={updateSkillCounts}
+                draggedSkill={draggedSkill}
+                overCellId={overCellId}
               />
             )}
           </ResizablePanel>
