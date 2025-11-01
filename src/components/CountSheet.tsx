@@ -1,3 +1,4 @@
+import React from "react";
 import { useDroppable, useDraggable } from "@dnd-kit/core";
 import type { PlacedSkill, Skill, SkillCategory } from "@/types/routine";
 import { X, ChevronLeft, ChevronRight } from "lucide-react";
@@ -15,8 +16,10 @@ interface CountSheetProps {
   onMoveSkill?: (id: string, newLineIndex: number, newStartCount: number) => void;
   onUpdateSkillCounts?: (id: string, counts: number) => void;
   isResizing?: boolean;
-  draggedSkill?: Skill | null; 
-  overCellId?: string | null;  
+  draggedSkill?: Skill | null;
+  overCellId?: string | null;
+  notes?: Record<number, string>;
+  onUpdateNote?: (lineIndex: number, note: string) => void;
 }
 
 interface SkillPlacement {
@@ -154,6 +157,8 @@ export const CountSheet = ({
   draggedSkill = null,
   overCellId = null,
   isResizing,
+  notes = {},
+  onUpdateNote,
 }: CountSheetProps) => {
   // Calculate total lines needed
   const totalBeats = Math.ceil((routineLength * bpm) / 60);
@@ -346,6 +351,74 @@ export const CountSheet = ({
     );
   };
 
+  const NotesCell = ({ lineIndex }: { lineIndex: number }) => {
+    const [isEditing, setIsEditing] = React.useState(false);
+    const [editValue, setEditValue] = React.useState(notes[lineIndex] || "");
+    const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+
+    React.useEffect(() => {
+      if (isEditing && textareaRef.current) {
+        textareaRef.current.focus();
+        textareaRef.current.select();
+      }
+    }, [isEditing]);
+
+    const handleClick = () => {
+      if (!isEditing) {
+        setIsEditing(true);
+        setEditValue(notes[lineIndex] || "");
+      }
+    };
+
+    const handleSave = () => {
+      onUpdateNote?.(lineIndex, editValue.trim());
+      setIsEditing(false);
+    };
+
+    const handleCancel = () => {
+      setEditValue(notes[lineIndex] || "");
+      setIsEditing(false);
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        handleSave();
+      } else if (e.key === "Escape") {
+        handleCancel();
+      }
+    };
+
+    const handleBlur = () => {
+      handleSave();
+    };
+
+    const currentNote = notes[lineIndex] || "";
+
+    return (
+      <td
+        className="border border-border bg-card hover:bg-accent/50 h-10 p-1 text-xs cursor-text"
+        onClick={handleClick}
+      >
+        {isEditing ? (
+          <textarea
+            ref={textareaRef}
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onBlur={handleBlur}
+            className="w-full h-full bg-transparent border-none outline-none resize-none text-xs p-0"
+            placeholder="Add note..."
+          />
+        ) : (
+          <div className={`whitespace-pre-wrap ${currentNote ? "text-foreground" : "text-muted-foreground"}`}>
+            {currentNote || "Click to add note..."}
+          </div>
+        )}
+      </td>
+    );
+  };
+
   const CountLine = ({ lineIndex }: { lineIndex: number }) => {
     const isSelected = selectedLine === lineIndex;
 
@@ -366,6 +439,21 @@ export const CountSheet = ({
     );
   };
 
+  const NotesLine = ({ lineIndex }: { lineIndex: number }) => {
+    const isSelected = selectedLine === lineIndex;
+
+    return (
+      <tr
+        onClick={() => onLineClick(lineIndex)}
+        className={`cursor-pointer transition-colors ${
+          isSelected ? "bg-accent/30" : "hover:bg-accent/20"
+        }`}
+      >
+        <NotesCell lineIndex={lineIndex} />
+      </tr>
+    );
+  };
+
   return (
     <div className="h-full flex flex-col bg-card relative z-10 overflow-hidden">
       <div className="p-1.5 border-b">
@@ -375,24 +463,41 @@ export const CountSheet = ({
         </p>
       </div>
 
-      <div className="flex-1 overflow-auto relative">
-        <table className="w-full border-collapse relative z-10" id="count-sheet-table">
-          <thead className="sticky top-0 bg-card z-20">
-            <tr>
-              <th className="border border-border bg-muted font-bold text-center px-2 py-1 text-xs">#</th>
-              {Array.from({ length: 8 }, (_, i) => (
-                <th key={i} className="border border-border bg-muted font-bold text-center px-2 py-1 text-xs">
-                  {i + 1}
-                </th>
+      <div className="flex-1 overflow-auto relative" id="count-sheet-container">
+        <div className="flex gap-2 min-w-max">
+          {/* Count Sheet Table */}
+          <table className="border-collapse relative z-10" id="count-sheet-table">
+            <thead className="sticky top-0 bg-card z-20">
+              <tr>
+                <th className="border border-border bg-muted font-bold text-center px-2 py-1 text-xs">#</th>
+                {Array.from({ length: 8 }, (_, i) => (
+                  <th key={i} className="border border-border bg-muted font-bold text-center px-2 py-1 text-xs">
+                    {i + 1}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {Array.from({ length: totalLines }, (_, i) => (
+                <CountLine key={i} lineIndex={i} />
               ))}
-            </tr>
-          </thead>
-          <tbody>
-            {Array.from({ length: totalLines }, (_, i) => (
-              <CountLine key={i} lineIndex={i} />
-            ))}
-          </tbody>
-        </table>
+            </tbody>
+          </table>
+
+          {/* Notes Table */}
+          <table className="border-collapse relative z-10 w-[400px]">
+            <thead className="sticky top-0 bg-card z-20">
+              <tr>
+                <th className="border border-border bg-muted font-bold text-center px-2 py-1 text-xs">Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {Array.from({ length: totalLines }, (_, i) => (
+                <NotesLine key={i} lineIndex={i} />
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

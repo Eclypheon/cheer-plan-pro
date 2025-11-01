@@ -30,6 +30,7 @@ export const RoutineBuilder = () => {
 
   const [placedSkills, setPlacedSkills] = useState<PlacedSkill[]>([]);
   const [positionIcons, setPositionIcons] = useState<PositionIcon[]>([]);
+  const [notes, setNotes] = useState<Record<number, string>>({});
   const [selectedLine, setSelectedLine] = useState<number | null>(null);
   const [lineHistories, setLineHistories] = useState<{ [saveStateSlot: number]: { [category: string]: { [lineIndex: number]: { history: PositionIcon[][], index: number } } } }>({});
   const [draggedSkill, setDraggedSkill] = useState<Skill | null>(null);
@@ -90,6 +91,7 @@ export const RoutineBuilder = () => {
         const data: SaveStateData = JSON.parse(savedState1);
         setPlacedSkills(data.placedSkills);
         setPositionIcons(data.positionIcons);
+        setNotes(data.notes || {});
         setConfig(data.config);
         setCurrentSaveState(data);
         setLoadedSaveStateSlot(1);
@@ -180,7 +182,7 @@ export const RoutineBuilder = () => {
           const pageHeight = 297;
           const margin = 10;
 
-          const countSheetElement = document.getElementById("count-sheet-table");
+          const countSheetElement = document.getElementById("count-sheet-container");
           if (countSheetElement) {
             const canvas = await html2canvas(countSheetElement, {
               scale: 2, // Higher quality
@@ -332,6 +334,7 @@ export const RoutineBuilder = () => {
         placedSkills: [...placedSkills],
         positionIcons: [...positionIcons],
         config: { ...config },
+        notes: { ...notes },
         timestamp: Date.now()
       };
       localStorage.setItem(key, JSON.stringify(data));
@@ -946,6 +949,7 @@ export const RoutineBuilder = () => {
       placedSkills: [...placedSkills],
       positionIcons: [...positionIcons],
       config: { ...config },
+      notes: { ...notes },
       timestamp: Date.now()
     };
     localStorage.setItem(key, JSON.stringify(data));
@@ -985,6 +989,7 @@ export const RoutineBuilder = () => {
         placedSkills: defaultPlacedSkills,
         positionIcons: defaultPositionIcons,
         config: { ...config },
+        notes: {},
         timestamp: Date.now()
       };
 
@@ -1729,6 +1734,7 @@ const handleDragEnd = (event: DragEndEvent) => {
                     placedSkills: [...placedSkills],
                     positionIcons: [...positionIcons],
                     config: { ...config },
+                    notes: { ...notes },
                     timestamp: Date.now()
                   };
                   localStorage.setItem(key, JSON.stringify(data));
@@ -1815,6 +1821,10 @@ const handleDragEnd = (event: DragEndEvent) => {
                     onUpdateSkillCounts={updateSkillCounts}
                     draggedSkill={draggedSkill}
                     overCellId={overCellId}
+                    notes={notes}
+                    onUpdateNote={(lineIndex, note) => {
+                      setNotes(prev => ({ ...prev, [lineIndex]: note }));
+                    }}
                   />
                 </ResizablePanel>
 

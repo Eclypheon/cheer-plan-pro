@@ -88,5 +88,6 @@ export interface SaveStateData {
   placedSkills: PlacedSkill[];
   positionIcons: PositionIcon[];
   config: RoutineConfig;
+  notes: Record<number, string>;
   timestamp: number;
 }
