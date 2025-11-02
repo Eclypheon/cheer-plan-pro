@@ -81,6 +81,8 @@ export interface RoutineConfig {
 export interface CategoryStateData {
   placedSkills: PlacedSkill[];
   positionIcons: PositionIcon[];
+  notes: Record<number, string>;
+  segmentNames?: Record<number, string>;
   timestamp: number;
 }
 
@@ -88,5 +90,7 @@ export interface SaveStateData {
   placedSkills: PlacedSkill[];
   positionIcons: PositionIcon[];
   config: RoutineConfig;
+  notes: Record<number, string>;
+  segmentNames?: Record<number, string>;
   timestamp: number;
 }
