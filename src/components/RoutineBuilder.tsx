@@ -1937,6 +1937,7 @@ const handleDragEnd = (event: DragEndEvent) => {
                     onUpdateNote={(lineIndex, note) => {
                       setNotes(prev => ({ ...prev, [lineIndex]: note }));
                     }}
+                    isPdfRender={isGeneratingPdf}
                   />
                 </ResizablePanel>
 
@@ -2025,6 +2026,11 @@ const handleDragEnd = (event: DragEndEvent) => {
                 onUpdateSkillCounts={updateSkillCounts}
                 draggedSkill={draggedSkill}
                 overCellId={overCellId}
+                                    notes={notes}
+                    onUpdateNote={(lineIndex, note) => {
+                      setNotes(prev => ({ ...prev, [lineIndex]: note }));
+                    }}
+                isPdfRender={isGeneratingPdf}
               />
             )}
           </ResizablePanel>

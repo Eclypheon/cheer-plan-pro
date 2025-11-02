@@ -2,6 +2,7 @@ import React from "react";
 import { useDroppable, useDraggable } from "@dnd-kit/core";
 import type { PlacedSkill, Skill, SkillCategory } from "@/types/routine";
 import { X, ChevronLeft, ChevronRight } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface CountSheetProps {
   routineLength: number;
@@ -20,6 +21,7 @@ interface CountSheetProps {
   overCellId?: string | null;
   notes?: Record<number, string>;
   onUpdateNote?: (lineIndex: number, note: string) => void;
+  isPdfRender?: boolean;
 }
 
 interface SkillPlacement {
@@ -159,6 +161,7 @@ export const CountSheet = ({
   isResizing,
   notes = {},
   onUpdateNote,
+  isPdfRender = false,
 }: CountSheetProps) => {
   // State for resizable panels
   const [countSheetWidth, setCountSheetWidth] = React.useState(60); // percentage
@@ -462,7 +465,7 @@ const handleClick = (e: React.MouseEvent) => {
 
     return (
       <td
-        className="border border-border bg-card hover:bg-accent/50 h-10 p-1 text-xs cursor-text"
+        className="border border-border bg-card hover:bg-accent/50 h-10 p-1 text-xs cursor-text whitespace-pre-wrap  break-words"
         onClick={handleClick}
       >
         {isEditing ? (
@@ -472,11 +475,11 @@ const handleClick = (e: React.MouseEvent) => {
             onChange={(e) => setEditValue(e.target.value)}
             onKeyDown={handleKeyDown}
             onBlur={handleBlur}
-            className="w-full h-full bg-transparent border-none outline-none resize-none text-xs p-0"
+            className="w-full h-full bg-transparent border-none outline-none resize-none text-xs p-0 whitespace-pre-wrap  break-words"
             placeholder="Add note..."
           />
         ) : (
-          <div className={`whitespace-pre-wrap ${currentNote ? "text-foreground" : "text-muted-foreground"}`}>
+          <div className={`whitespace-pre-wrap  break-words ${currentNote ? "text-foreground" : "text-muted-foreground"}`}>
             {currentNote || ""}
           </div>
         )}
@@ -538,7 +541,10 @@ const handleClick = (e: React.MouseEvent) => {
       <div className="flex-1 overflow-auto relative" id="count-sheet-container">
         <div ref={containerRef} id="count-sheet-content-wrapper" className="flex min-w-max relative">
           {/* Count Sheet Table */}
-          <div style={{ width: `${countSheetWidth}%` }} className="flex-shrink-0">
+          <div
+  style={!isPdfRender ? { width: `${countSheetWidth}%`, minWidth: '690px' } : { }}
+  className="flex-shrink-0"
+>
             <table className="border-collapse relative z-10 w-full" id="count-sheet-table">
               <thead className="sticky top-0 bg-card z-20">
                 <tr>
@@ -559,17 +565,25 @@ const handleClick = (e: React.MouseEvent) => {
           </div>
 
           {/* Resize Handle */}
-          <div
-            className="w-0.5 bg-border hover:bg-accent cursor-col-resize flex-shrink-0 relative z-30"
-            onMouseDown={handleMouseDown}
-            title="Drag to resize panels"
-          >
-            <div className="absolute inset-y-0 left-1/2 w-0.5 -translate-x-1/2 bg-border hover:bg-accent transition-colors" />
-          </div>
+{!isPdfRender && (
+  <div
+    className="w-0.5 bg-border hover:bg-accent cursor-col-resize flex-shrink-0 relative z-30"
+    onMouseDown={handleMouseDown}
+    title="Drag to resize panels"
+  >
+    <div className="absolute inset-y-0 left-1/2 w-0.5 -translate-x-1/2 bg-border hover:bg-accent transition-colors" />
+  </div>
+)}
 
           {/* Notes Table */}
-          <div style={{ width: `${100 - countSheetWidth}%` }} className="flex-shrink-0">
-            <table className="border-collapse relative z-10 w-full">
+          <div
+  style={!isPdfRender ? { width: `${100 - countSheetWidth}%` } : { minWidth: '150px' }}
+  className="flex-shrink-0"
+>
+            <table className={cn(
+              "border-collapse relative z-10",
+              isPdfRender ? "max-w-xl" : "w-full" // <-- EDIT THIS "max-w-xl" (e.g., max-w-lg, max-w-2xl) FOR THE PDF
+            )}>
               <thead className="sticky top-0 bg-card z-20">
                 <tr>
                   <th className="border border-border bg-muted font-bold text-center px-2 py-1 text-xs">Notes</th>
