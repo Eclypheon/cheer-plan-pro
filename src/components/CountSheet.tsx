@@ -280,6 +280,30 @@ export const CountSheet = ({
     );
   };
 
+  // Calculate overlap information for a skill across all cells it spans
+  const getSkillOverlapInfo = (skillPlacement: SkillPlacement) => {
+    const { placedSkill, lineIndex, startCount, endCount } = skillPlacement;
+    let maxOverlapCount = 1; // At least the skill itself
+    let skillIndexInMaxOverlap = 0;
+
+    // Check all cells this skill spans
+    for (let count = startCount; count <= endCount; count++) {
+      const cellSkills = getSkillsInCell(lineIndex, count);
+      if (cellSkills.length > maxOverlapCount) {
+        maxOverlapCount = cellSkills.length;
+        // Find this skill's index in the overlap group
+        skillIndexInMaxOverlap = cellSkills.findIndex(sp => sp.placedSkill.id === placedSkill.id);
+      }
+    }
+
+    return {
+      maxOverlapCount,
+      skillIndexInMaxOverlap,
+      heightPercentage: maxOverlapCount > 1 ? 100 / maxOverlapCount : 100,
+      topPercentage: maxOverlapCount > 1 ? skillIndexInMaxOverlap * (100 / maxOverlapCount) : 0
+    };
+  };
+
   const CountCell = ({ lineIndex, count }: { lineIndex: number; count: number }) => {
     const { setNodeRef, isOver } = useDroppable({
       id: `cell-${lineIndex}-${count}`,
@@ -306,7 +330,7 @@ export const CountSheet = ({
           isDropTarget ? "bg-accent" : isPartOfSkillSpan ? "bg-card" : "bg-card hover:bg-accent/50"
         }`}
       >
-        {isFirstCountOfSkill.map((sp) => {
+        {isFirstCountOfSkill.map((sp, skillIndex) => {
           const cellsToSpan = Math.min(sp.endCount - sp.startCount + 1, 9 - count);
           const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
             id: `placed-${sp.placedSkill.id}`,
@@ -329,13 +353,23 @@ export const CountSheet = ({
             }
           };
 
-          
+          // Calculate height and positioning for overlapping skills based on max overlaps across all spanned cells
+          const overlapInfo = getSkillOverlapInfo(sp);
+          const heightPercentage = overlapInfo.heightPercentage;
+          const topPercentage = overlapInfo.topPercentage;
+
           const style = transform && !isDragging
             ? {
                 transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
-                width: `${100 * cellsToSpan}%`
+                width: `${100 * cellsToSpan}%`,
+                height: `${heightPercentage}%`,
+                top: `${topPercentage}%`
               }
-            : { width: `${100 * cellsToSpan}%` };
+            : {
+                width: `${100 * cellsToSpan}%`,
+                height: `${heightPercentage}%`,
+                top: `${topPercentage}%`
+              };
 
           const colors = getSkillCategoryColors(sp.skill.category);
 
@@ -357,7 +391,7 @@ export const CountSheet = ({
                 e.stopPropagation();
                 onSelectSkill?.(sp.placedSkill.id);
               }}
-              className={`${colors.background} ${colors.border} border-2 rounded-md shadow-md absolute inset-0 flex items-center cursor-grab active:cursor-grabbing z-[2000] text-sm transition-all duration-200 hover:shadow-lg overflow-visible group ${
+              className={`${colors.background} ${colors.border} border-2 rounded-md shadow-md absolute flex items-center cursor-grab active:cursor-grabbing z-[2000] text-sm transition-all duration-200 hover:shadow-lg overflow-visible group ${
                 isDragging ? "opacity-50 shadow-xl" : "opacity-100"
               } ${selectedSkillId === sp.placedSkill.id ? "ring-2 ring-accent ring-offset-1" : ""} ${containerClass}`}
             >
