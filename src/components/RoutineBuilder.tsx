@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from "react";
-  import { DndContext, DragEndEvent, DragOverlay, useSensor, useSensors, PointerSensor, DragStartEvent, DragMoveEvent, CollisionDetection, rectIntersection, closestCenter } from "@dnd-kit/core";
+import { useState, useEffect, useRef, useCallback } from "react";
+  import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, DragMoveEvent, CollisionDetection, rectIntersection, closestCenter, DragOverEvent, useSensor, useSensors, PointerSensor } from "@dnd-kit/core";
 import { snapCenterToCursor } from "@dnd-kit/modifiers";
 import type { PlacedSkill, RoutineConfig, Skill, PositionIcon, CategoryStateData, SaveStateData } from "@/types/routine";
 import { useSkills } from "@/hooks/useSkills";
@@ -18,8 +18,10 @@ import { Link } from "react-router-dom";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { lineBreak } from "html2canvas/dist/types/css/property-descriptors/line-break";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { useTheme } from "next-themes";
 
 export const RoutineBuilder = () => {
+  const { theme } = useTheme();
   const { skills, exportToCSV, addCustomSkill, deleteSkill, updateSkillCounts } = useSkills();
   const [config, setConfig] = useState<RoutineConfig>({
     length: 90,
@@ -30,6 +32,8 @@ export const RoutineBuilder = () => {
 
   const [placedSkills, setPlacedSkills] = useState<PlacedSkill[]>([]);
   const [positionIcons, setPositionIcons] = useState<PositionIcon[]>([]);
+  const [notes, setNotes] = useState<Record<number, string>>({});
+  const [segmentNames, setSegmentNames] = useState<Record<number, string>>({});
   const [selectedLine, setSelectedLine] = useState<number | null>(null);
   const [lineHistories, setLineHistories] = useState<{ [saveStateSlot: number]: { [category: string]: { [lineIndex: number]: { history: PositionIcon[][], index: number } } } }>({});
   const [draggedSkill, setDraggedSkill] = useState<Skill | null>(null);
@@ -43,6 +47,12 @@ export const RoutineBuilder = () => {
   const [dragOffset, setDragOffset] = useState<{ x: number; y: number } | null>(null);
   const [draggedIconId, setDraggedIconId] = useState<string | null>(null);
   const [currentZoomLevel, setCurrentZoomLevel] = useState<number>(0.55);
+  const [overCellId, setOverCellId] = useState<string | null>(null);
+
+  // Handle zoom level changes from PositionSheet
+  const handleZoomChange = useCallback((zoomLevel: number) => {
+    setCurrentZoomLevel(zoomLevel);
+  }, []);
   const [hasLoadedState, setHasLoadedState] = useState(false);
   const initialLoadedCategoryRef = useRef<string | null>(null);
   const [currentSaveState, setCurrentSaveState] = useState<SaveStateData | null>(null);
@@ -53,6 +63,7 @@ export const RoutineBuilder = () => {
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [shouldGeneratePdf, setShouldGeneratePdf] = useState(false);
   const [pdfIcons, setPdfIcons] = useState<PositionIcon[] | undefined>(undefined);
+  const [pdfSegmentName, setPdfSegmentName] = useState<string | undefined>(undefined); // ----- ADD THIS LINE -----
 
   // Load keyboard settings
   const [keyboardSettings] = useState(() => {
@@ -84,6 +95,8 @@ export const RoutineBuilder = () => {
         const data: SaveStateData = JSON.parse(savedState1);
         setPlacedSkills(data.placedSkills);
         setPositionIcons(data.positionIcons);
+        setNotes(data.notes || {});
+        setSegmentNames(data.segmentNames || {});
         setConfig(data.config);
         setCurrentSaveState(data);
         setLoadedSaveStateSlot(1);
@@ -125,9 +138,10 @@ export const RoutineBuilder = () => {
   }, [showPdfPreview, pdfBlobUrl]);
 
   // Helper function to get unique position sheet configurations
-  const getUniquePositionConfigurations = (): PositionIcon[][] => {
+  // ----- MODIFY THIS FUNCTION -----
+  const getUniquePositionConfigurations = (): { icons: PositionIcon[], lineIndex: number }[] => {
     const totalLines = Math.ceil((config.length * config.bpm) / 60 / 8);
-    const configurations: PositionIcon[][] = [];
+    const configurations: { icons: PositionIcon[], lineIndex: number }[] = [];
     const seenConfigurations = new Set<string>();
 
     for (let lineIndex = 0; lineIndex < totalLines; lineIndex++) {
@@ -153,7 +167,7 @@ export const RoutineBuilder = () => {
       // Only add if we haven't seen this configuration before
       if (!seenConfigurations.has(configHash)) {
         seenConfigurations.add(configHash);
-        configurations.push(lineIcons);
+        configurations.push({ icons: lineIcons, lineIndex }); // Store lineIndex
       }
     }
 
@@ -161,6 +175,7 @@ export const RoutineBuilder = () => {
   };
 
   // Generate PDF when shouldGeneratePdf flag is set
+  // ----- MODIFY THIS FUNCTION -----
   useEffect(() => {
     if (shouldGeneratePdf) {
       const generatePDF = async () => {
@@ -168,20 +183,40 @@ export const RoutineBuilder = () => {
           const jsPDF = (await import("jspdf")).default;
           const html2canvas = (await import("html2canvas")).default;
 
+          // Determine background color based on theme
+          const isDarkMode = theme === "dark";
+          const backgroundColor = isDarkMode ? "#020817" : "#ffffff"; // Dark mode: very dark blue-gray, Light mode: white
+
+          // Convert hex to RGB for jsPDF
+          const hexToRgb = (hex: string) => {
+            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+            return result ? {
+              r: parseInt(result[1], 16),
+              g: parseInt(result[2], 16),
+              b: parseInt(result[3], 16)
+            } : { r: 255, g: 255, b: 255 };
+          };
+          const bgRgb = hexToRgb(backgroundColor);
+
           // Use portrait A4 (210mm x 297mm)
           const pdf = new jsPDF("p", "mm", "a4");
           const pageWidth = 210;
           const pageHeight = 297;
-          const margin = 10;
+          const margin = 2; // Minimal margin for maximum content fit
 
-          const countSheetElement = document.getElementById("count-sheet-table");
+          const countSheetElement = document.getElementById("count-sheet-content-wrapper");
           if (countSheetElement) {
+            
             const canvas = await html2canvas(countSheetElement, {
               scale: 2, // Higher quality
               useCORS: true,
               allowTaint: true,
-              backgroundColor: '#ffffff',
+              backgroundColor,
+              // Capture the full scrollable area
+              height: countSheetElement.scrollHeight,
+              width: countSheetElement.scrollWidth,
             });
+
             const imgData = canvas.toDataURL("image/png");
 
             // Calculate scaling to fit within portrait page
@@ -195,6 +230,10 @@ export const RoutineBuilder = () => {
             const imgWidth = canvas.width * scale;
             const imgHeight = canvas.height * scale;
 
+            // Fill the entire page with the background color
+            pdf.setFillColor(bgRgb.r, bgRgb.g, bgRgb.b);
+            pdf.rect(0, 0, pageWidth, pageHeight, 'F');
+
             // Center the image on the page
             const x = (pageWidth - imgWidth) / 2;
             const y = (pageHeight - imgHeight) / 2;
@@ -205,23 +244,29 @@ export const RoutineBuilder = () => {
           if (config.category === "team-16" || config.category === "team-24") {
             const uniqueConfigurations = getUniquePositionConfigurations();
 
-            for (const configIcons of uniqueConfigurations) {
+            for (const config of uniqueConfigurations) {
               pdf.addPage();
 
               // Temporarily set the pdfIcons to show this configuration
-              setPdfIcons(configIcons);
+              setPdfIcons(config.icons);
+              setPdfSegmentName(segmentNames[config.lineIndex] || ""); // <-- SET SEGMENT NAME
 
               // Wait for React to update the DOM
               await new Promise(resolve => setTimeout(resolve, 100));
 
-              const positionSheetElement = document.getElementById("position-sheet-visual");
+              const positionSheetElement = document.getElementById("position-sheet-content-wrapper");
               if (positionSheetElement) {
+ 
                 const canvas = await html2canvas(positionSheetElement, {
                   scale: 2, // Higher quality
                   useCORS: true,
                   allowTaint: true,
-                  backgroundColor: '#ffffff',
+                  backgroundColor,
+                  // Capture the full scrollable area
+                  height: positionSheetElement.scrollHeight,
+                  width: positionSheetElement.scrollWidth,
                 });
+
                 const imgData = canvas.toDataURL("image/png");
 
                 // Calculate scaling to fit within portrait page
@@ -235,6 +280,10 @@ export const RoutineBuilder = () => {
                 const imgWidth = canvas.width * scale;
                 const imgHeight = canvas.height * scale;
 
+                // Fill the entire page with the background color
+                pdf.setFillColor(bgRgb.r, bgRgb.g, bgRgb.b);
+                pdf.rect(0, 0, pageWidth, pageHeight, 'F');
+
                 // Center the image on the page
                 const x = (pageWidth - imgWidth) / 2;
                 const y = (pageHeight - imgHeight) / 2;
@@ -245,6 +294,7 @@ export const RoutineBuilder = () => {
 
             // Clear the pdfIcons to restore normal operation
             setPdfIcons(undefined);
+            setPdfSegmentName(undefined); // <-- RESET SEGMENT NAME
           }
 
           // Generate blob for preview - use arraybuffer first then convert to blob
@@ -258,12 +308,14 @@ export const RoutineBuilder = () => {
         } finally {
           setIsGeneratingPdf(false);
           setShouldGeneratePdf(false);
+          setPdfIcons(undefined);
+          setPdfSegmentName(undefined); // <-- RESET SEGMENT NAME
         }
       };
 
       generatePDF();
     }
-  }, [shouldGeneratePdf, config.category, config.length, config.bpm, positionIcons, selectedLine]);
+  }, [shouldGeneratePdf, config.category, config.length, config.bpm, positionIcons, selectedLine, theme, segmentNames]); // <-- ADD segmentNames
 
   // Handle category changes - auto-save/load category states
   useEffect(() => {
@@ -297,9 +349,13 @@ export const RoutineBuilder = () => {
     if (savedCategoryData) {
       setPlacedSkills(savedCategoryData.placedSkills);
       setPositionIcons(savedCategoryData.positionIcons);
+      setNotes(savedCategoryData.notes || {});
+      setSegmentNames(savedCategoryData.segmentNames || {});
     } else {
       // No saved state - create default state for category
       setPlacedSkills([]);
+      setNotes({});
+      setSegmentNames({});
       if (config.category === "team-16" || config.category === "team-24") {
         // Generate default team icons
         const totalLines = Math.ceil((config.length * config.bpm) / 60 / 8);
@@ -326,6 +382,8 @@ export const RoutineBuilder = () => {
         placedSkills: [...placedSkills],
         positionIcons: [...positionIcons],
         config: { ...config },
+        notes: { ...notes },
+        segmentNames: { ...segmentNames },
         timestamp: Date.now()
       };
       localStorage.setItem(key, JSON.stringify(data));
@@ -336,7 +394,7 @@ export const RoutineBuilder = () => {
         saveCategoryState(config.category);
       }
     }
-  }, [placedSkills, positionIcons, config, loadedSaveStateSlot, hasLoadedState]);
+  }, [placedSkills, positionIcons, config, loadedSaveStateSlot, hasLoadedState, notes, segmentNames]);
 
   // Auto-scroll to keep selected skill in view after keyboard movement
   useEffect(() => {
@@ -399,6 +457,12 @@ export const RoutineBuilder = () => {
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Skip keyboard shortcuts if user is typing in an input field
+      const activeElement = document.activeElement;
+      if (activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA' || (activeElement as HTMLElement).contentEditable === 'true')) {
+        return;
+      }
+
       // Position sheet shortcuts
       if (e.key === keyboardSettings.nextLine && !e.ctrlKey && !e.shiftKey) {
         const totalLines = Math.ceil((config.length * config.bpm) / 60 / 8);
@@ -922,7 +986,10 @@ export const RoutineBuilder = () => {
     const data: CategoryStateData = {
       placedSkills: [...placedSkills],
       positionIcons: [...positionIcons],
+      notes: { ...notes },
+      segmentNames: { ...segmentNames },
       timestamp: Date.now()
+
     };
     localStorage.setItem(key, JSON.stringify(data));
   };
@@ -940,6 +1007,8 @@ export const RoutineBuilder = () => {
       placedSkills: [...placedSkills],
       positionIcons: [...positionIcons],
       config: { ...config },
+      notes: { ...notes },
+      segmentNames: { ...segmentNames },
       timestamp: Date.now()
     };
     localStorage.setItem(key, JSON.stringify(data));
@@ -957,12 +1026,16 @@ export const RoutineBuilder = () => {
       setPlacedSkills(data.placedSkills);
       setPositionIcons(data.positionIcons);
       setConfig(data.config);
+      setNotes(data.notes || {});
+      setSegmentNames(data.segmentNames || {});
       setCurrentSaveState(data);
       setLoadedSaveStateSlot(slotNumber);
       initialLoadedCategoryRef.current = data.config.category;
     } else {
       // Create default state for new slot
       const defaultPlacedSkills: PlacedSkill[] = [];
+      const defaultNotes = {};
+      const defaultSegmentNames = {};
 
       let defaultPositionIcons: PositionIcon[] = [];
       if (config.category === "team-16" || config.category === "team-24") {
@@ -979,12 +1052,16 @@ export const RoutineBuilder = () => {
         placedSkills: defaultPlacedSkills,
         positionIcons: defaultPositionIcons,
         config: { ...config },
+        notes: defaultNotes,
+        segmentNames: defaultSegmentNames,
         timestamp: Date.now()
       };
 
       // Apply the default state
       setPlacedSkills(defaultPlacedSkills);
       setPositionIcons(defaultPositionIcons);
+      setNotes(defaultNotes);
+      setSegmentNames(defaultSegmentNames);
       // Keep current config
 
       // Save as the initial state for this slot
@@ -1201,6 +1278,15 @@ const handleDragMove = (event: DragMoveEvent) => {
     }
   };
 
+const handleDragOver = (event: DragOverEvent) => {
+    const overId = event.over?.id.toString();
+    if (overId && overId.startsWith('cell-')) {
+      setOverCellId(overId);
+    } else {
+      setOverCellId(null);
+    }
+  };
+
 const handleDragEnd = (event: DragEndEvent) => {
     // Console log using state variables for accurate type reporting
     console.log(`Drag End: Type='${isDraggingPlacedSkill ? 'placed skill' : isDraggingIcon ? 'position icon' : (skills.find(s => s.id === event.active.id) ? 'new skill' : 'unknown')}', ID='${event.active.id}', Over='${event.over?.id}', Over Data Type='${event.over?.data?.current?.type || 'N/A'}'`);
@@ -1219,6 +1305,7 @@ const handleDragEnd = (event: DragEndEvent) => {
     setIsDraggingIcon(false);
     setDragOffset(null);
     setDraggedIconId(null);
+    setOverCellId(null);
     // Re-enable scrolling
     document.body.style.overflow = '';
 
@@ -1354,6 +1441,7 @@ const handleDragEnd = (event: DragEndEvent) => {
     }
     // No further actions if not dropped on a cell or trash
   };
+
 
   const handleRemoveSkill = (id: string) => {
     setPlacedSkills(placedSkills.filter((ps) => ps.id !== id));
@@ -1567,9 +1655,52 @@ const handleDragEnd = (event: DragEndEvent) => {
   };
 
   const handleNamePositionIcon = (id: string, name: string) => {
-    setPositionIcons(
-      positionIcons.map((icon) => (icon.id === id ? { ...icon, name } : icon))
-    );
+    setPositionIcons(prev => {
+      const updated = prev.map((icon) => (icon.id === id ? { ...icon, name } : icon));
+
+      if (autoFollow) {
+        const namedIcon = updated.find(i => i.id === id);
+        if (!namedIcon) return updated;
+
+        const totalLines = Math.ceil((config.length * config.bpm) / 60 / 8);
+        const currentLine = namedIcon.lineIndex;
+
+        // For each subsequent line, find icons with matching position and type
+        const result = [...updated];
+        for (let line = currentLine + 1; line < totalLines; line++) {
+          const matchingIconIndex = result.findIndex(i =>
+            i.lineIndex === line &&
+            i.x === namedIcon.x &&
+            i.y === namedIcon.y &&
+            i.type === namedIcon.type
+          );
+
+          if (matchingIconIndex !== -1) {
+            result[matchingIconIndex] = { ...result[matchingIconIndex], name };
+          }
+        }
+
+        return result;
+      }
+
+      return updated;
+    });
+  };
+
+  const handleUpdateSegmentName = (lineIndex: number, name: string) => {
+    if (lineIndex === null) return;
+
+    setSegmentNames(prev => {
+      const newSegmentNames = { ...prev, [lineIndex]: name };
+
+      if (autoFollow) {
+        const totalLines = Math.ceil((config.length * config.bpm) / 60 / 8);
+        for (let line = lineIndex + 1; line < totalLines; line++) {
+          newSegmentNames[line] = name;
+        }
+      }
+      return newSegmentNames;
+    });
   };
 
   const handleExportPDF = () => {
@@ -1583,6 +1714,8 @@ const handleDragEnd = (event: DragEndEvent) => {
     setSelectedLine(null);
     setSelectedSkillId(null);
     setLineHistories({}); // Clear all history states
+    setNotes({});
+    setSegmentNames({});
 
     // For team categories, reset icons to default positions
     if (config.category === "team-16" || config.category === "team-24") {
@@ -1712,6 +1845,8 @@ const handleDragEnd = (event: DragEndEvent) => {
                     placedSkills: [...placedSkills],
                     positionIcons: [...positionIcons],
                     config: { ...config },
+                    notes: { ...notes },
+                    segmentNames: { ...segmentNames },
                     timestamp: Date.now()
                   };
                   localStorage.setItem(key, JSON.stringify(data));
@@ -1754,12 +1889,13 @@ const handleDragEnd = (event: DragEndEvent) => {
         collisionDetection={customCollisionDetection}
         onDragStart={handleDragStart}
         onDragMove={handleDragMove}
+        onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
         autoScroll={false}
         modifiers={[snapCenterToCursor]}
       >
         <ResizablePanelGroup direction="horizontal" className="flex-1 w-full">
-          <ResizablePanel defaultSize={25} minSize={10} maxSize={40} collapsible>
+          <ResizablePanel defaultSize={15} minSize={10} maxSize={40} collapsible>
             <SkillsPanel
               skills={skills}
               onAddCustomSkill={addCustomSkill}
@@ -1795,6 +1931,13 @@ const handleDragEnd = (event: DragEndEvent) => {
                       ));
                     }}
                     onUpdateSkillCounts={updateSkillCounts}
+                    draggedSkill={draggedSkill}
+                    overCellId={overCellId}
+                    notes={notes}
+                    onUpdateNote={(lineIndex, note) => {
+                      setNotes(prev => ({ ...prev, [lineIndex]: note }));
+                    }}
+                    isPdfRender={isGeneratingPdf}
                   />
                 </ResizablePanel>
 
@@ -1852,7 +1995,15 @@ const handleDragEnd = (event: DragEndEvent) => {
                       // Receive zoom level info and potentially handle scaled drag end
                       setCurrentZoomLevel(event.zoomLevel);
                     }}
+                    onZoomChange={(zoomLevel) => setCurrentZoomLevel(zoomLevel)}
+                    segmentName={selectedLine !== null ? segmentNames[selectedLine] || "" : ""}
+                    onUpdateSegmentName={(name) => {
+                      if (selectedLine !== null) {
+                        handleUpdateSegmentName(selectedLine, name);
+                      }
+                    }}
                     pdfIcons={pdfIcons}
+                    pdfSegmentName={pdfSegmentName} // ----- ADD THIS PROP -----
                   />
                 </ResizablePanel>
               </ResizablePanelGroup>
@@ -1873,6 +2024,13 @@ const handleDragEnd = (event: DragEndEvent) => {
                   ));
                 }}
                 onUpdateSkillCounts={updateSkillCounts}
+                draggedSkill={draggedSkill}
+                overCellId={overCellId}
+                                    notes={notes}
+                    onUpdateNote={(lineIndex, note) => {
+                      setNotes(prev => ({ ...prev, [lineIndex]: note }));
+                    }}
+                isPdfRender={isGeneratingPdf}
               />
             )}
           </ResizablePanel>
@@ -1886,7 +2044,7 @@ const handleDragEnd = (event: DragEndEvent) => {
 </div>
 ) : null}
 </DragOverlay>
-        <TrashDropZone isDragging={isDraggingPlacedSkill || draggedSkill !== null} />
+        <TrashDropZone isDragging={isDraggingPlacedSkill} />
       </DndContext>
 
       {/* PDF Preview Dialog */}

@@ -1,13 +1,7 @@
 import { useDraggable } from "@dnd-kit/core";
-import { Circle, Square, X } from "lucide-react";
+import { Circle, Square, X, Triangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { PositionIcon as PositionIconType } from "@/types/routine";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 
 interface PositionIconProps {
   icon: PositionIconType;
@@ -24,11 +18,11 @@ interface PositionIconProps {
 const IconComponent = ({ type }: { type: PositionIconType["type"] }) => {
   switch (type) {
     case "square":
-      return <Square className="w-6 h-6" />;
+      return <Square className="w-20 h-20" />;
     case "circle":
-      return <Circle className="w-4 h-4" />;
+      return <Circle className="w-20 h-20" />;
     case "x":
-      return <X className="w-6 h-6" />;
+      return <Triangle className="w-20 h-20" />;
   }
 };
 
@@ -67,7 +61,7 @@ export const PositionIcon = ({ icon, onUpdate, onClick, onRemove, dragOffset, is
       data-position-icon
       data-dnd-handle="position-icon-drag"
       className={cn(
-        "absolute w-8 h-8 -ml-4 -mt-4 cursor-grab active:cursor-grabbing z-[2000]",
+        "absolute w-32 h-32 -ml-16 -mt-16 cursor-grab active:cursor-grabbing z-[2000]",
         "flex items-center justify-center",
         "transition-colors",
         icon.selected
@@ -78,21 +72,15 @@ export const PositionIcon = ({ icon, onUpdate, onClick, onRemove, dragOffset, is
       style={style}
     >
       <IconComponent type={icon.type} />
+      {icon.name && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <span className="text-blue-900 dark:text-blue-100 text-xl font-medium text-center leading-tight max-w-full px-1">
+            {icon.name}
+          </span>
+        </div>
+      )}
     </div>
   );
-
-  if (icon.name) {
-    return (
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>{iconContent}</TooltipTrigger>
-          <TooltipContent>
-            <p>{icon.name}</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-    );
-  }
 
   return iconContent;
 };

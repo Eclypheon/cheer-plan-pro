@@ -1,6 +1,8 @@
+import React from "react";
 import { useDroppable, useDraggable } from "@dnd-kit/core";
 import type { PlacedSkill, Skill, SkillCategory } from "@/types/routine";
 import { X, ChevronLeft, ChevronRight } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface CountSheetProps {
   routineLength: number;
@@ -15,6 +17,11 @@ interface CountSheetProps {
   onMoveSkill?: (id: string, newLineIndex: number, newStartCount: number) => void;
   onUpdateSkillCounts?: (id: string, counts: number) => void;
   isResizing?: boolean;
+  draggedSkill?: Skill | null;
+  overCellId?: string | null;
+  notes?: Record<number, string>;
+  onUpdateNote?: (lineIndex: number, note: string) => void;
+  isPdfRender?: boolean;
 }
 
 interface SkillPlacement {
@@ -149,8 +156,62 @@ export const CountSheet = ({
   onSelectSkill,
   onMoveSkill,
   onUpdateSkillCounts,
+  draggedSkill = null,
+  overCellId = null,
   isResizing,
+  notes = {},
+  onUpdateNote,
+  isPdfRender = false,
 }: CountSheetProps) => {
+  // State for resizable panels
+  const [countSheetWidth, setCountSheetWidth] = React.useState(60); // percentage
+  const [isResizingPanels, setIsResizingPanels] = React.useState(false);
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const [editingNoteLine, setEditingNoteLine] = React.useState<number | null>(null);
+
+  // Handle panel resizing
+  const handleMouseDown = React.useCallback((e: React.MouseEvent) => {
+    setIsResizingPanels(true);
+    e.preventDefault();
+  }, []);
+
+  const handleMouseMove = React.useCallback((e: MouseEvent) => {
+    if (!isResizingPanels || !containerRef.current) return;
+
+    const container = containerRef.current;
+    const rect = container.getBoundingClientRect();
+    const newWidth = ((e.clientX - rect.left) / rect.width) * 100;
+
+    // Constrain between 60% and 85%
+    const constrainedWidth = Math.max(60, Math.min(85, newWidth));
+    setCountSheetWidth(constrainedWidth);
+  }, [isResizingPanels]);
+
+  const handleMouseUp = React.useCallback(() => {
+    setIsResizingPanels(false);
+  }, []);
+
+  React.useEffect(() => {
+    if (isResizingPanels) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    } else {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [isResizingPanels, handleMouseMove, handleMouseUp]);
+
   // Calculate total lines needed
   const totalBeats = Math.ceil((routineLength * bpm) / 60);
   const totalLines = Math.ceil(totalBeats / 8);
@@ -187,6 +248,27 @@ export const CountSheet = ({
     return placements;
   };
 
+//Determine the highlight span
+  let hoverLineIndex = -1;
+  let hoverStartCount = -1;
+  let skillSpan = 0;
+
+  if (draggedSkill && overCellId && overCellId.startsWith('cell-')) {
+    try {
+      // Parse "cell-5-3" into line 5, count 3
+      const [_, lineStr, countStr] = overCellId.split('-');
+      hoverLineIndex = parseInt(lineStr);
+      hoverStartCount = parseInt(countStr);
+      skillSpan = draggedSkill.counts;
+    } catch (e) {
+      // If parsing fails, reset values
+      hoverLineIndex = -1;
+      hoverStartCount = -1;
+      skillSpan = 0;
+    }
+  }
+  // END of new logic
+
   const skillPlacements = getSkillPlacements();
 
   const getSkillsInCell = (lineIndex: number, count: number) => {
@@ -210,12 +292,18 @@ export const CountSheet = ({
     // Check if this cell is part of a skill span but not the first cell
     const isPartOfSkillSpan = cellSkills.length > 0 && isFirstCountOfSkill.length === 0;
 
+    const isDropTarget = 
+      skillSpan > 0 && // Is a skill being dragged?
+      lineIndex === hoverLineIndex && // Is this cell on the correct line?
+      count >= hoverStartCount && // Is this cell at or after the start?
+      count < (hoverStartCount + skillSpan); // Is this cell within the skill's count?
+
     return (
       <td
         ref={setNodeRef}
         data-cell={`${lineIndex}-${count}`}
         className={`border border-border min-w-[80px] h-10 p-0.5 relative text-xs ${
-          isOver ? "bg-accent" : isPartOfSkillSpan ? "bg-gray-50 dark:bg-gray-800/50" : "bg-card hover:bg-accent/50"
+          isDropTarget ? "bg-accent" : isPartOfSkillSpan ? "bg-card" : "bg-card hover:bg-accent/50"
         }`}
       >
         {isFirstCountOfSkill.map((sp) => {
@@ -315,6 +403,90 @@ export const CountSheet = ({
     );
   };
 
+  const NotesCell = ({
+  lineIndex,
+  isEditing, // Added
+  onSetEditingNoteLine, // Added
+  onLineClick, // Pass down
+  notes, // Pass down
+  onUpdateNote, // Pass down
+}: {
+  lineIndex: number;
+  isEditing: boolean; // Added
+  onSetEditingNoteLine: (line: number | null) => void; // Added
+  onLineClick: (lineIndex: number) => void; // Pass down
+  notes: Record<number, string>; // Pass down
+  onUpdateNote?: (lineIndex: number, note: string) => void; // Pass down
+}) => {
+    const [editValue, setEditValue] = React.useState(notes[lineIndex] || "");
+    const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+
+    React.useEffect(() => {
+      if (isEditing && textareaRef.current) {
+        textareaRef.current.focus();
+        textareaRef.current.select();
+      }
+    }, [isEditing]);
+
+const handleClick = (e: React.MouseEvent) => {
+  e.stopPropagation(); // Stop the click from bubbling to the <tr>
+  onLineClick(lineIndex); // Explicitly select the line
+
+  if (!isEditing) {
+    setEditValue(notes[lineIndex] || "");
+    onSetEditingNoteLine(lineIndex); // Set this line as editing in the parent
+  }
+};
+
+    const handleSave = () => {
+      onUpdateNote?.(lineIndex, editValue.trim());
+      onSetEditingNoteLine(null);;
+    };
+
+    const handleCancel = () => {
+      setEditValue(notes[lineIndex] || "");
+      onSetEditingNoteLine(null);;
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        handleSave();
+      } else if (e.key === "Escape") {
+        handleCancel();
+      }
+    };
+
+    const handleBlur = () => {
+      handleSave();
+    };
+
+    const currentNote = notes[lineIndex] || "";
+
+    return (
+      <td
+        className="border border-border bg-card hover:bg-accent/50 h-10 p-1 text-xs cursor-text line-clamp-2 break-words max-w-[500px] min-w-[150px]"
+        onClick={handleClick}
+      >
+        {isEditing ? (
+          <textarea
+            ref={textareaRef}
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onBlur={handleBlur}
+            className="w-full h-full bg-transparent border-none outline-none resize-none text-xs p-0 line-clamp-2 break-words"
+            placeholder="Add note..."
+          />
+        ) : (
+          <div className={`w-full line-clamp-2 break-words ${currentNote ? "text-foreground" : "text-muted-foreground"}`}>
+            {currentNote || ""}
+          </div>
+        )}
+      </td>
+    );
+  };
+
   const CountLine = ({ lineIndex }: { lineIndex: number }) => {
     const isSelected = selectedLine === lineIndex;
 
@@ -335,6 +507,28 @@ export const CountSheet = ({
     );
   };
 
+  const NotesLine = ({ lineIndex }: { lineIndex: number }) => {
+    const isSelected = selectedLine === lineIndex;
+
+    return (
+      <tr
+        onClick={() => onLineClick(lineIndex)}
+        className={`cursor-pointer transition-colors ${
+          isSelected ? "bg-accent/30" : "hover:bg-accent/20"
+        }`}
+      >
+        <NotesCell
+  lineIndex={lineIndex}
+  isEditing={editingNoteLine === lineIndex}
+  onSetEditingNoteLine={setEditingNoteLine}
+  onLineClick={onLineClick}
+  notes={notes}
+  onUpdateNote={onUpdateNote}
+/>
+      </tr>
+    );
+  };
+
   return (
     <div className="h-full flex flex-col bg-card relative z-10 overflow-hidden">
       <div className="p-1.5 border-b">
@@ -344,26 +538,66 @@ export const CountSheet = ({
         </p>
       </div>
 
-      <div className="flex-1 overflow-auto relative">
-        <table className="w-full border-collapse relative z-10" id="count-sheet-table">
-          <thead>
-            <tr>
-              <th className="border border-border bg-muted font-bold text-center px-2 py-1 text-xs">#</th>
-              {Array.from({ length: 8 }, (_, i) => (
-                <th key={i} className="border border-border bg-muted font-bold text-center px-2 py-1 text-xs">
-                  {i + 1}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {Array.from({ length: totalLines }, (_, i) => (
-              <CountLine key={i} lineIndex={i} />
-            ))}
-          </tbody>
-        </table>
+      <div className="flex-1 overflow-auto relative" id="count-sheet-container">
+        <div ref={containerRef} id="count-sheet-content-wrapper" className="flex min-w-max relative">
+          {/* Count Sheet Table */}
+          <div
+  style={!isPdfRender ? { width: `${countSheetWidth}%`, minWidth: '690px' } : { }}
+  className="flex-shrink-0"
+>
+            <table className="border-collapse relative z-10 w-full" id="count-sheet-table">
+              <thead className="sticky top-0 bg-card z-20">
+                <tr>
+                  <th className="border border-border bg-muted font-bold text-center px-2 py-1 text-xs">#</th>
+                  {Array.from({ length: 8 }, (_, i) => (
+                    <th key={i} className="border border-border bg-muted font-bold text-center px-2 py-1 text-xs">
+                      {i + 1}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {Array.from({ length: totalLines }, (_, i) => (
+                  <CountLine key={i} lineIndex={i} />
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Resize Handle */}
+{!isPdfRender && (
+  <div
+    className="w-0.5 bg-border hover:bg-accent cursor-col-resize flex-shrink-0 relative z-30"
+    onMouseDown={handleMouseDown}
+    title="Drag to resize panels"
+  >
+    <div className="absolute inset-y-0 left-1/2 w-0.5 -translate-x-1/2 bg-border hover:bg-accent transition-colors" />
+  </div>
+)}
+
+          {/* Notes Table */}
+          <div
+  style={!isPdfRender ? { width: `${100 - countSheetWidth}%` } : { minWidth: '150px' }}
+  className="flex-shrink-0"
+>
+            <table className={cn(
+              "border-collapse relative z-10",
+              isPdfRender ? "max-w-xl" : "w-full" // <-- EDIT THIS "max-w-xl" (e.g., max-w-lg, max-w-2xl) FOR THE PDF
+            )}>
+              <thead className="sticky top-0 bg-card z-20">
+                <tr>
+                  <th className="border border-border bg-muted font-bold text-center px-2 py-1 text-xs">Notes</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Array.from({ length: totalLines }, (_, i) => (
+                  <NotesLine key={i} lineIndex={i} />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
   );
 };
-

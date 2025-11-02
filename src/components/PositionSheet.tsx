@@ -4,9 +4,11 @@ import type { PositionIcon } from "@/types/routine";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
-import { Plus, Undo, Redo, ToggleLeft, ToggleRight, Square, Circle, X, ZoomIn, ZoomOut } from "lucide-react";
+import { Plus, Undo, Redo, ToggleLeft, ToggleRight, Square, Circle, Triangle, X, ZoomIn, ZoomOut } from "lucide-react";
 import { PositionIcon as PositionIconComponent } from "./PositionIcon";
 import { PositionIconNameDialog } from "./PositionIconNameDialog";
+import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 
 interface PositionSheetProps {
   icons: PositionIcon[];
@@ -33,7 +35,11 @@ interface PositionSheetProps {
   onIconDragStart?: () => void;
   onIconDragEnd?: () => void;
   onIconDrop?: (event: { active: any, delta: { x: number; y: number }, zoomLevel: number }) => void;
+  onZoomChange?: (zoomLevel: number) => void;
+  segmentName?: string;
+  onUpdateSegmentName?: (name: string) => void;
   pdfIcons?: PositionIcon[]; // Override icons for PDF generation
+  pdfSegmentName?: string; // ----- ADD THIS LINE -----
 }
 
 export const PositionSheet = ({
@@ -61,7 +67,11 @@ export const PositionSheet = ({
   onIconDragStart,
   onIconDragEnd,
   onIconDrop,
+  onZoomChange,
+  segmentName,
+  onUpdateSegmentName,
   pdfIcons,
+  pdfSegmentName, // ----- ADD THIS LINE -----
 }: PositionSheetProps) => {
   const [selectedIconId, setSelectedIconId] = useState<string | null>(null);
   const [nameDialogOpen, setNameDialogOpen] = useState(false);
@@ -84,16 +94,26 @@ export const PositionSheet = ({
 
   // Zoom handlers
   const handleZoomChange = useCallback((value: number[]) => {
-    setZoomLevel(value[0]);
-  }, []);
+    const newZoomLevel = value[0];
+    setZoomLevel(newZoomLevel);
+    onZoomChange?.(newZoomLevel);
+  }, [onZoomChange]);
 
   const handleZoomIn = useCallback(() => {
-    setZoomLevel(prev => Math.min(1.0, prev + 0.1));
-  }, []);
+    setZoomLevel(prev => {
+      const newZoomLevel = Math.min(1.0, prev + 0.1);
+      onZoomChange?.(newZoomLevel);
+      return newZoomLevel;
+    });
+  }, [onZoomChange]);
 
   const handleZoomOut = useCallback(() => {
-    setZoomLevel(prev => Math.max(0.25, prev - 0.1));
-  }, []);
+    setZoomLevel(prev => {
+      const newZoomLevel = Math.max(0.25, prev - 0.1);
+      onZoomChange?.(newZoomLevel);
+      return newZoomLevel;
+    });
+  }, [onZoomChange]);
 
   // Pinch gesture handlers
   const getTouchDistance = useCallback((touches: React.TouchList) => {
@@ -123,9 +143,10 @@ export const PositionSheet = ({
         const scale = currentDistance / initialPinchDistance;
         const newZoomLevel = Math.max(0.25, Math.min(1.0, initialZoomLevel * scale));
         setZoomLevel(newZoomLevel);
+        onZoomChange?.(newZoomLevel);
       }
     }
-  }, [isPinching, initialPinchDistance, initialZoomLevel, getTouchDistance]);
+  }, [isPinching, initialPinchDistance, initialZoomLevel, getTouchDistance, onZoomChange]);
 
   const handleTouchEnd = useCallback((e: React.TouchEvent) => {
     if (e.touches.length < 2) {
@@ -257,7 +278,13 @@ export const PositionSheet = ({
     }
   };
 
-  if (selectedLine === null) {
+  // ----- MODIFY THESE LINES -----
+  const isPdfRender = pdfIcons !== undefined;
+  const lineIcons = isPdfRender ? pdfIcons : icons.filter((i) => i.lineIndex === selectedLine);
+  const currentSegmentName = isPdfRender ? (pdfSegmentName || "") : (segmentName || "");
+  // ----- END OF MODIFICATION -----
+
+  if (selectedLine === null && !isPdfRender) { // Keep showing sheet for PDF render
     return (
       <Card className="h-full flex items-center justify-center p-8">
         <p className="text-muted-foreground text-center">
@@ -267,7 +294,6 @@ export const PositionSheet = ({
     );
   }
 
-  const lineIcons = pdfIcons || icons.filter((i) => i.lineIndex === selectedLine);
   const selectedIcon = icons.find((i) => i.id === selectedIconId);
   const selectedIconsCount = lineIcons.filter(i => i.selected).length;
   const isMultiDrag = selectedIconsCount > 1 && dragOffset !== null;
@@ -279,7 +305,7 @@ return (
       <div className="p-1.5 border-b relative z-10">
         <div className="flex items-center justify-between gap-1.5">
           <div className="flex items-center gap-1">
-            <h3 className="text-sm font-semibold">Line {selectedLine + 1}</h3>
+            <h3 className="text-sm font-semibold">Line {selectedLine !== null ? selectedLine + 1 : 'PDF'}</h3>
             <Button size="sm" variant="ghost" className="h-6 px-1.5 text-xs" onClick={() => onAddIcon("square")}>
               <Square className="h-3 w-3 mr-0.5" />
               Base
@@ -289,7 +315,7 @@ return (
               Mid
             </Button>
             <Button size="sm" variant="ghost" className="h-6 px-1.5 text-xs" onClick={() => onAddIcon("x")}>
-              <X className="h-3 w-3 mr-0.5" />
+              <Triangle className="h-3 w-3 mr-0.5" />
               Fly
             </Button>
           </div>
@@ -389,8 +415,50 @@ return (
           </Button>
         </div>
 
- {/* Position sheet */}
-        <div className="flex-1 p-1.5 flex justify-center overflow-auto">
+        {/* Position sheet */}
+        <div id="position-sheet-container" className="flex-1 p-1.5 flex flex-col items-center overflow-auto">
+          <div id="position-sheet-content-wrapper" className="flex flex-col items-center">
+          {/* ----- START OF MODIFIED CODE ----- */}
+          <div
+            className="flex justify-between items-center mb-1" // Use justify-between
+            style={{
+              width: `${800 * zoomLevel}px`,
+              flexShrink: 0,
+              transition: 'width 0.1s ease-out'
+            }}
+          >
+            {/* 1. Segment Name (Top Left) */}
+            <Input
+              placeholder="Segment name"
+              value={currentSegmentName}
+              onChange={(e) => onUpdateSegmentName?.(e.target.value)}
+              readOnly={isPdfRender}
+              className={cn(
+                "h-8 border-none bg-transparent p-0 shadow-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-0",
+                currentSegmentName ? "text-2xl font-medium text-foreground" : "text-lg",
+                "placeholder:text-lg placeholder:font-medium placeholder:text-muted-foreground",
+                isPdfRender ? "focus-visible:ring-0" : "" // Hide focus ring during PDF render
+              )}
+              style={{ width: '33.33%' }}
+            />
+
+            {/* 2. Audience (Centered) */}
+            <div
+              className="text-2xl font-medium text-foreground"
+              style={{
+                width: '33.33%',
+                textAlign: 'center',
+              }}
+            >
+              Audience
+            </div>
+
+            {/* 3. Spacer (Top Right) */}
+            <div style={{ width: '33.33%' }} /> 
+          </div>
+          {/* ----- END OF MODIFIED CODE ----- */}
+
+
           {/* This is the wrapper div that fixes the scroll issue.
             Its size is what the scroll-container "sees".
             It shrinks and grows with the zoomLevel, eliminating empty scroll space.
@@ -409,7 +477,7 @@ return (
                 sheetRef.current = node;
                 setNodeRef(node);
               }}
-              className={`sheet-background relative bg-background border border-border rounded ${
+              className={`sheet-background relative bg-background border-4 border-border rounded ${
                 isOver ? "bg-accent/10" : ""
               }`}
               style={{
@@ -462,7 +530,7 @@ return (
               {Array.from({ length: 9 }, (_, i) => (
                 <div
                   key={i}
-                  className="absolute top-0 bottom-0 border-l border-muted pointer-events-none"
+                  className="absolute top-0 bottom-0 border-l-2 border-muted pointer-events-none"
                   style={{ left: `${(i / 9) * 100}%`, zIndex: 1 }}
                 />
               ))}
@@ -500,6 +568,7 @@ return (
                   }}
                 />
               ))}
+              </div>
             </div>
           </div>
         </div>
