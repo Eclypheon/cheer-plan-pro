@@ -55,6 +55,20 @@ const AboutModal = ({ open, onOpenChange }: AboutModalProps) => {
         <div className="flex-1 overflow-auto">
           {currentPage === 1 ? (
             <Card className="p-6 space-y-4">
+
+                <section>
+                <h2 className="text-2xl font-semibold mb-3">Tips</h2>
+                <ul className="list-disc list-inside space-y-2 text-muted-foreground">
+                  <p>Propagate Changes toggle transmit changes made to all following lines</p>
+                  <p>Export PDF only exports unique positions</p>
+                  <p>Edit counts directly on count sheet by dragging the handles of placed skills</p>
+                  <p>Select placed skill or icon and press <kbd className="px-1 py-0.5 bg-muted rounded text-sm">Delete</kbd> to delete them.</p>
+                  <p>Select placed skill and use arrow keys to move them</p>
+                  <p>Use <kbd className="px-1 py-0.5 bg-muted rounded text-sm">Shift</kbd> + arrow keys to move a selected skill and all skills after it</p>
+                  <p>Use <kbd className="px-1 py-0.5 bg-muted rounded text-sm">Shift</kbd> + <kbd className="px-1 py-0.5 bg-muted rounded text-sm">Alt</kbd> arrow keys to move a selected skill and before it</p>
+                </ul>
+              </section>
+
               <section>
                 <h2 className="text-2xl font-semibold mb-3">How to Use</h2>
                 <div className="space-y-4 text-muted-foreground">
@@ -64,42 +78,27 @@ const AboutModal = ({ open, onOpenChange }: AboutModalProps) => {
                   </div>
                   <div>
                     <h3 className="font-semibold text-foreground mb-1">2. Add Skills</h3>
-                    <p>Browse the skills library on the left. Drag skills from the library onto the count sheet. Skills will span multiple counts based on their duration (1, 3, or 8 counts).</p>
+                    <p>Browse the skills library on the left. Drag skills from the library onto the count sheet.</p>
                   </div>
                   <div>
                     <h3 className="font-semibold text-foreground mb-1">3. Customize Skills</h3>
-                    <p>Click on skill counts in the library to edit them. Add custom skills using the form at the bottom of each category. Delete custom skills using the trash icon.</p>
+                    <p>Click on skill counts in the library to edit them. Add custom skills as needed.</p>
                   </div>
                   <div>
                     <h3 className="font-semibold text-foreground mb-1">4. Reposition and Delete</h3>
-                    <p>Drag placed skills to different positions on the count sheet. To delete, drag a skill to the trash bin that appears at the bottom of the screen.</p>
+                    <p>To delete, drag a skill to the trash bin that appears at the left of the screen.</p>
                   </div>
                   <div>
                     <h3 className="font-semibold text-foreground mb-1">5. Position Mapping (Team Categories Only)</h3>
-                    <p>For Team (16) or Team (24), use the position sheet below the count sheet. Drag icons to position athletes on the mat. Click icons to assign names. Use the legend: Square = Base, Circle = Mid Tier, X = Top Fly.</p>
+                    <p>For Team Categories, double-click icons to assign names. Click the icons in the toolbar to add new people.</p>
                   </div>
                   <div>
-                    <h3 className="font-semibold text-foreground mb-1">6. Advanced Editing</h3>
-                    <p>Visit the Skills Library Editor (link in header) for bulk editing of all skills in a table format.</p>
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-foreground mb-1">7. Export</h3>
-                    <p>Export your routine to PDF or export/import your skills library as CSV (Feature Pending).</p>
+                    <h3 className="font-semibold text-foreground mb-1">6. Export</h3>
+                    <p>Export your routine to PDF.</p>
                   </div>
                 </div>
               </section>
 
-              <section>
-                <h2 className="text-2xl font-semibold mb-3">Tips</h2>
-                <ul className="list-disc list-inside space-y-2 text-muted-foreground">
-                  <li>Skills that overflow a line will automatically continue onto the next line</li>
-                  <li>Use the Propagate Changes toggle in position sheets to maintain consistent positioning across lines</li>
-                  <li>Export PDF only exports unique positions</li>
-                  <li>Edit counts directly on count sheet by dragging the handles of placed skills</li>
-                  <li>Use <kbd className="px-1 py-0.5 bg-muted rounded text-sm">Shift</kbd> + arrow keys to move a selected skill and all skills after it together</li>
-                  <li>Use <kbd className="px-1 py-0.5 bg-muted rounded text-sm">Shift</kbd> + <kbd className="px-1 py-0.5 bg-muted rounded text-sm">Alt</kbd> arrow keys to move a selected skill and all skills before it together</li>
-                </ul>
-              </section>
             </Card>
           ) : (
             <Card className="p-6 space-y-4">
