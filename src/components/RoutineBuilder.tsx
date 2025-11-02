@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-  import { DndContext, DragEndEvent, DragOverlay, useSensor, useSensors, PointerSensor, DragStartEvent, DragMoveEvent, CollisionDetection, rectIntersection, closestCenter, DragOverEvent } from "@dnd-kit/core";
+  import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, DragMoveEvent, CollisionDetection, rectIntersection, closestCenter, DragOverEvent, useSensor, useSensors, PointerSensor } from "@dnd-kit/core";
 import { snapCenterToCursor } from "@dnd-kit/modifiers";
 import type { PlacedSkill, RoutineConfig, Skill, PositionIcon, CategoryStateData, SaveStateData } from "@/types/routine";
 import { useSkills } from "@/hooks/useSkills";
@@ -18,8 +18,10 @@ import { Link } from "react-router-dom";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { lineBreak } from "html2canvas/dist/types/css/property-descriptors/line-break";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { useTheme } from "next-themes";
 
 export const RoutineBuilder = () => {
+  const { theme } = useTheme();
   const { skills, exportToCSV, addCustomSkill, deleteSkill, updateSkillCounts } = useSkills();
   const [config, setConfig] = useState<RoutineConfig>({
     length: 90,
@@ -176,6 +178,21 @@ export const RoutineBuilder = () => {
           const jsPDF = (await import("jspdf")).default;
           const html2canvas = (await import("html2canvas")).default;
 
+          // Determine background color based on theme
+          const isDarkMode = theme === "dark";
+          const backgroundColor = isDarkMode ? "#020817" : "#ffffff"; // Dark mode: very dark blue-gray, Light mode: white
+
+          // Convert hex to RGB for jsPDF
+          const hexToRgb = (hex: string) => {
+            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+            return result ? {
+              r: parseInt(result[1], 16),
+              g: parseInt(result[2], 16),
+              b: parseInt(result[3], 16)
+            } : { r: 255, g: 255, b: 255 };
+          };
+          const bgRgb = hexToRgb(backgroundColor);
+
           // Use portrait A4 (210mm x 297mm)
           const pdf = new jsPDF("p", "mm", "a4");
           const pageWidth = 210;
@@ -196,7 +213,7 @@ export const RoutineBuilder = () => {
               scale: 2, // Higher quality
               useCORS: true,
               allowTaint: true,
-              backgroundColor: '#ffffff',
+              backgroundColor,
               // Capture the full scrollable area
               height: countSheetElement.scrollHeight,
               width: countSheetElement.scrollWidth,
@@ -218,6 +235,10 @@ export const RoutineBuilder = () => {
 
             const imgWidth = canvas.width * scale;
             const imgHeight = canvas.height * scale;
+
+            // Fill the entire page with the background color
+            pdf.setFillColor(bgRgb.r, bgRgb.g, bgRgb.b);
+            pdf.rect(0, 0, pageWidth, pageHeight, 'F');
 
             // Center the image on the page
             const x = (pageWidth - imgWidth) / 2;
@@ -252,7 +273,7 @@ export const RoutineBuilder = () => {
                   scale: 2, // Higher quality
                   useCORS: true,
                   allowTaint: true,
-                  backgroundColor: '#ffffff',
+                  backgroundColor,
                   // Capture the full scrollable area
                   height: positionSheetElement.scrollHeight,
                   width: positionSheetElement.scrollWidth,
@@ -273,6 +294,10 @@ export const RoutineBuilder = () => {
 
                 const imgWidth = canvas.width * scale;
                 const imgHeight = canvas.height * scale;
+
+                // Fill the entire page with the background color
+                pdf.setFillColor(bgRgb.r, bgRgb.g, bgRgb.b);
+                pdf.rect(0, 0, pageWidth, pageHeight, 'F');
 
                 // Center the image on the page
                 const x = (pageWidth - imgWidth) / 2;
@@ -302,7 +327,7 @@ export const RoutineBuilder = () => {
 
       generatePDF();
     }
-  }, [shouldGeneratePdf, config.category, config.length, config.bpm, positionIcons, selectedLine]);
+  }, [shouldGeneratePdf, config.category, config.length, config.bpm, positionIcons, selectedLine, theme]);
 
   // Handle category changes - auto-save/load category states
   useEffect(() => {

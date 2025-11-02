@@ -406,7 +406,7 @@ return (
         <div id="position-sheet-container" className="flex-1 p-1.5 flex flex-col items-center overflow-auto">
           {/* ----- START OF ADDED CODE ----- */}
           <div
-            className="text-2xl font-medium text-gray-800 mb-1"
+            className="text-2xl font-medium text-foreground mb-1"
             style={{
               width: `${800 * zoomLevel}px`,
               textAlign: 'center',
@@ -436,7 +436,7 @@ return (
                 sheetRef.current = node;
                 setNodeRef(node);
               }}
-              className={`sheet-background relative bg-background border border-border rounded ${
+              className={`sheet-background relative bg-background border-4 border-border rounded ${
                 isOver ? "bg-accent/10" : ""
               }`}
               style={{
@@ -489,7 +489,7 @@ return (
               {Array.from({ length: 9 }, (_, i) => (
                 <div
                   key={i}
-                  className="absolute top-0 bottom-0 border-l border-muted pointer-events-none"
+                  className="absolute top-0 bottom-0 border-l-2 border-muted pointer-events-none"
                   style={{ left: `${(i / 9) * 100}%`, zIndex: 1 }}
                 />
               ))}
