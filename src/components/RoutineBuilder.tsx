@@ -9,6 +9,7 @@ import { PositionSheet } from "./PositionSheet";
 import { SkillCard } from "./SkillCard";
 import { TrashDropZone } from "./TrashDropZone";
 import { ThemeToggle } from "./ThemeToggle";
+import AboutModal from "./AboutModal";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -71,6 +72,7 @@ export const RoutineBuilder = () => {
   });
   const [showRenameDialog, setShowRenameDialog] = useState(false);
   const [renameInput, setRenameInput] = useState("");
+  const [showAboutModal, setShowAboutModal] = useState(false);
 
   // Load keyboard settings
   const [keyboardSettings] = useState(() => {
@@ -1782,11 +1784,9 @@ const handleDragEnd = (event: DragEndEvent) => {
         <div className="flex items-center justify-between mb-2">
           <h1 className="text-xl font-bold">Cheerleading Routine Builder</h1>
           <div className="flex gap-1">
-            <Link to="/about">
-              <Button variant="outline" size="sm">
-                <Info className="h-4 w-4" />
-              </Button>
-            </Link>
+            <Button variant="outline" size="sm" onClick={() => setShowAboutModal(true)}>
+              <Info className="h-4 w-4" />
+            </Button>
             <Button variant="destructive" size="sm" onClick={handleReset}>
               <RotateCcw className="h-4 w-4" />
             </Button>
@@ -2161,6 +2161,9 @@ const handleDragEnd = (event: DragEndEvent) => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* About Modal */}
+      <AboutModal open={showAboutModal} onOpenChange={setShowAboutModal} />
     </div>
   );
 };
