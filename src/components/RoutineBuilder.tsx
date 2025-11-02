@@ -33,6 +33,7 @@ export const RoutineBuilder = () => {
   const [placedSkills, setPlacedSkills] = useState<PlacedSkill[]>([]);
   const [positionIcons, setPositionIcons] = useState<PositionIcon[]>([]);
   const [notes, setNotes] = useState<Record<number, string>>({});
+  const [segmentNames, setSegmentNames] = useState<Record<number, string>>({});
   const [selectedLine, setSelectedLine] = useState<number | null>(null);
   const [lineHistories, setLineHistories] = useState<{ [saveStateSlot: number]: { [category: string]: { [lineIndex: number]: { history: PositionIcon[][], index: number } } } }>({});
   const [draggedSkill, setDraggedSkill] = useState<Skill | null>(null);
@@ -62,6 +63,7 @@ export const RoutineBuilder = () => {
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [shouldGeneratePdf, setShouldGeneratePdf] = useState(false);
   const [pdfIcons, setPdfIcons] = useState<PositionIcon[] | undefined>(undefined);
+  const [pdfSegmentName, setPdfSegmentName] = useState<string | undefined>(undefined); // ----- ADD THIS LINE -----
 
   // Load keyboard settings
   const [keyboardSettings] = useState(() => {
@@ -94,6 +96,7 @@ export const RoutineBuilder = () => {
         setPlacedSkills(data.placedSkills);
         setPositionIcons(data.positionIcons);
         setNotes(data.notes || {});
+        setSegmentNames(data.segmentNames || {});
         setConfig(data.config);
         setCurrentSaveState(data);
         setLoadedSaveStateSlot(1);
@@ -135,9 +138,10 @@ export const RoutineBuilder = () => {
   }, [showPdfPreview, pdfBlobUrl]);
 
   // Helper function to get unique position sheet configurations
-  const getUniquePositionConfigurations = (): PositionIcon[][] => {
+  // ----- MODIFY THIS FUNCTION -----
+  const getUniquePositionConfigurations = (): { icons: PositionIcon[], lineIndex: number }[] => {
     const totalLines = Math.ceil((config.length * config.bpm) / 60 / 8);
-    const configurations: PositionIcon[][] = [];
+    const configurations: { icons: PositionIcon[], lineIndex: number }[] = [];
     const seenConfigurations = new Set<string>();
 
     for (let lineIndex = 0; lineIndex < totalLines; lineIndex++) {
@@ -163,7 +167,7 @@ export const RoutineBuilder = () => {
       // Only add if we haven't seen this configuration before
       if (!seenConfigurations.has(configHash)) {
         seenConfigurations.add(configHash);
-        configurations.push(lineIcons);
+        configurations.push({ icons: lineIcons, lineIndex }); // Store lineIndex
       }
     }
 
@@ -171,6 +175,7 @@ export const RoutineBuilder = () => {
   };
 
   // Generate PDF when shouldGeneratePdf flag is set
+  // ----- MODIFY THIS FUNCTION -----
   useEffect(() => {
     if (shouldGeneratePdf) {
       const generatePDF = async () => {
@@ -250,11 +255,12 @@ export const RoutineBuilder = () => {
           if (config.category === "team-16" || config.category === "team-24") {
             const uniqueConfigurations = getUniquePositionConfigurations();
 
-            for (const configIcons of uniqueConfigurations) {
+            for (const config of uniqueConfigurations) {
               pdf.addPage();
 
               // Temporarily set the pdfIcons to show this configuration
-              setPdfIcons(configIcons);
+              setPdfIcons(config.icons);
+              setPdfSegmentName(segmentNames[config.lineIndex] || ""); // <-- SET SEGMENT NAME
 
               // Wait for React to update the DOM
               await new Promise(resolve => setTimeout(resolve, 100));
@@ -309,6 +315,7 @@ export const RoutineBuilder = () => {
 
             // Clear the pdfIcons to restore normal operation
             setPdfIcons(undefined);
+            setPdfSegmentName(undefined); // <-- RESET SEGMENT NAME
           }
 
           // Generate blob for preview - use arraybuffer first then convert to blob
@@ -322,12 +329,14 @@ export const RoutineBuilder = () => {
         } finally {
           setIsGeneratingPdf(false);
           setShouldGeneratePdf(false);
+          setPdfIcons(undefined);
+          setPdfSegmentName(undefined); // <-- RESET SEGMENT NAME
         }
       };
 
       generatePDF();
     }
-  }, [shouldGeneratePdf, config.category, config.length, config.bpm, positionIcons, selectedLine, theme]);
+  }, [shouldGeneratePdf, config.category, config.length, config.bpm, positionIcons, selectedLine, theme, segmentNames]); // <-- ADD segmentNames
 
   // Handle category changes - auto-save/load category states
   useEffect(() => {
@@ -362,10 +371,12 @@ export const RoutineBuilder = () => {
       setPlacedSkills(savedCategoryData.placedSkills);
       setPositionIcons(savedCategoryData.positionIcons);
       setNotes(savedCategoryData.notes || {});
+      setSegmentNames(savedCategoryData.segmentNames || {});
     } else {
       // No saved state - create default state for category
       setPlacedSkills([]);
       setNotes({});
+      setSegmentNames({});
       if (config.category === "team-16" || config.category === "team-24") {
         // Generate default team icons
         const totalLines = Math.ceil((config.length * config.bpm) / 60 / 8);
@@ -393,6 +404,7 @@ export const RoutineBuilder = () => {
         positionIcons: [...positionIcons],
         config: { ...config },
         notes: { ...notes },
+        segmentNames: { ...segmentNames },
         timestamp: Date.now()
       };
       localStorage.setItem(key, JSON.stringify(data));
@@ -403,7 +415,7 @@ export const RoutineBuilder = () => {
         saveCategoryState(config.category);
       }
     }
-  }, [placedSkills, positionIcons, config, loadedSaveStateSlot, hasLoadedState]);
+  }, [placedSkills, positionIcons, config, loadedSaveStateSlot, hasLoadedState, notes, segmentNames]);
 
   // Auto-scroll to keep selected skill in view after keyboard movement
   useEffect(() => {
@@ -996,6 +1008,7 @@ export const RoutineBuilder = () => {
       placedSkills: [...placedSkills],
       positionIcons: [...positionIcons],
       notes: { ...notes },
+      segmentNames: { ...segmentNames },
       timestamp: Date.now()
 
     };
@@ -1016,6 +1029,7 @@ export const RoutineBuilder = () => {
       positionIcons: [...positionIcons],
       config: { ...config },
       notes: { ...notes },
+      segmentNames: { ...segmentNames },
       timestamp: Date.now()
     };
     localStorage.setItem(key, JSON.stringify(data));
@@ -1033,12 +1047,16 @@ export const RoutineBuilder = () => {
       setPlacedSkills(data.placedSkills);
       setPositionIcons(data.positionIcons);
       setConfig(data.config);
+      setNotes(data.notes || {});
+      setSegmentNames(data.segmentNames || {});
       setCurrentSaveState(data);
       setLoadedSaveStateSlot(slotNumber);
       initialLoadedCategoryRef.current = data.config.category;
     } else {
       // Create default state for new slot
       const defaultPlacedSkills: PlacedSkill[] = [];
+      const defaultNotes = {};
+      const defaultSegmentNames = {};
 
       let defaultPositionIcons: PositionIcon[] = [];
       if (config.category === "team-16" || config.category === "team-24") {
@@ -1055,13 +1073,16 @@ export const RoutineBuilder = () => {
         placedSkills: defaultPlacedSkills,
         positionIcons: defaultPositionIcons,
         config: { ...config },
-        notes: {},
+        notes: defaultNotes,
+        segmentNames: defaultSegmentNames,
         timestamp: Date.now()
       };
 
       // Apply the default state
       setPlacedSkills(defaultPlacedSkills);
       setPositionIcons(defaultPositionIcons);
+      setNotes(defaultNotes);
+      setSegmentNames(defaultSegmentNames);
       // Keep current config
 
       // Save as the initial state for this slot
@@ -1687,6 +1708,22 @@ const handleDragEnd = (event: DragEndEvent) => {
     });
   };
 
+  const handleUpdateSegmentName = (lineIndex: number, name: string) => {
+    if (lineIndex === null) return;
+
+    setSegmentNames(prev => {
+      const newSegmentNames = { ...prev, [lineIndex]: name };
+
+      if (autoFollow) {
+        const totalLines = Math.ceil((config.length * config.bpm) / 60 / 8);
+        for (let line = lineIndex + 1; line < totalLines; line++) {
+          newSegmentNames[line] = name;
+        }
+      }
+      return newSegmentNames;
+    });
+  };
+
   const handleExportPDF = () => {
     setIsGeneratingPdf(true);
     setShouldGeneratePdf(true);
@@ -1698,6 +1735,8 @@ const handleDragEnd = (event: DragEndEvent) => {
     setSelectedLine(null);
     setSelectedSkillId(null);
     setLineHistories({}); // Clear all history states
+    setNotes({});
+    setSegmentNames({});
 
     // For team categories, reset icons to default positions
     if (config.category === "team-16" || config.category === "team-24") {
@@ -1828,6 +1867,7 @@ const handleDragEnd = (event: DragEndEvent) => {
                     positionIcons: [...positionIcons],
                     config: { ...config },
                     notes: { ...notes },
+                    segmentNames: { ...segmentNames },
                     timestamp: Date.now()
                   };
                   localStorage.setItem(key, JSON.stringify(data));
@@ -1976,7 +2016,14 @@ const handleDragEnd = (event: DragEndEvent) => {
                       setCurrentZoomLevel(event.zoomLevel);
                     }}
                     onZoomChange={(zoomLevel) => setCurrentZoomLevel(zoomLevel)}
+                    segmentName={selectedLine !== null ? segmentNames[selectedLine] || "" : ""}
+                    onUpdateSegmentName={(name) => {
+                      if (selectedLine !== null) {
+                        handleUpdateSegmentName(selectedLine, name);
+                      }
+                    }}
                     pdfIcons={pdfIcons}
+                    pdfSegmentName={pdfSegmentName} // ----- ADD THIS PROP -----
                   />
                 </ResizablePanel>
               </ResizablePanelGroup>

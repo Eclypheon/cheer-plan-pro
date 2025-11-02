@@ -7,6 +7,8 @@ import { Slider } from "@/components/ui/slider";
 import { Plus, Undo, Redo, ToggleLeft, ToggleRight, Square, Circle, Triangle, X, ZoomIn, ZoomOut } from "lucide-react";
 import { PositionIcon as PositionIconComponent } from "./PositionIcon";
 import { PositionIconNameDialog } from "./PositionIconNameDialog";
+import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 
 interface PositionSheetProps {
   icons: PositionIcon[];
@@ -34,7 +36,10 @@ interface PositionSheetProps {
   onIconDragEnd?: () => void;
   onIconDrop?: (event: { active: any, delta: { x: number; y: number }, zoomLevel: number }) => void;
   onZoomChange?: (zoomLevel: number) => void;
+  segmentName?: string;
+  onUpdateSegmentName?: (name: string) => void;
   pdfIcons?: PositionIcon[]; // Override icons for PDF generation
+  pdfSegmentName?: string; // ----- ADD THIS LINE -----
 }
 
 export const PositionSheet = ({
@@ -63,7 +68,10 @@ export const PositionSheet = ({
   onIconDragEnd,
   onIconDrop,
   onZoomChange,
+  segmentName,
+  onUpdateSegmentName,
   pdfIcons,
+  pdfSegmentName, // ----- ADD THIS LINE -----
 }: PositionSheetProps) => {
   const [selectedIconId, setSelectedIconId] = useState<string | null>(null);
   const [nameDialogOpen, setNameDialogOpen] = useState(false);
@@ -270,7 +278,13 @@ export const PositionSheet = ({
     }
   };
 
-  if (selectedLine === null) {
+  // ----- MODIFY THESE LINES -----
+  const isPdfRender = pdfIcons !== undefined;
+  const lineIcons = isPdfRender ? pdfIcons : icons.filter((i) => i.lineIndex === selectedLine);
+  const currentSegmentName = isPdfRender ? (pdfSegmentName || "") : (segmentName || "");
+  // ----- END OF MODIFICATION -----
+
+  if (selectedLine === null && !isPdfRender) { // Keep showing sheet for PDF render
     return (
       <Card className="h-full flex items-center justify-center p-8">
         <p className="text-muted-foreground text-center">
@@ -280,7 +294,6 @@ export const PositionSheet = ({
     );
   }
 
-  const lineIcons = pdfIcons || icons.filter((i) => i.lineIndex === selectedLine);
   const selectedIcon = icons.find((i) => i.id === selectedIconId);
   const selectedIconsCount = lineIcons.filter(i => i.selected).length;
   const isMultiDrag = selectedIconsCount > 1 && dragOffset !== null;
@@ -292,7 +305,7 @@ return (
       <div className="p-1.5 border-b relative z-10">
         <div className="flex items-center justify-between gap-1.5">
           <div className="flex items-center gap-1">
-            <h3 className="text-sm font-semibold">Line {selectedLine + 1}</h3>
+            <h3 className="text-sm font-semibold">Line {selectedLine !== null ? selectedLine + 1 : 'PDF'}</h3>
             <Button size="sm" variant="ghost" className="h-6 px-1.5 text-xs" onClick={() => onAddIcon("square")}>
               <Square className="h-3 w-3 mr-0.5" />
               Base
@@ -404,19 +417,47 @@ return (
 
         {/* Position sheet */}
         <div id="position-sheet-container" className="flex-1 p-1.5 flex flex-col items-center overflow-auto">
-          {/* ----- START OF ADDED CODE ----- */}
+          
+          {/* ----- START OF MODIFIED CODE ----- */}
           <div
-            className="text-2xl font-medium text-foreground mb-1"
+            className="flex justify-between items-center mb-1" // Use justify-between
             style={{
               width: `${800 * zoomLevel}px`,
-              textAlign: 'center',
               flexShrink: 0,
               transition: 'width 0.1s ease-out'
             }}
           >
-            Audience
+            {/* 1. Segment Name (Top Left) */}
+            <Input
+              placeholder="Segment name"
+              value={currentSegmentName}
+              onChange={(e) => onUpdateSegmentName?.(e.target.value)}
+              readOnly={isPdfRender}
+              className={cn(
+                "h-8 border-none bg-transparent p-0 shadow-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-0",
+                currentSegmentName ? "text-2xl font-medium text-foreground" : "text-lg",
+                "placeholder:text-lg placeholder:font-medium placeholder:text-muted-foreground",
+                isPdfRender ? "focus-visible:ring-0" : "" // Hide focus ring during PDF render
+              )}
+              style={{ width: '33.33%' }}
+            />
+
+            {/* 2. Audience (Centered) */}
+            <div
+              className="text-2xl font-medium text-foreground"
+              style={{
+                width: '33.33%',
+                textAlign: 'center',
+              }}
+            >
+              Audience
+            </div>
+
+            {/* 3. Spacer (Top Right) */}
+            <div style={{ width: '33.33%' }} /> 
           </div>
-          {/* ----- END OF ADDED CODE ----- */}
+          {/* ----- END OF MODIFIED CODE ----- */}
+
 
           {/* This is the wrapper div that fixes the scroll issue.
             Its size is what the scroll-container "sees".
