@@ -465,7 +465,7 @@ const handleClick = (e: React.MouseEvent) => {
 
     return (
       <td
-        className="border border-border bg-card hover:bg-accent/50 h-10 p-1 text-xs cursor-text whitespace-pre-wrap  break-words"
+        className="border border-border bg-card hover:bg-accent/50 h-10 p-1 text-xs cursor-text whitespace-pre-wrap  break-words max-w-[250px] min-w-[150px]"
         onClick={handleClick}
       >
         {isEditing ? (
@@ -479,7 +479,7 @@ const handleClick = (e: React.MouseEvent) => {
             placeholder="Add note..."
           />
         ) : (
-          <div className={`whitespace-pre-wrap  break-words ${currentNote ? "text-foreground" : "text-muted-foreground"}`}>
+          <div className={`w-full whitespace-pre-wrap  break-words ${currentNote ? "text-foreground" : "text-muted-foreground"}`}>
             {currentNote || ""}
           </div>
         )}
