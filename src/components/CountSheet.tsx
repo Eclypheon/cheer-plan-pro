@@ -465,7 +465,7 @@ const handleClick = (e: React.MouseEvent) => {
 
     return (
       <td
-        className="border border-border bg-card hover:bg-accent/50 h-10 p-1 text-xs cursor-text line-clamp-2 break-words max-w-[500px] min-w-[150px]"
+        className="border border-border bg-card hover:bg-accent/50 h-10 p-1 text-xs cursor-text line-clamp-2 break-words max-w-[500px] min-w-[500px]"
         onClick={handleClick}
       >
         {isEditing ? (
@@ -577,7 +577,7 @@ const handleClick = (e: React.MouseEvent) => {
 
           {/* Notes Table */}
           <div
-  style={!isPdfRender ? { width: `${100 - countSheetWidth}%` } : { minWidth: '150px' }}
+  style={!isPdfRender ? { width: `${100 - countSheetWidth}%` } : { minWidth: '500px' }}
   className="flex-shrink-0"
 >
             <table className={cn(
