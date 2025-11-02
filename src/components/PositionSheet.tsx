@@ -402,8 +402,22 @@ return (
           </Button>
         </div>
 
- {/* Position sheet */}
-        <div id="position-sheet-container" className="flex-1 p-1.5 flex justify-center overflow-auto">
+        {/* Position sheet */}
+        <div id="position-sheet-container" className="flex-1 p-1.5 flex flex-col items-center overflow-auto">
+          {/* ----- START OF ADDED CODE ----- */}
+          <div
+            className="text-2xl font-medium text-gray-800 mb-1"
+            style={{
+              width: `${800 * zoomLevel}px`,
+              textAlign: 'center',
+              flexShrink: 0,
+              transition: 'width 0.1s ease-out'
+            }}
+          >
+            Audience
+          </div>
+          {/* ----- END OF ADDED CODE ----- */}
+
           {/* This is the wrapper div that fixes the scroll issue.
             Its size is what the scroll-container "sees".
             It shrinks and grows with the zoomLevel, eliminating empty scroll space.
