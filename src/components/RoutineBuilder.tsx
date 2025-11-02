@@ -1742,26 +1742,23 @@ const handleDragEnd = (event: DragEndEvent) => {
         <div className="flex items-center justify-between mb-2">
           <h1 className="text-xl font-bold">Cheerleading Routine Builder</h1>
           <div className="flex gap-1">
+            <Link to="/about">
+              <Button variant="outline" size="sm">
+                <Info className="h-4 w-4" />
+              </Button>
+            </Link>
+            <Button variant="destructive" size="sm" onClick={handleReset}>
+              <RotateCcw className="h-4 w-4" />
+            </Button>
+            <Link to="/settings">
+              <Button variant="outline" size="sm">
+                <SettingsIcon className="h-4 w-4" />
+              </Button>
+            </Link>
             <Link to="/skills-editor">
               <Button variant="outline" size="sm">
                 <Library className="h-4 w-4 mr-1" />
                 Skills Editor
-              </Button>
-            </Link>
-            <Link to="/settings">
-              <Button variant="outline" size="sm">
-                <SettingsIcon className="h-4 w-4 mr-1" />
-                Settings
-              </Button>
-            </Link>
-            <Button variant="destructive" size="sm" onClick={handleReset}>
-              <RotateCcw className="h-4 w-4 mr-1" />
-              Reset
-            </Button>
-            <Link to="/about">
-              <Button variant="outline" size="sm">
-                <Info className="h-4 w-4 mr-1" />
-                About
               </Button>
             </Link>
             <Button
@@ -1815,7 +1812,7 @@ const handleDragEnd = (event: DragEndEvent) => {
           </div>
 
           <div className="flex items-center gap-1">
-            <Label className="text-xs">Category:</Label>
+            <Label className="text-xs">Cat:</Label>
             <Select
               value={config.category}
               onValueChange={(v) => setConfig({ ...config, category: v as any })}
@@ -1833,7 +1830,7 @@ const handleDragEnd = (event: DragEndEvent) => {
           </div>
 
           <div className="flex items-center gap-1">
-            <Label className="text-xs">Save State:</Label>
+            <Label className="text-xs">Saves:</Label>
             <Select
               value={loadedSaveStateSlot?.toString() || "1"}
               onValueChange={(slot) => {
@@ -1855,29 +1852,15 @@ const handleDragEnd = (event: DragEndEvent) => {
                 loadFromSlot(newSlot);
               }}
             >
-              <SelectTrigger className="w-60 h-8">
+              <SelectTrigger className="w-32 h-8">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {([1, 2, 3] as const).map(slot => {
-                  const key = `save-state-${slot}`;
-                  const saved = localStorage.getItem(key);
-                  let label = `State ${slot}`;
-                  if (saved) {
-                    try {
-                      const data = JSON.parse(saved) as SaveStateData;
-                      const category = data.config.category.replace('-', ' ').toUpperCase();
-                      label += ` (${category})`;
-                    } catch (e) {
-                      // Keep default label if parsing fails
-                    }
-                  }
-                  return (
-                    <SelectItem key={slot} value={slot.toString()}>
-                      {label}
-                    </SelectItem>
-                  );
-                })}
+                {([1, 2, 3] as const).map(slot => (
+                  <SelectItem key={slot} value={slot.toString()}>
+                    Save {slot}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
