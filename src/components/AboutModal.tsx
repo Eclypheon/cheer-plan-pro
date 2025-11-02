@@ -116,7 +116,7 @@ const AboutModal = ({ open, onOpenChange }: AboutModalProps) => {
                 <ul className="list-disc list-inside space-y-2 text-muted-foreground">
                   <li>Drag-and-drop skill placement on an 8-count system</li>
                   <li>Customizable skills library with pre-loaded skills across all categories</li>
-                  <li>Visual position mapping for team routines on a 7-mat layout</li>
+                  <li>Visual position mapping for team routines on a 9-mat layout</li>
                   <li>BPM-based automatic count calculation</li>
                   <li>PDF export for count sheets and position diagrams</li>
                   <li>CSV import/export for skills management</li>
