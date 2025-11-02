@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Download, Info, Library, RotateCcw, Settings as SettingsIcon } from "lucide-react";
+import { Download, Info, Library, RotateCcw, Settings as SettingsIcon, Edit } from "lucide-react";
 import { Link } from "react-router-dom";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { lineBreak } from "html2canvas/dist/types/css/property-descriptors/line-break";
@@ -64,6 +64,13 @@ export const RoutineBuilder = () => {
   const [shouldGeneratePdf, setShouldGeneratePdf] = useState(false);
   const [pdfIcons, setPdfIcons] = useState<PositionIcon[] | undefined>(undefined);
   const [pdfSegmentName, setPdfSegmentName] = useState<string | undefined>(undefined); // ----- ADD THIS LINE -----
+  const [saveNames, setSaveNames] = useState<Record<1 | 2 | 3, string>>({
+    1: "Save 1",
+    2: "Save 2",
+    3: "Save 3"
+  });
+  const [showRenameDialog, setShowRenameDialog] = useState(false);
+  const [renameInput, setRenameInput] = useState("");
 
   // Load keyboard settings
   const [keyboardSettings] = useState(() => {
@@ -88,6 +95,17 @@ export const RoutineBuilder = () => {
 
   // Load saved state on component mount - auto-load State 1 if available
   useEffect(() => {
+    // Load save names
+    const savedNames = localStorage.getItem('save-names');
+    if (savedNames) {
+      try {
+        const names = JSON.parse(savedNames);
+        setSaveNames(prev => ({ ...prev, ...names }));
+      } catch (e) {
+        console.error('Failed to load save names:', e);
+      }
+    }
+
     const state1Key = 'save-state-1';
     const savedState1 = localStorage.getItem(state1Key);
     if (savedState1) {
@@ -1014,6 +1032,9 @@ export const RoutineBuilder = () => {
     localStorage.setItem(key, JSON.stringify(data));
     setCurrentSaveState(data);
     setLoadedSaveStateSlot(slotNumber);
+
+    // Save the current save names
+    localStorage.setItem('save-names', JSON.stringify(saveNames));
   };
 
   const loadFromSlot = (slotNumber: 1 | 2 | 3) => {
@@ -1736,6 +1757,25 @@ const handleDragEnd = (event: DragEndEvent) => {
     // The current state will auto-save as empty if the auto-save effect runs again
   };
 
+  const handleRenameSave = () => {
+    if (!loadedSaveStateSlot || !renameInput.trim()) return;
+
+    const trimmedName = renameInput.trim();
+    setSaveNames(prev => ({
+      ...prev,
+      [loadedSaveStateSlot]: trimmedName
+    }));
+
+    // Save to localStorage
+    localStorage.setItem('save-names', JSON.stringify({
+      ...saveNames,
+      [loadedSaveStateSlot]: trimmedName
+    }));
+
+    setShowRenameDialog(false);
+    setRenameInput("");
+  };
+
   return (
     <div className="h-screen flex flex-col overflow-hidden">
       <header className="border-b bg-card p-2">
@@ -1781,7 +1821,7 @@ const handleDragEnd = (event: DragEndEvent) => {
               value={config.length.toString()}
               onValueChange={(v) => setConfig({ ...config, length: parseInt(v) })}
             >
-              <SelectTrigger className="w-24 h-8">
+              <SelectTrigger className="w-20 h-8">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -1817,7 +1857,7 @@ const handleDragEnd = (event: DragEndEvent) => {
               value={config.category}
               onValueChange={(v) => setConfig({ ...config, category: v as any })}
             >
-              <SelectTrigger className="w-40 h-8">
+              <SelectTrigger className="w-36 h-8">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -1858,11 +1898,25 @@ const handleDragEnd = (event: DragEndEvent) => {
               <SelectContent>
                 {([1, 2, 3] as const).map(slot => (
                   <SelectItem key={slot} value={slot.toString()}>
-                    Save {slot}
+                    {saveNames[slot]}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                if (loadedSaveStateSlot) {
+                  setRenameInput(saveNames[loadedSaveStateSlot]);
+                  setShowRenameDialog(true);
+                }
+              }}
+              className="h-8 w-8 p-0"
+              title="Rename current save"
+            >
+              <Edit className="h-4 w-4" />
+            </Button>
           </div>
         </div>
       </header>
@@ -1878,7 +1932,7 @@ const handleDragEnd = (event: DragEndEvent) => {
         modifiers={[snapCenterToCursor]}
       >
         <ResizablePanelGroup direction="horizontal" className="flex-1 w-full">
-          <ResizablePanel defaultSize={15} minSize={10} maxSize={40} collapsible>
+          <ResizablePanel defaultSize={15} minSize={10} maxSize={40} collapsible className="min-w-40">
             <SkillsPanel
               skills={skills}
               onAddCustomSkill={addCustomSkill}
@@ -2067,6 +2121,42 @@ const handleDragEnd = (event: DragEndEvent) => {
             >
               <Download className="h-4 w-4 mr-2" />
               Download PDF
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Rename Save Dialog */}
+      <Dialog open={showRenameDialog} onOpenChange={setShowRenameDialog}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Rename Save Slot</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="save-name" className="text-right">
+                Name
+              </Label>
+              <Input
+                id="save-name"
+                value={renameInput}
+                onChange={(e) => setRenameInput(e.target.value)}
+                className="col-span-3"
+                placeholder="Enter save name..."
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleRenameSave();
+                  }
+                }}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowRenameDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleRenameSave}>
+              Save
             </Button>
           </DialogFooter>
         </DialogContent>

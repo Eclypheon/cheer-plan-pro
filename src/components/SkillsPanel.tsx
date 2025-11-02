@@ -23,7 +23,7 @@ const categoryLabels: Record<SkillCategory, string> = {
   dismounts: "Dismounts",
   "on-hands": "On-Hands",
   pyramids: "Pyramids",
-  baskets: "Baskets",
+  baskets: "Basket Toss",
   tumbling: "Tumbling",
   transitions: "Transitions",
 };
