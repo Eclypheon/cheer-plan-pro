@@ -204,16 +204,9 @@ export const RoutineBuilder = () => {
           const pageHeight = 297;
           const margin = 2; // Minimal margin for maximum content fit
 
-          const countSheetElement = document.getElementById("count-sheet-container");
+          const countSheetElement = document.getElementById("count-sheet-content-wrapper");
           if (countSheetElement) {
-            // Store original styles to restore later
-            const originalOverflow = countSheetElement.style.overflow;
-            const originalHeight = countSheetElement.style.height;
-
-            // Temporarily make all content visible without scrolling
-            countSheetElement.style.overflow = 'visible';
-            countSheetElement.style.height = 'auto';
-
+            
             const canvas = await html2canvas(countSheetElement, {
               scale: 2, // Higher quality
               useCORS: true,
@@ -223,10 +216,6 @@ export const RoutineBuilder = () => {
               height: countSheetElement.scrollHeight,
               width: countSheetElement.scrollWidth,
             });
-
-            // Restore original styles
-            countSheetElement.style.overflow = originalOverflow;
-            countSheetElement.style.height = originalHeight;
 
             const imgData = canvas.toDataURL("image/png");
 
@@ -265,16 +254,9 @@ export const RoutineBuilder = () => {
               // Wait for React to update the DOM
               await new Promise(resolve => setTimeout(resolve, 100));
 
-              const positionSheetElement = document.getElementById("position-sheet-container");
+              const positionSheetElement = document.getElementById("position-sheet-content-wrapper");
               if (positionSheetElement) {
-                // Store original styles to restore later
-                const originalOverflow = positionSheetElement.style.overflow;
-                const originalHeight = positionSheetElement.style.height;
-
-                // Temporarily make all content visible without scrolling
-                positionSheetElement.style.overflow = 'visible';
-                positionSheetElement.style.height = 'auto';
-
+ 
                 const canvas = await html2canvas(positionSheetElement, {
                   scale: 2, // Higher quality
                   useCORS: true,
@@ -285,9 +267,6 @@ export const RoutineBuilder = () => {
                   width: positionSheetElement.scrollWidth,
                 });
 
-                // Restore original styles
-                positionSheetElement.style.overflow = originalOverflow;
-                positionSheetElement.style.height = originalHeight;
                 const imgData = canvas.toDataURL("image/png");
 
                 // Calculate scaling to fit within portrait page

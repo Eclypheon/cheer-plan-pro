@@ -179,7 +179,7 @@ export const CountSheet = ({
     const rect = container.getBoundingClientRect();
     const newWidth = ((e.clientX - rect.left) / rect.width) * 100;
 
-    // Constrain between 30% and 80%
+    // Constrain between 60% and 85%
     const constrainedWidth = Math.max(60, Math.min(85, newWidth));
     setCountSheetWidth(constrainedWidth);
   }, [isResizingPanels]);
@@ -536,7 +536,7 @@ const handleClick = (e: React.MouseEvent) => {
       </div>
 
       <div className="flex-1 overflow-auto relative" id="count-sheet-container">
-        <div ref={containerRef} className="flex min-w-max relative">
+        <div ref={containerRef} id="count-sheet-content-wrapper" className="flex min-w-max relative">
           {/* Count Sheet Table */}
           <div style={{ width: `${countSheetWidth}%` }} className="flex-shrink-0">
             <table className="border-collapse relative z-10 w-full" id="count-sheet-table">

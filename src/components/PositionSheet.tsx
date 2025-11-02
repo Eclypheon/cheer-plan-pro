@@ -417,7 +417,7 @@ return (
 
         {/* Position sheet */}
         <div id="position-sheet-container" className="flex-1 p-1.5 flex flex-col items-center overflow-auto">
-          
+          <div id="position-sheet-content-wrapper" className="flex flex-col items-center">
           {/* ----- START OF MODIFIED CODE ----- */}
           <div
             className="flex justify-between items-center mb-1" // Use justify-between
@@ -568,6 +568,7 @@ return (
                   }}
                 />
               ))}
+              </div>
             </div>
           </div>
         </div>
