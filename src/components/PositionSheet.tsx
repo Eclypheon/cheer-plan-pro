@@ -320,7 +320,7 @@ return (
             </Button>
           </div>
           <div className="flex gap-1 items-center">
-            <span className="text-xs text-muted-foreground">Auto follow</span>
+            <span className="text-xs text-muted-foreground">Propagate Changes</span>
             <Button
               size="sm"
               variant={autoFollow ? "default" : "outline"}

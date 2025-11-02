@@ -464,15 +464,15 @@ export const RoutineBuilder = () => {
       }
 
       // Position sheet shortcuts
-      if (e.key === keyboardSettings.nextLine && !e.ctrlKey && !e.shiftKey) {
+      if (e.key === keyboardSettings.nextLine && !e.shiftKey) {
         const totalLines = Math.ceil((config.length * config.bpm) / 60 / 8);
         if (selectedLine !== null && selectedLine < totalLines - 1) {
           setSelectedLine(selectedLine + 1);
           e.preventDefault();
         }
       }
-      
-      if (e.key === keyboardSettings.prevLine && !e.ctrlKey && !e.shiftKey) {
+
+      if (e.key === keyboardSettings.prevLine && !e.shiftKey) {
         if (selectedLine !== null && selectedLine > 0) {
           setSelectedLine(selectedLine - 1);
           e.preventDefault();
@@ -504,7 +504,7 @@ export const RoutineBuilder = () => {
       }
 
       // Delete key for selected skills in count sheet
-      if ((e.key === "Delete" || e.key === "Backspace") && selectedSkillId && !e.ctrlKey && !e.shiftKey) {
+      if ((e.key === "Delete" || e.key === "Backspace") && selectedSkillId && !e.shiftKey) {
         handleRemoveSkill(selectedSkillId);
         setSelectedSkillId(null);
         e.preventDefault();
@@ -585,7 +585,7 @@ export const RoutineBuilder = () => {
       }
 
       // Advanced keyboard shortcuts for bulk skill movement
-      if (selectedSkillId && e.shiftKey && !e.ctrlKey) {
+      if (selectedSkillId && e.shiftKey && !e.altKey && !e.ctrlKey) {
         // Shift + Arrow keys: Move selected skill and all skills after it
         const selectedSkill = placedSkills.find(ps => ps.id === selectedSkillId);
         if (!selectedSkill) return;
@@ -709,8 +709,8 @@ export const RoutineBuilder = () => {
         }
       }
 
-      if (selectedSkillId && e.ctrlKey && !e.shiftKey) {
-        // Ctrl + Arrow keys: Move selected skill and all skills before it
+      if (selectedSkillId && e.shiftKey && e.altKey) {
+        // Shift + Alt + Arrow keys: Move selected skill and all skills before it
         const selectedSkill = placedSkills.find(ps => ps.id === selectedSkillId);
         if (!selectedSkill) return;
 
