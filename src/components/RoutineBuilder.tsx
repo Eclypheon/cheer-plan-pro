@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Download, Info, Library, RotateCcw, Settings as SettingsIcon } from "lucide-react";
+import { Download, Info, Library, RotateCcw, Settings as SettingsIcon, Edit } from "lucide-react";
 import { Link } from "react-router-dom";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { lineBreak } from "html2canvas/dist/types/css/property-descriptors/line-break";
@@ -64,6 +64,13 @@ export const RoutineBuilder = () => {
   const [shouldGeneratePdf, setShouldGeneratePdf] = useState(false);
   const [pdfIcons, setPdfIcons] = useState<PositionIcon[] | undefined>(undefined);
   const [pdfSegmentName, setPdfSegmentName] = useState<string | undefined>(undefined); // ----- ADD THIS LINE -----
+  const [saveNames, setSaveNames] = useState<Record<1 | 2 | 3, string>>({
+    1: "Save 1",
+    2: "Save 2",
+    3: "Save 3"
+  });
+  const [showRenameDialog, setShowRenameDialog] = useState(false);
+  const [renameInput, setRenameInput] = useState("");
 
   // Load keyboard settings
   const [keyboardSettings] = useState(() => {
@@ -88,6 +95,17 @@ export const RoutineBuilder = () => {
 
   // Load saved state on component mount - auto-load State 1 if available
   useEffect(() => {
+    // Load save names
+    const savedNames = localStorage.getItem('save-names');
+    if (savedNames) {
+      try {
+        const names = JSON.parse(savedNames);
+        setSaveNames(prev => ({ ...prev, ...names }));
+      } catch (e) {
+        console.error('Failed to load save names:', e);
+      }
+    }
+
     const state1Key = 'save-state-1';
     const savedState1 = localStorage.getItem(state1Key);
     if (savedState1) {
@@ -464,15 +482,15 @@ export const RoutineBuilder = () => {
       }
 
       // Position sheet shortcuts
-      if (e.key === keyboardSettings.nextLine && !e.ctrlKey && !e.shiftKey) {
+      if (e.key === keyboardSettings.nextLine && !e.shiftKey) {
         const totalLines = Math.ceil((config.length * config.bpm) / 60 / 8);
         if (selectedLine !== null && selectedLine < totalLines - 1) {
           setSelectedLine(selectedLine + 1);
           e.preventDefault();
         }
       }
-      
-      if (e.key === keyboardSettings.prevLine && !e.ctrlKey && !e.shiftKey) {
+
+      if (e.key === keyboardSettings.prevLine && !e.shiftKey) {
         if (selectedLine !== null && selectedLine > 0) {
           setSelectedLine(selectedLine - 1);
           e.preventDefault();
@@ -504,7 +522,7 @@ export const RoutineBuilder = () => {
       }
 
       // Delete key for selected skills in count sheet
-      if ((e.key === "Delete" || e.key === "Backspace") && selectedSkillId && !e.ctrlKey && !e.shiftKey) {
+      if ((e.key === "Delete" || e.key === "Backspace") && selectedSkillId && !e.shiftKey) {
         handleRemoveSkill(selectedSkillId);
         setSelectedSkillId(null);
         e.preventDefault();
@@ -585,7 +603,7 @@ export const RoutineBuilder = () => {
       }
 
       // Advanced keyboard shortcuts for bulk skill movement
-      if (selectedSkillId && e.shiftKey && !e.ctrlKey) {
+      if (selectedSkillId && e.shiftKey && !e.altKey && !e.ctrlKey) {
         // Shift + Arrow keys: Move selected skill and all skills after it
         const selectedSkill = placedSkills.find(ps => ps.id === selectedSkillId);
         if (!selectedSkill) return;
@@ -709,8 +727,8 @@ export const RoutineBuilder = () => {
         }
       }
 
-      if (selectedSkillId && e.ctrlKey && !e.shiftKey) {
-        // Ctrl + Arrow keys: Move selected skill and all skills before it
+      if (selectedSkillId && e.shiftKey && e.altKey) {
+        // Shift + Alt + Arrow keys: Move selected skill and all skills before it
         const selectedSkill = placedSkills.find(ps => ps.id === selectedSkillId);
         if (!selectedSkill) return;
 
@@ -1014,6 +1032,9 @@ export const RoutineBuilder = () => {
     localStorage.setItem(key, JSON.stringify(data));
     setCurrentSaveState(data);
     setLoadedSaveStateSlot(slotNumber);
+
+    // Save the current save names
+    localStorage.setItem('save-names', JSON.stringify(saveNames));
   };
 
   const loadFromSlot = (slotNumber: 1 | 2 | 3) => {
@@ -1736,32 +1757,48 @@ const handleDragEnd = (event: DragEndEvent) => {
     // The current state will auto-save as empty if the auto-save effect runs again
   };
 
+  const handleRenameSave = () => {
+    if (!loadedSaveStateSlot || !renameInput.trim()) return;
+
+    const trimmedName = renameInput.trim();
+    setSaveNames(prev => ({
+      ...prev,
+      [loadedSaveStateSlot]: trimmedName
+    }));
+
+    // Save to localStorage
+    localStorage.setItem('save-names', JSON.stringify({
+      ...saveNames,
+      [loadedSaveStateSlot]: trimmedName
+    }));
+
+    setShowRenameDialog(false);
+    setRenameInput("");
+  };
+
   return (
     <div className="h-screen flex flex-col overflow-hidden">
       <header className="border-b bg-card p-2">
         <div className="flex items-center justify-between mb-2">
           <h1 className="text-xl font-bold">Cheerleading Routine Builder</h1>
           <div className="flex gap-1">
+            <Link to="/about">
+              <Button variant="outline" size="sm">
+                <Info className="h-4 w-4" />
+              </Button>
+            </Link>
+            <Button variant="destructive" size="sm" onClick={handleReset}>
+              <RotateCcw className="h-4 w-4" />
+            </Button>
+            <Link to="/settings">
+              <Button variant="outline" size="sm">
+                <SettingsIcon className="h-4 w-4" />
+              </Button>
+            </Link>
             <Link to="/skills-editor">
               <Button variant="outline" size="sm">
                 <Library className="h-4 w-4 mr-1" />
                 Skills Editor
-              </Button>
-            </Link>
-            <Link to="/settings">
-              <Button variant="outline" size="sm">
-                <SettingsIcon className="h-4 w-4 mr-1" />
-                Settings
-              </Button>
-            </Link>
-            <Button variant="destructive" size="sm" onClick={handleReset}>
-              <RotateCcw className="h-4 w-4 mr-1" />
-              Reset
-            </Button>
-            <Link to="/about">
-              <Button variant="outline" size="sm">
-                <Info className="h-4 w-4 mr-1" />
-                About
               </Button>
             </Link>
             <Button
@@ -1784,7 +1821,7 @@ const handleDragEnd = (event: DragEndEvent) => {
               value={config.length.toString()}
               onValueChange={(v) => setConfig({ ...config, length: parseInt(v) })}
             >
-              <SelectTrigger className="w-24 h-8">
+              <SelectTrigger className="w-20 h-8">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -1815,12 +1852,12 @@ const handleDragEnd = (event: DragEndEvent) => {
           </div>
 
           <div className="flex items-center gap-1">
-            <Label className="text-xs">Category:</Label>
+            <Label className="text-xs">Cat:</Label>
             <Select
               value={config.category}
               onValueChange={(v) => setConfig({ ...config, category: v as any })}
             >
-              <SelectTrigger className="w-40 h-8">
+              <SelectTrigger className="w-36 h-8">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -1833,7 +1870,7 @@ const handleDragEnd = (event: DragEndEvent) => {
           </div>
 
           <div className="flex items-center gap-1">
-            <Label className="text-xs">Save State:</Label>
+            <Label className="text-xs">Saves:</Label>
             <Select
               value={loadedSaveStateSlot?.toString() || "1"}
               onValueChange={(slot) => {
@@ -1855,31 +1892,31 @@ const handleDragEnd = (event: DragEndEvent) => {
                 loadFromSlot(newSlot);
               }}
             >
-              <SelectTrigger className="w-60 h-8">
+              <SelectTrigger className="w-32 h-8">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {([1, 2, 3] as const).map(slot => {
-                  const key = `save-state-${slot}`;
-                  const saved = localStorage.getItem(key);
-                  let label = `State ${slot}`;
-                  if (saved) {
-                    try {
-                      const data = JSON.parse(saved) as SaveStateData;
-                      const category = data.config.category.replace('-', ' ').toUpperCase();
-                      label += ` (${category})`;
-                    } catch (e) {
-                      // Keep default label if parsing fails
-                    }
-                  }
-                  return (
-                    <SelectItem key={slot} value={slot.toString()}>
-                      {label}
-                    </SelectItem>
-                  );
-                })}
+                {([1, 2, 3] as const).map(slot => (
+                  <SelectItem key={slot} value={slot.toString()}>
+                    {saveNames[slot]}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                if (loadedSaveStateSlot) {
+                  setRenameInput(saveNames[loadedSaveStateSlot]);
+                  setShowRenameDialog(true);
+                }
+              }}
+              className="h-8 w-8 p-0"
+              title="Rename current save"
+            >
+              <Edit className="h-4 w-4" />
+            </Button>
           </div>
         </div>
       </header>
@@ -1895,7 +1932,7 @@ const handleDragEnd = (event: DragEndEvent) => {
         modifiers={[snapCenterToCursor]}
       >
         <ResizablePanelGroup direction="horizontal" className="flex-1 w-full">
-          <ResizablePanel defaultSize={15} minSize={10} maxSize={40} collapsible>
+          <ResizablePanel defaultSize={15} minSize={10} maxSize={40} collapsible className="min-w-40">
             <SkillsPanel
               skills={skills}
               onAddCustomSkill={addCustomSkill}
@@ -2084,6 +2121,42 @@ const handleDragEnd = (event: DragEndEvent) => {
             >
               <Download className="h-4 w-4 mr-2" />
               Download PDF
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Rename Save Dialog */}
+      <Dialog open={showRenameDialog} onOpenChange={setShowRenameDialog}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Rename Save Slot</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="save-name" className="text-right">
+                Name
+              </Label>
+              <Input
+                id="save-name"
+                value={renameInput}
+                onChange={(e) => setRenameInput(e.target.value)}
+                className="col-span-3"
+                placeholder="Enter save name..."
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleRenameSave();
+                  }
+                }}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowRenameDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleRenameSave}>
+              Save
             </Button>
           </DialogFooter>
         </DialogContent>
