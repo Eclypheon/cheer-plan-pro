@@ -465,7 +465,7 @@ const handleClick = (e: React.MouseEvent) => {
 
     return (
       <td
-        className="border border-border bg-card hover:bg-accent/50 h-10 p-1 text-xs cursor-text whitespace-pre-wrap  break-words max-w-[250px] min-w-[150px]"
+        className="border border-border bg-card hover:bg-accent/50 h-10 p-1 text-xs cursor-text line-clamp-2 break-words max-w-[500px] min-w-[150px]"
         onClick={handleClick}
       >
         {isEditing ? (
@@ -475,11 +475,11 @@ const handleClick = (e: React.MouseEvent) => {
             onChange={(e) => setEditValue(e.target.value)}
             onKeyDown={handleKeyDown}
             onBlur={handleBlur}
-            className="w-full h-full bg-transparent border-none outline-none resize-none text-xs p-0 whitespace-pre-wrap  break-words"
+            className="w-full h-full bg-transparent border-none outline-none resize-none text-xs p-0 line-clamp-2 break-words"
             placeholder="Add note..."
           />
         ) : (
-          <div className={`w-full whitespace-pre-wrap  break-words ${currentNote ? "text-foreground" : "text-muted-foreground"}`}>
+          <div className={`w-full line-clamp-2 break-words ${currentNote ? "text-foreground" : "text-muted-foreground"}`}>
             {currentNote || ""}
           </div>
         )}
