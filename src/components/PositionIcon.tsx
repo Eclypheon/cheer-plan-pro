@@ -74,7 +74,7 @@ export const PositionIcon = ({ icon, onUpdate, onClick, onRemove, dragOffset, is
       <IconComponent type={icon.type} />
       {icon.name && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <span className="text-blue-900 dark:text-blue-100 text-xl font-medium text-center leading-tight max-w-full px-1">
+          <span className="text-blue-900 dark:text-blue-100 text-base font-medium text-center leading-tight max-w-full px-1">
             {icon.name}
           </span>
         </div>
