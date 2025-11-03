@@ -66,6 +66,16 @@ import {
 } from "@/components/ui/dialog";
 import { useTheme } from "next-themes";
 
+// Define global functions for TypeScript
+declare global {
+  interface Window {
+    showPdfProgress: (totalSteps: number) => void;
+    updatePdfProgress: (currentStep: number, message: string) => void;
+    hidePdfProgress: () => void;
+    pdfTotalSteps: number;
+  }
+}
+
 export const RoutineBuilder = () => {
   const { theme } = useTheme();
   const { skills, exportToCSV, addCustomSkill, deleteSkill, updateSkillCounts } =
@@ -121,7 +131,7 @@ export const RoutineBuilder = () => {
   const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
   const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
-  const [shouldGeneratePdf, setShouldGeneratePdf] = useState(false);
+  // const [shouldGeneratePdf, setShouldGeneratePdf] = useState(false); // <-- REMOVED
   const [saveNames, setSaveNames] = useState<Record<1 | 2 | 3, string>>({
     1: "Save 1",
     2: "Save 2",
@@ -259,181 +269,7 @@ export const RoutineBuilder = () => {
   };
 
   // Generate PDF when shouldGeneratePdf flag is set
-  useEffect(() => {
-    if (shouldGeneratePdf) {
-      const generatePDF = async () => {
-        setIsGeneratingPdf(true);
-        try {
-          const jsPDF = (await import("jspdf")).default;
-          const html2canvas = (await import("html2canvas")).default;
-          const { createRoot } = (await import("react-dom/client"));
-
-          // Determine background color based on theme
-          const isDarkMode = theme === "dark";
-          const backgroundColor = isDarkMode ? "#020817" : "#ffffff";
-
-          // Convert hex to RGB for jsPDF
-          const hexToRgb = (hex: string) => {
-            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(
-              hex,
-            );
-            return result
-              ? {
-                  r: parseInt(result[1], 16),
-                  g: parseInt(result[2], 16),
-                  b: parseInt(result[3], 16),
-                }
-              : { r: 255, g: 255, b: 255 };
-          };
-          const bgRgb = hexToRgb(backgroundColor);
-
-          // Use portrait A4 (210mm x 297mm)
-          const pdf = new jsPDF("p", "mm", "a4");
-          const pageWidth = 210;
-          const pageHeight = 297;
-          const margin = 2; // Minimal margin
-
-          // 1. Capture Count Sheet
-          const countSheetElement = document.getElementById(
-            "count-sheet-content-wrapper",
-          );
-          if (countSheetElement) {
-            const canvas = await html2canvas(countSheetElement, {
-              scale: 2,
-              useCORS: true,
-              allowTaint: true,
-              backgroundColor,
-              height: countSheetElement.scrollHeight,
-              width: countSheetElement.scrollWidth,
-            });
-
-            const imgData = canvas.toDataURL("image/png");
-            const availableWidth = pageWidth - margin * 2;
-            const availableHeight = pageHeight - margin * 2;
-            const scaleX = availableWidth / canvas.width;
-            const scaleY = availableHeight / canvas.height;
-            const scale = Math.min(scaleX, scaleY);
-            const imgWidth = canvas.width * scale;
-            const imgHeight = canvas.height * scale;
-
-            pdf.setFillColor(bgRgb.r, bgRgb.g, bgRgb.b);
-            pdf.rect(0, 0, pageWidth, pageHeight, "F");
-            const x = (pageWidth - imgWidth) / 2;
-            const y = (pageHeight - imgHeight) / 2;
-            pdf.addImage(imgData, "PNG", x, y, imgWidth, imgHeight);
-          }
-
-          // 2. Prepare to render Position Sheets
-          if (config.category === "team-16" || config.category === "team-24") {
-            const uniqueConfigurations = getUniquePositionConfigurations();
-
-            // Create a hidden div to render into
-            const renderDiv = document.createElement("div");
-            renderDiv.id = "pdf-render-target";
-            document.body.appendChild(renderDiv);
-
-            // Use createRoot to render your hidden component
-            const root = createRoot(renderDiv);
-            root.render(
-              <PdfRenderer
-                configurations={uniqueConfigurations}
-                segmentNames={segmentNames}
-                zoomLevel={1.0} // Render at 100% zoom
-              />,
-            );
-
-            // Wait for React to render
-            await new Promise((resolve) => setTimeout(resolve, 0));
-
-            // 3. Find all rendered page wrappers
-            const positionSheetElements = document.querySelectorAll(
-              ".pdf-page-class",
-            );
-
-            // 4. Capture the *content* inside each wrapper in parallel
-            const canvasPromises = Array.from(positionSheetElements).map(
-              (element) => {
-                // --- THIS IS THE KEY CHANGE ---
-                // Find the correct content wrapper *inside* the rendered component
-                const contentToCapture = element.querySelector(
-                  "#position-sheet-content-wrapper", //
-                ) as HTMLElement;
-
-                if (!contentToCapture) {
-                  return Promise.reject(
-                    "Could not find #position-sheet-content-wrapper for PDF render",
-                  );
-                }
-
-                return html2canvas(contentToCapture, {
-                  scale: 1, // Use 1 for better performance, 2 for higher res
-                  useCORS: true,
-                  allowTaint: true,
-                  backgroundColor,
-                  // Let html2canvas determine height and width from the element
-                  height: contentToCapture.scrollHeight,
-                  width: contentToCapture.scrollWidth,
-                });
-              },
-            );
-
-            const canvases = await Promise.all(canvasPromises);
-
-            // 5. Add all captured canvases to the PDF
-            const availableWidth = pageWidth - margin * 2;
-            const availableHeight = pageHeight - margin * 2;
-
-            for (const canvas of canvases) {
-              pdf.addPage();
-              pdf.setFillColor(bgRgb.r, bgRgb.g, bgRgb.b);
-              pdf.rect(0, 0, pageWidth, pageHeight, "F");
-
-              const imgData = canvas.toDataURL("image/png");
-              const scaleX = availableWidth / canvas.width;
-              const scaleY = availableHeight / canvas.height;
-              const scale = Math.min(scaleX, scaleY);
-              const imgWidth = canvas.width * scale;
-              const imgHeight = canvas.height * scale;
-              const x = (pageWidth - imgWidth) / 2;
-              const y = (pageHeight - imgHeight) / 2;
-
-              pdf.addImage(imgData, "PNG", x, y, imgWidth, imgHeight);
-            }
-
-            // 6. Cleanup
-            root.unmount();
-            document.body.removeChild(renderDiv);
-          }
-
-          // Generate blob for preview
-          const pdfArrayBuffer = pdf.output("arraybuffer");
-          const pdfBlob = new Blob([pdfArrayBuffer], {
-            type: "application/pdf; charset=utf-8",
-          });
-
-          setPdfBlob(pdfBlob);
-          setShowPdfPreview(true);
-        } catch (error) {
-          console.error("Error generating PDF:", error);
-        } finally {
-          setIsGeneratingPdf(false);
-          setShouldGeneratePdf(false);
-        }
-      };
-
-      generatePDF();
-    }
-  }, [
-    shouldGeneratePdf,
-    config.category,
-    config.length,
-    config.bpm,
-    positionIcons,
-    theme,
-    segmentNames,
-    skills,
-    notes,
-  ]);
+  // ----- THIS ENTIRE useEffect(..., [shouldGeneratePdf, ...]) IS REMOVED -----
 
   // Handle category changes - auto-save/load category states
   useEffect(() => {
@@ -2151,9 +1987,179 @@ export const RoutineBuilder = () => {
     });
   };
 
-  const handleExportPDF = () => {
+  // ----- MODIFIED FUNCTION -----
+  const handleExportPDF = async () => {
+    if (isGeneratingPdf) return; // Prevent double-clicks
     setIsGeneratingPdf(true);
-    setShouldGeneratePdf(true);
+
+    try {
+      // --- PDF Generation Logic ---
+      const jsPDF = (await import("jspdf")).default;
+      const html2canvas = (await import("html2canvas")).default;
+      const { createRoot } = (await import("react-dom/client"));
+
+      // --- Progress Bar Setup ---
+      const isTeamCategory =
+        config.category === "team-16" || config.category === "team-24";
+      const uniqueConfigurations = isTeamCategory
+        ? getUniquePositionConfigurations()
+        : [];
+      // 1 (CountSheet) + N (PosSheets) + 1 (Assemble)
+      const totalSteps =
+        1 + (isTeamCategory ? uniqueConfigurations.length : 0) + 1;
+
+      window.showPdfProgress(totalSteps);
+      let currentStep = 0;
+
+      // --- Theme & PDF Setup ---
+      const isDarkMode = theme === "dark";
+      const backgroundColor = isDarkMode ? "#020817" : "#ffffff";
+
+      // Convert hex to RGB for jsPDF
+      const hexToRgb = (hex: string) => {
+        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        return result
+          ? {
+              r: parseInt(result[1], 16),
+              g: parseInt(result[2], 16),
+              b: parseInt(result[3], 16),
+            }
+          : { r: 255, g: 255, b: 255 };
+      };
+      const bgRgb = hexToRgb(backgroundColor);
+
+      // Use portrait A4 (210mm x 297mm)
+      const pdf = new jsPDF("p", "mm", "a4");
+      const pageWidth = 210;
+      const pageHeight = 297;
+      const margin = 2; // Minimal margin
+      const availableWidth = pageWidth - margin * 2;
+      const availableHeight = pageHeight - margin * 2;
+      
+      // --- Step 1: Capture Count Sheet ---
+      currentStep++;
+      window.updatePdfProgress(currentStep, `Capturing Count Sheet...`);
+      await new Promise(resolve => setTimeout(resolve, 50)); // Allow UI to update
+
+      const countSheetElement = document.getElementById(
+        "count-sheet-content-wrapper",
+      );
+      if (countSheetElement) {
+        const canvas = await html2canvas(countSheetElement, {
+          scale: 2,
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor,
+          height: countSheetElement.scrollHeight,
+          width: countSheetElement.scrollWidth,
+        });
+
+        const imgData = canvas.toDataURL("image/png");
+        const scaleX = availableWidth / canvas.width;
+        const scaleY = availableHeight / canvas.height;
+        const scale = Math.min(scaleX, scaleY);
+        const imgWidth = canvas.width * scale;
+        const imgHeight = canvas.height * scale;
+
+        pdf.setFillColor(bgRgb.r, bgRgb.g, bgRgb.b);
+        pdf.rect(0, 0, pageWidth, pageHeight, "F");
+        const x = (pageWidth - imgWidth) / 2;
+        const y = (pageHeight - imgHeight) / 2;
+        pdf.addImage(imgData, "PNG", x, y, imgWidth, imgHeight);
+      }
+
+      // --- Step 2: Capture Position Sheets ---
+      if (isTeamCategory) {
+        // Create a hidden div to render into
+        const renderDiv = document.createElement("div");
+        renderDiv.id = "pdf-render-target";
+        document.body.appendChild(renderDiv);
+
+        // Use createRoot to render your hidden component
+        const root = createRoot(renderDiv);
+        root.render(
+          <PdfRenderer
+            configurations={uniqueConfigurations}
+            segmentNames={segmentNames}
+            zoomLevel={1.0} // Render at 100% zoom
+          />,
+        );
+
+        // Wait for React to render
+        await new Promise((resolve) => setTimeout(resolve, 50));
+
+        // Find all rendered page wrappers
+        const positionSheetElements = document.querySelectorAll(
+          ".pdf-page-class",
+        );
+
+        for (let i = 0; i < positionSheetElements.length; i++) {
+          currentStep++;
+          window.updatePdfProgress(currentStep, `Capturing Position Sheet ${i + 1} of ${uniqueConfigurations.length}...`);
+          await new Promise(resolve => setTimeout(resolve, 50)); // Allow UI to update
+
+          const element = positionSheetElements[i];
+          const contentToCapture = element.querySelector(
+            "#position-sheet-content-wrapper",
+          ) as HTMLElement;
+          
+          if (contentToCapture) {
+             const canvas = await html2canvas(contentToCapture, {
+              scale: 1, 
+              useCORS: true,
+              allowTaint: true,
+              backgroundColor,
+              height: contentToCapture.scrollHeight,
+              width: contentToCapture.scrollWidth,
+            });
+
+            pdf.addPage();
+            pdf.setFillColor(bgRgb.r, bgRgb.g, bgRgb.b);
+            pdf.rect(0, 0, pageWidth, pageHeight, "F");
+
+            const imgData = canvas.toDataURL("image/png");
+            const scaleX = availableWidth / canvas.width;
+            const scaleY = availableHeight / canvas.height;
+            const scale = Math.min(scaleX, scaleY);
+            const imgWidth = canvas.width * scale;
+            const imgHeight = canvas.height * scale;
+            const x = (pageWidth - imgWidth) / 2;
+            const y = (pageHeight - imgHeight) / 2;
+
+            pdf.addImage(imgData, "PNG", x, y, imgWidth, imgHeight);
+          }
+        }
+
+        // Cleanup
+        root.unmount();
+        if (document.body.contains(renderDiv)) {
+          document.body.removeChild(renderDiv);
+        }
+      }
+
+      // --- Step 3: Assemble & Show Preview ---
+      currentStep++;
+      window.updatePdfProgress(currentStep, "Assembling PDF...");
+      await new Promise(resolve => setTimeout(resolve, 50)); // Allow UI to update
+
+      const pdfArrayBuffer = pdf.output("arraybuffer");
+      const pdfBlob = new Blob([pdfArrayBuffer], {
+        type: "application/pdf; charset=utf-8",
+      });
+
+      setPdfBlob(pdfBlob);
+      setShowPdfPreview(true); // Show React modal
+      
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      window.hidePdfProgress(); // Hide progress on error
+    } finally {
+      // Hide progress bar *after* React modal is ready
+      setTimeout(() => {
+          setIsGeneratingPdf(false);
+          window.hidePdfProgress();
+      }, 300); // Small delay to let modal animate in
+    }
   };
 
   const handleReset = () => {
