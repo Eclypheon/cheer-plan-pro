@@ -499,7 +499,7 @@ const handleClick = (e: React.MouseEvent) => {
 
     return (
       <td
-        className="border border-border bg-card hover:bg-accent/50 h-10 p-1 text-xs cursor-text line-clamp-2 break-words max-w-[500px] min-w-[500px]"
+        className="border border-border bg-card hover:bg-accent/50 h-10 p-1 text-xs cursor-text line-clamp-2 break-words min-w-[300px]"
         onClick={handleClick}
       >
         {isEditing ? (
@@ -573,14 +573,14 @@ const handleClick = (e: React.MouseEvent) => {
       </div>
 
       <div className="flex-1 overflow-auto relative" id="count-sheet-container">
-        <div ref={containerRef} id="count-sheet-content-wrapper" className="flex min-w-max relative">
+        <div ref={containerRef} id="count-sheet-content-wrapper" className={`${!isPdfRender ? 'flex min-w-max relative' : 'flex w-1500px relative'}`}>
           {/* Count Sheet Table */}
           <div
-  style={!isPdfRender ? { width: `${countSheetWidth}%`, minWidth: '690px' } : { }}
+  style={!isPdfRender ? { width: `${countSheetWidth}%`, minWidth: '690px' } : { width: '1000px' }}
   className="flex-shrink-0"
 >
             <table className="border-collapse relative z-10 w-full" id="count-sheet-table">
-              <thead className="sticky top-0 bg-card z-20">
+              <thead className="sticky top-0 bg-card z-[4000]">
                 <tr>
                   <th className="border border-border bg-muted font-bold text-center px-2 py-1 text-xs">#</th>
                   {Array.from({ length: 8 }, (_, i) => (
@@ -611,14 +611,14 @@ const handleClick = (e: React.MouseEvent) => {
 
           {/* Notes Table */}
           <div
-  style={!isPdfRender ? { width: `${100 - countSheetWidth}%` } : { minWidth: '500px' }}
+  style={!isPdfRender ? { width: `${100 - countSheetWidth}%` } : { width: `${100 - countSheetWidth}%` }}
   className="flex-shrink-0"
 >
             <table className={cn(
               "border-collapse relative z-10",
               isPdfRender ? "max-w-xl" : "w-full" // <-- EDIT THIS "max-w-xl" (e.g., max-w-lg, max-w-2xl) FOR THE PDF
             )}>
-              <thead className="sticky top-0 bg-card z-20">
+              <thead className="sticky top-0 bg-card z-[4000]">
                 <tr>
                   <th className="border border-border bg-muted font-bold text-center px-2 py-1 text-xs">Notes</th>
                 </tr>
