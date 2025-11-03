@@ -499,7 +499,7 @@ const handleClick = (e: React.MouseEvent) => {
 
     return (
       <td
-        className="border border-border bg-card hover:bg-accent/50 h-10 p-1 text-xs cursor-text line-clamp-2 break-words min-w-[300px]"
+        className="border border-border bg-card hover:bg-accent/50 h-10 p-1 text-xs cursor-text line-clamp-2 break-words"
         onClick={handleClick}
       >
         {isEditing ? (
