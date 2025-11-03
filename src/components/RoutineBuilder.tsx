@@ -48,6 +48,7 @@ export const RoutineBuilder = () => {
   const [dragOffset, setDragOffset] = useState<{ x: number; y: number } | null>(null);
   const [draggedIconId, setDraggedIconId] = useState<string | null>(null);
   const [currentZoomLevel, setCurrentZoomLevel] = useState<number>(0.55);
+  const [pdfZoomLevel, setPdfZoomLevel] = useState<number | undefined>(undefined);
   const [overCellId, setOverCellId] = useState<string | null>(null);
 
   // Handle zoom level changes from PositionSheet
@@ -264,6 +265,12 @@ export const RoutineBuilder = () => {
           if (config.category === "team-16" || config.category === "team-24") {
             const uniqueConfigurations = getUniquePositionConfigurations();
 
+            // Store current zoom level and temporarily set to 100% for PDF capture
+            const originalZoomLevel = currentZoomLevel;
+            setPdfZoomLevel(1.0);
+            // Small delay to ensure zoom level is set before captures happen
+            await new Promise(resolve => setTimeout(resolve, 100));
+
             for (const config of uniqueConfigurations) {
               pdf.addPage();
 
@@ -271,14 +278,11 @@ export const RoutineBuilder = () => {
               setPdfIcons(config.icons);
               setPdfSegmentName(segmentNames[config.lineIndex] || ""); // <-- SET SEGMENT NAME
 
-              // Wait for React to update the DOM
-              await new Promise(resolve => setTimeout(resolve, 100));
-
               const positionSheetElement = document.getElementById("position-sheet-content-wrapper");
               if (positionSheetElement) {
- 
+
                 const canvas = await html2canvas(positionSheetElement, {
-                  scale: 2, // Higher quality
+                  scale: 1, // Higher quality
                   useCORS: true,
                   allowTaint: true,
                   backgroundColor,
@@ -312,9 +316,10 @@ export const RoutineBuilder = () => {
               }
             }
 
-            // Clear the pdfIcons to restore normal operation
+            // Clear the pdfIcons and restore original zoom level
             setPdfIcons(undefined);
             setPdfSegmentName(undefined); // <-- RESET SEGMENT NAME
+            setPdfZoomLevel(undefined); // Restore original zoom level
           }
 
           // Generate blob for preview - use arraybuffer first then convert to blob
@@ -2041,6 +2046,7 @@ const handleDragEnd = (event: DragEndEvent) => {
                     }}
                     pdfIcons={pdfIcons}
                     pdfSegmentName={pdfSegmentName} // ----- ADD THIS PROP -----
+                    zoomLevel={pdfZoomLevel}
                   />
                 </ResizablePanel>
               </ResizablePanelGroup>

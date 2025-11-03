@@ -101,14 +101,14 @@ export const SkillsPanel = ({ skills, onAddCustomSkill, onDeleteSkill, onUpdateS
               {getSkillsByCategory(category).map((skill) => (
                 <div key={skill.id} className="relative group">
                   <SkillCard skill={skill} onUpdateCounts={onUpdateSkillCounts} />
-                  {skill.id.startsWith("custom-") && (
+                  {
                     <button
                       onClick={() => onDeleteSkill(skill.id)}
                       className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-destructive text-destructive-foreground p-1 rounded"
                     >
                       <Trash2 className="h-3 w-3" />
                     </button>
-                  )}
+                  }
                 </div>
               ))}
               

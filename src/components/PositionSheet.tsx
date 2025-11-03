@@ -40,6 +40,7 @@ interface PositionSheetProps {
   onUpdateSegmentName?: (name: string) => void;
   pdfIcons?: PositionIcon[]; // Override icons for PDF generation
   pdfSegmentName?: string; // ----- ADD THIS LINE -----
+  zoomLevel?: number; // Override zoom level for PDF generation
 }
 
 export const PositionSheet = ({
@@ -72,6 +73,7 @@ export const PositionSheet = ({
   onUpdateSegmentName,
   pdfIcons,
   pdfSegmentName, // ----- ADD THIS LINE -----
+  zoomLevel: propZoomLevel,
 }: PositionSheetProps) => {
   const [selectedIconId, setSelectedIconId] = useState<string | null>(null);
   const [nameDialogOpen, setNameDialogOpen] = useState(false);
@@ -126,6 +128,9 @@ export const PositionSheet = ({
     );
   }, []);
 
+  // Use prop zoom level if provided, otherwise use internal state
+  const effectiveZoomLevel = propZoomLevel ?? zoomLevel;
+
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     if (e.touches.length === 2) {
       e.preventDefault();
@@ -168,8 +173,8 @@ export const PositionSheet = ({
     const relativeY = clientY - centerY;
 
     // Adjust for zoom scaling - divide to get the zoomed-in coordinate
-    const zoomedX = relativeX / zoomLevel;
-    const zoomedY = relativeY / zoomLevel;
+    const zoomedX = relativeX / effectiveZoomLevel;
+    const zoomedY = relativeY / effectiveZoomLevel;
 
     // Convert back to absolute position within the 800x600 area
     const x = zoomedX + 400; // 800/2 = 400 (center offset)
@@ -180,7 +185,7 @@ export const PositionSheet = ({
       x: Math.max(0, Math.min(800, x)),
       y: Math.max(0, Math.min(600, y))
     };
-  }, [zoomLevel]);
+  }, [effectiveZoomLevel]);
 
   const handleSelectionMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement;
@@ -422,7 +427,7 @@ return (
           <div
             className="flex justify-between items-center mb-1" // Use justify-between
             style={{
-              width: `${800 * zoomLevel}px`,
+              width: `${800 * effectiveZoomLevel}px`,
               flexShrink: 0,
               transition: 'width 0.1s ease-out'
             }}
@@ -435,26 +440,30 @@ return (
               readOnly={isPdfRender}
               className={cn(
                 "h-8 border-none bg-transparent p-0 shadow-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-0",
-                currentSegmentName ? "text-2xl font-medium text-foreground" : "text-lg",
-                "placeholder:text-lg placeholder:font-medium placeholder:text-muted-foreground",
+                currentSegmentName ? "font-medium text-foreground" : "",
+                "placeholder:font-medium placeholder:text-muted-foreground",
                 isPdfRender ? "focus-visible:ring-0" : "" // Hide focus ring during PDF render
               )}
-              style={{ width: '33.33%' }}
+              style={{
+                width: '33.33%',
+                fontSize: `${(currentSegmentName ? 18 : 18) * effectiveZoomLevel}px`
+              }}
             />
 
             {/* 2. Audience (Centered) */}
             <div
-              className="text-2xl font-medium text-foreground"
+              className="font-medium text-foreground"
               style={{
                 width: '33.33%',
                 textAlign: 'center',
+                fontSize: `${32 * effectiveZoomLevel}px`
               }}
             >
               Audience
             </div>
 
             {/* 3. Spacer (Top Right) */}
-            <div style={{ width: '33.33%' }} /> 
+            <div style={{ width: '33.33%' }} />
           </div>
           {/* ----- END OF MODIFIED CODE ----- */}
 
@@ -465,8 +474,8 @@ return (
           */}
           <div
             style={{
-              width: `${800 * zoomLevel}px`,
-              height: `${600 * zoomLevel}px`,
+              width: `${800 * effectiveZoomLevel}px`,
+              height: `${600 * effectiveZoomLevel}px`,
               flexShrink: 0,
               transition: 'width 0.1s ease-out, height 0.1s ease-out'
             }}
@@ -484,7 +493,7 @@ return (
                 width: '800px',
                 height: '600px',
                 flexShrink: 0,
-                transform: `scale(${zoomLevel})`,
+                transform: `scale(${effectiveZoomLevel})`,
                 transformOrigin: 'top left', // Scale from the top-left corner
                 transition: 'transform 0.1s ease-out'
               }}

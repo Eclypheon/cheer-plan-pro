@@ -57,19 +57,20 @@ export const useSkills = () => {
   };
 
   const importFromCSV = (csvText: string) => {
-    // Simple CSV parser: expects headers: id,name,category,level,counts,description
+    // Simple CSV parser: expects headers: name,category,level,counts,description
     const lines = csvText.trim().split("\n");
-    const headers = lines[0].split(",");
     
+    // Skip header row (lines[0])
     const newSkills: Skill[] = lines.slice(1).map((line) => {
       const values = line.split(",");
       return {
-        id: values[0],
-        name: values[1],
-        category: values[2] as Skill["category"],
-        level: values[3] as Skill["level"],
-        counts: parseInt(values[4]),
-        description: values[5] || "",
+        // Generate a new unique ID on import
+        id: `custom-${Date.now()}-${Math.random()}`,
+        name: values[0],
+        category: values[1] as Skill["category"],
+        level: values[2] as Skill["level"],
+        counts: parseInt(values[3]),
+        description: values[4] || "",
       };
     });
 
@@ -77,9 +78,10 @@ export const useSkills = () => {
   };
 
   const exportToCSV = () => {
-    const headers = ["id", "name", "category", "level", "counts", "description"];
+    // "id" is no longer included in the export
+    const headers = ["name", "category", "level", "counts", "description"];
     const rows = skills.map((skill) => [
-      skill.id,
+      // skill.id is no longer exported
       skill.name,
       skill.category,
       skill.level,
