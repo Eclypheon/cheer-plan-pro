@@ -435,19 +435,23 @@ return (
               readOnly={isPdfRender}
               className={cn(
                 "h-8 border-none bg-transparent p-0 shadow-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-0",
-                currentSegmentName ? "text-2xl font-medium text-foreground" : "text-lg",
-                "placeholder:text-lg placeholder:font-medium placeholder:text-muted-foreground",
+                currentSegmentName ? "font-medium text-foreground" : "",
+                "placeholder:font-medium placeholder:text-muted-foreground",
                 isPdfRender ? "focus-visible:ring-0" : "" // Hide focus ring during PDF render
               )}
-              style={{ width: '33.33%' }}
+              style={{
+                width: '33.33%',
+                fontSize: `${(currentSegmentName ? 18 : 18) * zoomLevel}px`
+              }}
             />
 
             {/* 2. Audience (Centered) */}
             <div
-              className="text-2xl font-medium text-foreground"
+              className="font-medium text-foreground"
               style={{
                 width: '33.33%',
                 textAlign: 'center',
+                fontSize: `${32 * zoomLevel}px`
               }}
             >
               Audience
