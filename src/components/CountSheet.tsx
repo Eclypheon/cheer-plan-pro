@@ -573,7 +573,7 @@ const handleClick = (e: React.MouseEvent) => {
       </div>
 
       <div className="flex-1 overflow-auto relative" id="count-sheet-container">
-        <div ref={containerRef} id="count-sheet-content-wrapper" className={`${!isPdfRender ? 'flex min-w-max relative' : 'flex w-1500px relative'}`}>
+        <div ref={containerRef} id="count-sheet-content-wrapper" className={`${!isPdfRender ? 'flex min-w-max relative' : 'flex w-1576px relative'}`}>
           {/* Count Sheet Table */}
           <div
   style={!isPdfRender ? { width: `${countSheetWidth}%`, minWidth: '690px' } : { width: '1000px' }}
@@ -611,12 +611,12 @@ const handleClick = (e: React.MouseEvent) => {
 
           {/* Notes Table */}
           <div
-  style={!isPdfRender ? { width: `${100 - countSheetWidth}%` } : { width: `${100 - countSheetWidth}%` }}
+  style={!isPdfRender ? { width: `${100 - countSheetWidth}%` } : { width: `300px` }}
   className="flex-shrink-0"
 >
             <table className={cn(
               "border-collapse relative z-10",
-              isPdfRender ? "max-w-xl" : "w-full" // <-- EDIT THIS "max-w-xl" (e.g., max-w-lg, max-w-2xl) FOR THE PDF
+              isPdfRender ? "w-full" : "w-full" // <-- EDIT THIS "max-w-xl" (e.g., max-w-lg, max-w-2xl) FOR THE PDF
             )}>
               <thead className="sticky top-0 bg-card z-[4000]">
                 <tr>
