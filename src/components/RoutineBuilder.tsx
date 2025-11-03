@@ -1,7 +1,28 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-  import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, DragMoveEvent, CollisionDetection, rectIntersection, closestCenter, DragOverEvent, useSensor, useSensors, PointerSensor } from "@dnd-kit/core";
+import { createRoot } from "react-dom/client"; // <-- IMPORT ADDED
+import {
+  DndContext,
+  DragEndEvent,
+  DragOverlay,
+  DragStartEvent,
+  DragMoveEvent,
+  CollisionDetection,
+  rectIntersection,
+  closestCenter,
+  DragOverEvent,
+  useSensor,
+  useSensors,
+  PointerSensor,
+} from "@dnd-kit/core";
 import { snapCenterToCursor } from "@dnd-kit/modifiers";
-import type { PlacedSkill, RoutineConfig, Skill, PositionIcon, CategoryStateData, SaveStateData } from "@/types/routine";
+import type {
+  PlacedSkill,
+  RoutineConfig,
+  Skill,
+  PositionIcon,
+  CategoryStateData,
+  SaveStateData,
+} from "@/types/routine";
 import { useSkills } from "@/hooks/useSkills";
 import { SkillsPanel } from "./SkillsPanel";
 import { CountSheet } from "./CountSheet";
@@ -10,20 +31,45 @@ import { SkillCard } from "./SkillCard";
 import { TrashDropZone } from "./TrashDropZone";
 import { ThemeToggle } from "./ThemeToggle";
 import AboutModal from "./AboutModal";
+import { PdfRenderer } from "./PdfRenderer"; // <-- IMPORT ADDED
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Download, Info, Library, RotateCcw, Settings as SettingsIcon, Edit } from "lucide-react";
+import {
+  Download,
+  Info,
+  Library,
+  RotateCcw,
+  Settings as SettingsIcon,
+  Edit,
+} from "lucide-react";
 import { Link } from "react-router-dom";
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@/components/ui/resizable";
 import { lineBreak } from "html2canvas/dist/types/css/property-descriptors/line-break";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { useTheme } from "next-themes";
 
 export const RoutineBuilder = () => {
   const { theme } = useTheme();
-  const { skills, exportToCSV, addCustomSkill, deleteSkill, updateSkillCounts } = useSkills();
+  const { skills, exportToCSV, addCustomSkill, deleteSkill, updateSkillCounts } =
+    useSkills();
   const [config, setConfig] = useState<RoutineConfig>({
     length: 90,
     category: "partner-stunts",
@@ -36,19 +82,28 @@ export const RoutineBuilder = () => {
   const [notes, setNotes] = useState<Record<number, string>>({});
   const [segmentNames, setSegmentNames] = useState<Record<number, string>>({});
   const [selectedLine, setSelectedLine] = useState<number | null>(null);
-  const [lineHistories, setLineHistories] = useState<{ [saveStateSlot: number]: { [category: string]: { [lineIndex: number]: { history: PositionIcon[][], index: number } } } }>({});
+  const [lineHistories, setLineHistories] = useState<{
+    [saveStateSlot: number]: {
+      [category: string]: {
+        [lineIndex: number]: { history: PositionIcon[][]; index: number };
+      };
+    };
+  }>({});
   const [draggedSkill, setDraggedSkill] = useState<Skill | null>(null);
   const [isDraggingPlacedSkill, setIsDraggingPlacedSkill] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
-  const [draggedPlacedSkillId, setDraggedPlacedSkillId] = useState<string | null>(null);
+  const [draggedPlacedSkillId, setDraggedPlacedSkillId] = useState<string | null>(
+    null,
+  );
   const [selectedSkillId, setSelectedSkillId] = useState<string | null>(null);
   const [showGrid, setShowGrid] = useState(false);
   const [autoFollow, setAutoFollow] = useState(true);
   const [isDraggingIcon, setIsDraggingIcon] = useState(false);
-  const [dragOffset, setDragOffset] = useState<{ x: number; y: number } | null>(null);
+  const [dragOffset, setDragOffset] = useState<{ x: number; y: number } | null>(
+    null,
+  );
   const [draggedIconId, setDraggedIconId] = useState<string | null>(null);
   const [currentZoomLevel, setCurrentZoomLevel] = useState<number>(0.55);
-  const [pdfZoomLevel, setPdfZoomLevel] = useState<number | undefined>(undefined);
   const [overCellId, setOverCellId] = useState<string | null>(null);
 
   // Handle zoom level changes from PositionSheet
@@ -57,19 +112,20 @@ export const RoutineBuilder = () => {
   }, []);
   const [hasLoadedState, setHasLoadedState] = useState(false);
   const initialLoadedCategoryRef = useRef<string | null>(null);
-  const [currentSaveState, setCurrentSaveState] = useState<SaveStateData | null>(null);
-  const [loadedSaveStateSlot, setLoadedSaveStateSlot] = useState<null | 1 | 2 | 3>(null);
+  const [currentSaveState, setCurrentSaveState] =
+    useState<SaveStateData | null>(null);
+  const [loadedSaveStateSlot, setLoadedSaveStateSlot] = useState<
+    null | 1 | 2 | 3
+  >(null);
   const [showPdfPreview, setShowPdfPreview] = useState(false);
   const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
   const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [shouldGeneratePdf, setShouldGeneratePdf] = useState(false);
-  const [pdfIcons, setPdfIcons] = useState<PositionIcon[] | undefined>(undefined);
-  const [pdfSegmentName, setPdfSegmentName] = useState<string | undefined>(undefined); // ----- ADD THIS LINE -----
   const [saveNames, setSaveNames] = useState<Record<1 | 2 | 3, string>>({
     1: "Save 1",
     2: "Save 2",
-    3: "Save 3"
+    3: "Save 3",
   });
   const [showRenameDialog, setShowRenameDialog] = useState(false);
   const [renameInput, setRenameInput] = useState("");
@@ -78,38 +134,40 @@ export const RoutineBuilder = () => {
   // Load keyboard settings
   const [keyboardSettings] = useState(() => {
     const saved = localStorage.getItem("keyboardSettings");
-    return saved ? JSON.parse(saved) : {
-      nextLine: "ArrowDown",
-      prevLine: "ArrowUp",
-      undo: "z",
-      redo: "y",
-      toggleAutoFollow: "f",
-      deleteIcon: "Delete",
-      moveLeft: "ArrowLeft",
-      moveRight: "ArrowRight",
-      moveUp: "ArrowUp",
-      moveDown: "ArrowDown",
-      altMoveLeft: "a",
-      altMoveRight: "d",
-      altMoveUp: "w",
-      altMoveDown: "s",
-    };
+    return saved
+      ? JSON.parse(saved)
+      : {
+          nextLine: "ArrowDown",
+          prevLine: "ArrowUp",
+          undo: "z",
+          redo: "y",
+          toggleAutoFollow: "f",
+          deleteIcon: "Delete",
+          moveLeft: "ArrowLeft",
+          moveRight: "ArrowRight",
+          moveUp: "ArrowUp",
+          moveDown: "ArrowDown",
+          altMoveLeft: "a",
+          altMoveRight: "d",
+          altMoveUp: "w",
+          altMoveDown: "s",
+        };
   });
 
   // Load saved state on component mount - auto-load State 1 if available
   useEffect(() => {
     // Load save names
-    const savedNames = localStorage.getItem('save-names');
+    const savedNames = localStorage.getItem("save-names");
     if (savedNames) {
       try {
         const names = JSON.parse(savedNames);
-        setSaveNames(prev => ({ ...prev, ...names }));
+        setSaveNames((prev) => ({ ...prev, ...names }));
       } catch (e) {
-        console.error('Failed to load save names:', e);
+        console.error("Failed to load save names:", e);
       }
     }
 
-    const state1Key = 'save-state-1';
+    const state1Key = "save-state-1";
     const savedState1 = localStorage.getItem(state1Key);
     if (savedState1) {
       try {
@@ -124,7 +182,7 @@ export const RoutineBuilder = () => {
         // Store the initially loaded category so we know when user manually changes it
         initialLoadedCategoryRef.current = data.config.category;
       } catch (e) {
-        console.error('Failed to load State 1:', e);
+        console.error("Failed to load State 1:", e);
       }
     } else {
       // No State 1 exists - start fresh but default to State 1
@@ -160,22 +218,27 @@ export const RoutineBuilder = () => {
 
   // Helper function to get unique position sheet configurations
   // ----- MODIFY THIS FUNCTION -----
-  const getUniquePositionConfigurations = (): { icons: PositionIcon[], lineIndex: number }[] => {
-    const totalLines = Math.ceil((config.length * config.bpm) / 60 / 8);
-    const configurations: { icons: PositionIcon[], lineIndex: number }[] = [];
+  const getUniquePositionConfigurations = (): {
+    icons: PositionIcon[];
+    lineIndex: number;
+  }[] => {
+    const totalLines = Math.ceil(((config.length * config.bpm) / 60 / 8));
+    const configurations: { icons: PositionIcon[]; lineIndex: number }[] = [];
     const seenConfigurations = new Set<string>();
 
     for (let lineIndex = 0; lineIndex < totalLines; lineIndex++) {
-      const lineIcons = positionIcons.filter(icon => icon.lineIndex === lineIndex);
+      const lineIcons = positionIcons.filter(
+        (icon) => icon.lineIndex === lineIndex,
+      );
 
       // Create a normalized representation of the configuration
       // Sort icons by position and create a hash string
       const normalizedIcons = lineIcons
-        .map(icon => ({
+        .map((icon) => ({
           type: icon.type,
           x: icon.x,
           y: icon.y,
-          name: icon.name || ''
+          name: icon.name || "",
         }))
         .sort((a, b) => {
           if (a.y !== b.y) return a.y - b.y;
@@ -196,26 +259,31 @@ export const RoutineBuilder = () => {
   };
 
   // Generate PDF when shouldGeneratePdf flag is set
-  // ----- MODIFY THIS FUNCTION -----
   useEffect(() => {
     if (shouldGeneratePdf) {
       const generatePDF = async () => {
+        setIsGeneratingPdf(true);
         try {
           const jsPDF = (await import("jspdf")).default;
           const html2canvas = (await import("html2canvas")).default;
+          const { createRoot } = (await import("react-dom/client"));
 
           // Determine background color based on theme
           const isDarkMode = theme === "dark";
-          const backgroundColor = isDarkMode ? "#020817" : "#ffffff"; // Dark mode: very dark blue-gray, Light mode: white
+          const backgroundColor = isDarkMode ? "#020817" : "#ffffff";
 
           // Convert hex to RGB for jsPDF
           const hexToRgb = (hex: string) => {
-            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-            return result ? {
-              r: parseInt(result[1], 16),
-              g: parseInt(result[2], 16),
-              b: parseInt(result[3], 16)
-            } : { r: 255, g: 255, b: 255 };
+            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(
+              hex,
+            );
+            return result
+              ? {
+                  r: parseInt(result[1], 16),
+                  g: parseInt(result[2], 16),
+                  b: parseInt(result[3], 16),
+                }
+              : { r: 255, g: 255, b: 255 };
           };
           const bgRgb = hexToRgb(backgroundColor);
 
@@ -223,124 +291,149 @@ export const RoutineBuilder = () => {
           const pdf = new jsPDF("p", "mm", "a4");
           const pageWidth = 210;
           const pageHeight = 297;
-          const margin = 2; // Minimal margin for maximum content fit
+          const margin = 2; // Minimal margin
 
-          const countSheetElement = document.getElementById("count-sheet-content-wrapper");
+          // 1. Capture Count Sheet
+          const countSheetElement = document.getElementById(
+            "count-sheet-content-wrapper",
+          );
           if (countSheetElement) {
-            
             const canvas = await html2canvas(countSheetElement, {
-              scale: 2, // Higher quality
+              scale: 2,
               useCORS: true,
               allowTaint: true,
               backgroundColor,
-              // Capture the full scrollable area
               height: countSheetElement.scrollHeight,
               width: countSheetElement.scrollWidth,
             });
 
             const imgData = canvas.toDataURL("image/png");
-
-            // Calculate scaling to fit within portrait page
-            const availableWidth = pageWidth - (margin * 2);
-            const availableHeight = pageHeight - (margin * 2);
-
+            const availableWidth = pageWidth - margin * 2;
+            const availableHeight = pageHeight - margin * 2;
             const scaleX = availableWidth / canvas.width;
             const scaleY = availableHeight / canvas.height;
             const scale = Math.min(scaleX, scaleY);
-
             const imgWidth = canvas.width * scale;
             const imgHeight = canvas.height * scale;
 
-            // Fill the entire page with the background color
             pdf.setFillColor(bgRgb.r, bgRgb.g, bgRgb.b);
-            pdf.rect(0, 0, pageWidth, pageHeight, 'F');
-
-            // Center the image on the page
+            pdf.rect(0, 0, pageWidth, pageHeight, "F");
             const x = (pageWidth - imgWidth) / 2;
             const y = (pageHeight - imgHeight) / 2;
-
             pdf.addImage(imgData, "PNG", x, y, imgWidth, imgHeight);
           }
 
+          // 2. Prepare to render Position Sheets
           if (config.category === "team-16" || config.category === "team-24") {
             const uniqueConfigurations = getUniquePositionConfigurations();
 
-            // Store current zoom level and temporarily set to 100% for PDF capture
-            const originalZoomLevel = currentZoomLevel;
-            setPdfZoomLevel(1.0);
-            // Small delay to ensure zoom level is set before captures happen
-            await new Promise(resolve => setTimeout(resolve, 100));
+            // Create a hidden div to render into
+            const renderDiv = document.createElement("div");
+            renderDiv.id = "pdf-render-target";
+            document.body.appendChild(renderDiv);
 
-            for (const config of uniqueConfigurations) {
-              pdf.addPage();
+            // Use createRoot to render your hidden component
+            const root = createRoot(renderDiv);
+            root.render(
+              <PdfRenderer
+                configurations={uniqueConfigurations}
+                segmentNames={segmentNames}
+                zoomLevel={1.0} // Render at 100% zoom
+              />,
+            );
 
-              // Temporarily set the pdfIcons to show this configuration
-              setPdfIcons(config.icons);
-              setPdfSegmentName(segmentNames[config.lineIndex] || ""); // <-- SET SEGMENT NAME
+            // Wait for React to render
+            await new Promise((resolve) => setTimeout(resolve, 0));
 
-              const positionSheetElement = document.getElementById("position-sheet-content-wrapper");
-              if (positionSheetElement) {
+            // 3. Find all rendered page wrappers
+            const positionSheetElements = document.querySelectorAll(
+              ".pdf-page-class",
+            );
 
-                const canvas = await html2canvas(positionSheetElement, {
-                  scale: 1, // Higher quality
+            // 4. Capture the *content* inside each wrapper in parallel
+            const canvasPromises = Array.from(positionSheetElements).map(
+              (element) => {
+                // --- THIS IS THE KEY CHANGE ---
+                // Find the correct content wrapper *inside* the rendered component
+                const contentToCapture = element.querySelector(
+                  "#position-sheet-content-wrapper", //
+                ) as HTMLElement;
+
+                if (!contentToCapture) {
+                  return Promise.reject(
+                    "Could not find #position-sheet-content-wrapper for PDF render",
+                  );
+                }
+
+                return html2canvas(contentToCapture, {
+                  scale: 1, // Use 1 for better performance, 2 for higher res
                   useCORS: true,
                   allowTaint: true,
                   backgroundColor,
-                  // Capture the full scrollable area
-                  height: positionSheetElement.scrollHeight,
-                  width: positionSheetElement.scrollWidth,
+                  // Let html2canvas determine height and width from the element
+                  height: contentToCapture.scrollHeight,
+                  width: contentToCapture.scrollWidth,
                 });
+              },
+            );
 
-                const imgData = canvas.toDataURL("image/png");
+            const canvases = await Promise.all(canvasPromises);
 
-                // Calculate scaling to fit within portrait page
-                const availableWidth = pageWidth - (margin * 2);
-                const availableHeight = pageHeight - (margin * 2);
+            // 5. Add all captured canvases to the PDF
+            const availableWidth = pageWidth - margin * 2;
+            const availableHeight = pageHeight - margin * 2;
 
-                const scaleX = availableWidth / canvas.width;
-                const scaleY = availableHeight / canvas.height;
-                const scale = Math.min(scaleX, scaleY);
+            for (const canvas of canvases) {
+              pdf.addPage();
+              pdf.setFillColor(bgRgb.r, bgRgb.g, bgRgb.b);
+              pdf.rect(0, 0, pageWidth, pageHeight, "F");
 
-                const imgWidth = canvas.width * scale;
-                const imgHeight = canvas.height * scale;
+              const imgData = canvas.toDataURL("image/png");
+              const scaleX = availableWidth / canvas.width;
+              const scaleY = availableHeight / canvas.height;
+              const scale = Math.min(scaleX, scaleY);
+              const imgWidth = canvas.width * scale;
+              const imgHeight = canvas.height * scale;
+              const x = (pageWidth - imgWidth) / 2;
+              const y = (pageHeight - imgHeight) / 2;
 
-                // Fill the entire page with the background color
-                pdf.setFillColor(bgRgb.r, bgRgb.g, bgRgb.b);
-                pdf.rect(0, 0, pageWidth, pageHeight, 'F');
-
-                // Center the image on the page
-                const x = (pageWidth - imgWidth) / 2;
-                const y = (pageHeight - imgHeight) / 2;
-
-                pdf.addImage(imgData, "PNG", x, y, imgWidth, imgHeight);
-              }
+              pdf.addImage(imgData, "PNG", x, y, imgWidth, imgHeight);
             }
 
-            // Clear the pdfIcons and restore original zoom level
-            setPdfIcons(undefined);
-            setPdfSegmentName(undefined); // <-- RESET SEGMENT NAME
-            setPdfZoomLevel(undefined); // Restore original zoom level
+            // 6. Cleanup
+            root.unmount();
+            document.body.removeChild(renderDiv);
           }
 
-          // Generate blob for preview - use arraybuffer first then convert to blob
-          const pdfArrayBuffer = pdf.output('arraybuffer');
-          const pdfBlob = new Blob([pdfArrayBuffer], { type: 'application/pdf; charset=utf-8' });
+          // Generate blob for preview
+          const pdfArrayBuffer = pdf.output("arraybuffer");
+          const pdfBlob = new Blob([pdfArrayBuffer], {
+            type: "application/pdf; charset=utf-8",
+          });
 
           setPdfBlob(pdfBlob);
           setShowPdfPreview(true);
         } catch (error) {
-          console.error('Error generating PDF:', error);
+          console.error("Error generating PDF:", error);
         } finally {
           setIsGeneratingPdf(false);
           setShouldGeneratePdf(false);
-          setPdfIcons(undefined);
-          setPdfSegmentName(undefined); // <-- RESET SEGMENT NAME
         }
       };
 
       generatePDF();
     }
-  }, [shouldGeneratePdf, config.category, config.length, config.bpm, positionIcons, selectedLine, theme, segmentNames]); // <-- ADD segmentNames
+  }, [
+    shouldGeneratePdf,
+    config.category,
+    config.length,
+    config.bpm,
+    positionIcons,
+    theme,
+    segmentNames,
+    skills,
+    notes,
+  ]);
 
   // Handle category changes - auto-save/load category states
   useEffect(() => {
@@ -348,13 +441,18 @@ export const RoutineBuilder = () => {
     if (!hasLoadedState) return;
 
     // Save current category state before switching (only for user-initiated changes)
-    if (initialLoadedCategoryRef.current !== null && initialLoadedCategoryRef.current !== config.category) {
-      saveCategoryState(initialLoadedCategoryRef.current as RoutineConfig['category']);
+    if (
+      initialLoadedCategoryRef.current !== null &&
+      initialLoadedCategoryRef.current !== config.category
+    ) {
+      saveCategoryState(
+        initialLoadedCategoryRef.current as RoutineConfig["category"],
+      );
     }
 
     // Always start with fresh history when changing categories to ensure complete isolation
     if (loadedSaveStateSlot) {
-      setLineHistories(prev => {
+      setLineHistories((prev) => {
         if (!prev[loadedSaveStateSlot]) {
           return prev;
         }
@@ -364,7 +462,7 @@ export const RoutineBuilder = () => {
         delete newSaveStateHistories[config.category]; // Clear new category history too
         return {
           ...prev,
-          [loadedSaveStateSlot]: newSaveStateHistories
+          [loadedSaveStateSlot]: newSaveStateHistories,
         };
       });
     }
@@ -383,7 +481,7 @@ export const RoutineBuilder = () => {
       setSegmentNames({});
       if (config.category === "team-16" || config.category === "team-24") {
         // Generate default team icons
-        const totalLines = Math.ceil((config.length * config.bpm) / 60 / 8);
+        const totalLines = Math.ceil(((config.length * config.bpm) / 60 / 8));
         const newIcons: PositionIcon[] = [];
         for (let lineIndex = 0; lineIndex < totalLines; lineIndex++) {
           newIcons.push(...generateTeamIcons(config.category, lineIndex));
@@ -409,7 +507,7 @@ export const RoutineBuilder = () => {
         config: { ...config },
         notes: { ...notes },
         segmentNames: { ...segmentNames },
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
       localStorage.setItem(key, JSON.stringify(data));
       setCurrentSaveState(data);
@@ -419,21 +517,33 @@ export const RoutineBuilder = () => {
         saveCategoryState(config.category);
       }
     }
-  }, [placedSkills, positionIcons, config, loadedSaveStateSlot, hasLoadedState, notes, segmentNames]);
+  }, [
+    placedSkills,
+    positionIcons,
+    config,
+    loadedSaveStateSlot,
+    hasLoadedState,
+    notes,
+    segmentNames,
+  ]);
 
   // Auto-scroll to keep selected skill in view after keyboard movement
   useEffect(() => {
     if (!selectedSkillId) return;
 
-    const selectedSkill = placedSkills.find(ps => ps.id === selectedSkillId);
+    const selectedSkill = placedSkills.find((ps) => ps.id === selectedSkillId);
     if (!selectedSkill) return;
 
     // Find the count sheet container (the scrollable div)
-    const countSheetContainer = document.querySelector('.flex-1.overflow-auto.relative') as HTMLElement;
+    const countSheetContainer = document.querySelector(
+      ".flex-1.overflow-auto.relative",
+    ) as HTMLElement;
     if (!countSheetContainer) return;
 
     // Find the specific skill element for the selected skill
-    const skillElement = document.querySelector(`[data-skill-id="${selectedSkillId}"]`) as HTMLElement;
+    const skillElement = document.querySelector(
+      `[data-skill-id="${selectedSkillId}"]`,
+    ) as HTMLElement;
     if (!skillElement) return;
 
     const containerRect = countSheetContainer.getBoundingClientRect();
@@ -446,7 +556,12 @@ export const RoutineBuilder = () => {
     const isRightOfViewport = skillRect.right > containerRect.right;
 
     // If any part of the skill is outside the viewport, scroll to bring it into view
-    if (isAboveViewport || isBelowViewport || isLeftOfViewport || isRightOfViewport) {
+    if (
+      isAboveViewport ||
+      isBelowViewport ||
+      isLeftOfViewport ||
+      isRightOfViewport
+    ) {
       const currentScrollTop = countSheetContainer.scrollTop;
       const currentScrollLeft = countSheetContainer.scrollLeft;
 
@@ -457,23 +572,29 @@ export const RoutineBuilder = () => {
         newScrollTop = currentScrollTop + (skillRect.top - containerRect.top) - 20;
       } else if (isBelowViewport) {
         // Scroll down to show skill at bottom of viewport (with small margin)
-        newScrollTop = currentScrollTop + (skillRect.bottom - containerRect.bottom) + 20;
+        newScrollTop =
+          currentScrollTop + (skillRect.bottom - containerRect.bottom) + 20;
       }
 
       // For horizontal scrolling, we need to scroll the cell table itself
       let newScrollLeft = currentScrollLeft;
       if (isLeftOfViewport) {
-        newScrollLeft = currentScrollLeft + (skillRect.left - containerRect.left) - 20;
+        newScrollLeft =
+          currentScrollLeft + (skillRect.left - containerRect.left) - 20;
       } else if (isRightOfViewport) {
-        newScrollLeft = currentScrollLeft + (skillRect.right - containerRect.right) + 20;
+        newScrollLeft =
+          currentScrollLeft + (skillRect.right - containerRect.right) + 20;
       }
 
       // Apply the scroll
-      if (newScrollTop !== currentScrollTop || newScrollLeft !== currentScrollLeft) {
+      if (
+        newScrollTop !== currentScrollTop ||
+        newScrollLeft !== currentScrollLeft
+      ) {
         countSheetContainer.scrollTo({
           top: Math.max(0, newScrollTop),
           left: Math.max(0, newScrollLeft),
-          behavior: 'smooth'
+          behavior: "smooth",
         });
       }
     }
@@ -484,13 +605,18 @@ export const RoutineBuilder = () => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Skip keyboard shortcuts if user is typing in an input field
       const activeElement = document.activeElement;
-      if (activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA' || (activeElement as HTMLElement).contentEditable === 'true')) {
+      if (
+        activeElement &&
+        (activeElement.tagName === "INPUT" ||
+          activeElement.tagName === "TEXTAREA" ||
+          (activeElement as HTMLElement).contentEditable === "true")
+      ) {
         return;
       }
 
       // Position sheet shortcuts
       if (e.key === keyboardSettings.nextLine && !e.shiftKey) {
-        const totalLines = Math.ceil((config.length * config.bpm) / 60 / 8);
+        const totalLines = Math.ceil(((config.length * config.bpm) / 60 / 8));
         if (selectedLine !== null && selectedLine < totalLines - 1) {
           setSelectedLine(selectedLine + 1);
           e.preventDefault();
@@ -520,16 +646,24 @@ export const RoutineBuilder = () => {
         e.preventDefault();
       }
 
-      if (e.key === keyboardSettings.deleteIcon || e.key === "Delete" || e.key === "Backspace") {
-        const selectedIcons = positionIcons.filter(icon => icon.selected);
+      if (
+        e.key === keyboardSettings.deleteIcon ||
+        e.key === "Delete" ||
+        e.key === "Backspace"
+      ) {
+        const selectedIcons = positionIcons.filter((icon) => icon.selected);
         if (selectedIcons.length > 0) {
-          setPositionIcons(prev => prev.filter(icon => !icon.selected));
+          setPositionIcons((prev) => prev.filter((icon) => !icon.selected));
           e.preventDefault();
         }
       }
 
       // Delete key for selected skills in count sheet
-      if ((e.key === "Delete" || e.key === "Backspace") && selectedSkillId && !e.shiftKey) {
+      if (
+        (e.key === "Delete" || e.key === "Backspace") &&
+        selectedSkillId &&
+        !e.shiftKey
+      ) {
         handleRemoveSkill(selectedSkillId);
         setSelectedSkillId(null);
         e.preventDefault();
@@ -537,17 +671,23 @@ export const RoutineBuilder = () => {
 
       // Count sheet shortcuts
       if (selectedSkillId) {
-        const selectedSkill = placedSkills.find(ps => ps.id === selectedSkillId);
+        const selectedSkill = placedSkills.find(
+          (ps) => ps.id === selectedSkillId,
+        );
         if (!selectedSkill) return;
 
-        const totalLines = Math.ceil((config.length * config.bpm) / 60 / 8);
+        const totalLines = Math.ceil(((config.length * config.bpm) / 60 / 8));
 
-        if (e.key === keyboardSettings.moveLeft || e.key === keyboardSettings.altMoveLeft) {
-          const skill = skills.find(s => s.id === selectedSkill.skillId);
+        if (
+          e.key === keyboardSettings.moveLeft ||
+          e.key === keyboardSettings.altMoveLeft
+        ) {
+          const skill = skills.find((s) => s.id === selectedSkill.skillId);
           if (!skill) return;
 
           // Calculate absolute start position (0-indexed)
-          const absoluteStartPos = selectedSkill.lineIndex * 8 + selectedSkill.startCount - 1;
+          const absoluteStartPos =
+            selectedSkill.lineIndex * 8 + selectedSkill.startCount - 1;
 
           // Try to move left by 1 count
           const newAbsoluteStartPos = absoluteStartPos - 1;
@@ -557,19 +697,27 @@ export const RoutineBuilder = () => {
             const newLineIndex = Math.floor(newAbsoluteStartPos / 8);
             const newStartCount = (newAbsoluteStartPos % 8) + 1;
 
-            setPlacedSkills(prev => prev.map(ps =>
-              ps.id === selectedSkillId ? { ...ps, lineIndex: newLineIndex, startCount: newStartCount } : ps
-            ));
+            setPlacedSkills((prev) =>
+              prev.map((ps) =>
+                ps.id === selectedSkillId
+                  ? { ...ps, lineIndex: newLineIndex, startCount: newStartCount }
+                  : ps,
+              ),
+            );
           }
           e.preventDefault();
         }
 
-        if (e.key === keyboardSettings.moveRight || e.key === keyboardSettings.altMoveRight) {
-          const skill = skills.find(s => s.id === selectedSkill.skillId);
+        if (
+          e.key === keyboardSettings.moveRight ||
+          e.key === keyboardSettings.altMoveRight
+        ) {
+          const skill = skills.find((s) => s.id === selectedSkill.skillId);
           if (!skill) return;
 
           // Calculate absolute start position (0-indexed)
-          const absoluteStartPos = selectedSkill.lineIndex * 8 + selectedSkill.startCount - 1;
+          const absoluteStartPos =
+            selectedSkill.lineIndex * 8 + selectedSkill.startCount - 1;
 
           // Try to move right by 1 count
           const newAbsoluteStartPos = absoluteStartPos + 1;
@@ -583,27 +731,45 @@ export const RoutineBuilder = () => {
             const newLineIndex = Math.floor(newAbsoluteStartPos / 8);
             const newStartCount = (newAbsoluteStartPos % 8) + 1;
 
-            setPlacedSkills(prev => prev.map(ps =>
-              ps.id === selectedSkillId ? { ...ps, lineIndex: newLineIndex, startCount: newStartCount } : ps
-            ));
+            setPlacedSkills((prev) =>
+              prev.map((ps) =>
+                ps.id === selectedSkillId
+                  ? { ...ps, lineIndex: newLineIndex, startCount: newStartCount }
+                  : ps,
+              ),
+            );
           }
           e.preventDefault();
         }
-        
-        if (e.key === keyboardSettings.moveUp || e.key === keyboardSettings.altMoveUp) {
+
+        if (
+          e.key === keyboardSettings.moveUp ||
+          e.key === keyboardSettings.altMoveUp
+        ) {
           if (selectedSkill.lineIndex > 0) {
-            setPlacedSkills(prev => prev.map(ps =>
-              ps.id === selectedSkillId ? { ...ps, lineIndex: ps.lineIndex - 1 } : ps
-            ));
+            setPlacedSkills((prev) =>
+              prev.map((ps) =>
+                ps.id === selectedSkillId
+                  ? { ...ps, lineIndex: ps.lineIndex - 1 }
+                  : ps,
+              ),
+            );
           }
           e.preventDefault();
         }
-        
-        if (e.key === keyboardSettings.moveDown || e.key === keyboardSettings.altMoveDown) {
+
+        if (
+          e.key === keyboardSettings.moveDown ||
+          e.key === keyboardSettings.altMoveDown
+        ) {
           if (selectedSkill.lineIndex < totalLines - 1) {
-            setPlacedSkills(prev => prev.map(ps =>
-              ps.id === selectedSkillId ? { ...ps, lineIndex: ps.lineIndex + 1 } : ps
-            ));
+            setPlacedSkills((prev) =>
+              prev.map((ps) =>
+                ps.id === selectedSkillId
+                  ? { ...ps, lineIndex: ps.lineIndex + 1 }
+                  : ps,
+              ),
+            );
           }
           e.preventDefault();
         }
@@ -612,21 +778,28 @@ export const RoutineBuilder = () => {
       // Advanced keyboard shortcuts for bulk skill movement
       if (selectedSkillId && e.shiftKey && !e.altKey && !e.ctrlKey) {
         // Shift + Arrow keys: Move selected skill and all skills after it
-        const selectedSkill = placedSkills.find(ps => ps.id === selectedSkillId);
+        const selectedSkill = placedSkills.find(
+          (ps) => ps.id === selectedSkillId,
+        );
         if (!selectedSkill) return;
 
-        const totalLines = Math.ceil((config.length * config.bpm) / 60 / 8);
+        const totalLines = Math.ceil(((config.length * config.bpm) / 60 / 8));
 
-        if (e.key === keyboardSettings.moveLeft || e.key === keyboardSettings.altMoveLeft) {
+        if (
+          e.key === keyboardSettings.moveLeft ||
+          e.key === keyboardSettings.altMoveLeft
+        ) {
           // Check if we can move left - calculate absolute positions for all affected skills
-          const skillsToMove = placedSkills.filter(ps =>
-            ps.lineIndex > selectedSkill.lineIndex ||
-            (ps.lineIndex === selectedSkill.lineIndex && ps.startCount > selectedSkill.startCount)
+          const skillsToMove = placedSkills.filter(
+            (ps) =>
+              ps.lineIndex > selectedSkill.lineIndex ||
+              (ps.lineIndex === selectedSkill.lineIndex &&
+                ps.startCount > selectedSkill.startCount),
           );
 
           // Check if all skills to move can be moved left by calculating their new absolute positions
-          const canMoveLeft = skillsToMove.every(ps => {
-            const skill = skills.find(s => s.id === ps.skillId);
+          const canMoveLeft = skillsToMove.every((ps) => {
+            const skill = skills.find((s) => s.id === ps.skillId);
             if (!skill) return false;
 
             // Calculate absolute start position (0-indexed)
@@ -638,34 +811,45 @@ export const RoutineBuilder = () => {
           });
 
           if (canMoveLeft) {
-            setPlacedSkills(prev => prev.map(ps => {
-              if (skillsToMove.some(stm => stm.id === ps.id)) {
-                // Calculate absolute start position (0-indexed)
-                const absoluteStartPos = ps.lineIndex * 8 + ps.startCount - 1;
-                const newAbsoluteStartPos = absoluteStartPos - 1;
+            setPlacedSkills((prev) =>
+              prev.map((ps) => {
+                if (skillsToMove.some((stm) => stm.id === ps.id)) {
+                  // Calculate absolute start position (0-indexed)
+                  const absoluteStartPos = ps.lineIndex * 8 + ps.startCount - 1;
+                  const newAbsoluteStartPos = absoluteStartPos - 1;
 
-                // Calculate new line and start count
-                const newLineIndex = Math.floor(newAbsoluteStartPos / 8);
-                const newStartCount = (newAbsoluteStartPos % 8) + 1;
+                  // Calculate new line and start count
+                  const newLineIndex = Math.floor(newAbsoluteStartPos / 8);
+                  const newStartCount = (newAbsoluteStartPos % 8) + 1;
 
-                return { ...ps, lineIndex: newLineIndex, startCount: newStartCount };
-              }
-              return ps;
-            }));
+                  return {
+                    ...ps,
+                    lineIndex: newLineIndex,
+                    startCount: newStartCount,
+                  };
+                }
+                return ps;
+              }),
+            );
           }
           e.preventDefault();
         }
 
-        if (e.key === keyboardSettings.moveRight || e.key === keyboardSettings.altMoveRight) {
+        if (
+          e.key === keyboardSettings.moveRight ||
+          e.key === keyboardSettings.altMoveRight
+        ) {
           // Check if we can move right - calculate absolute positions for all affected skills
-          const skillsToMove = placedSkills.filter(ps =>
-            ps.lineIndex > selectedSkill.lineIndex ||
-            (ps.lineIndex === selectedSkill.lineIndex && ps.startCount > selectedSkill.startCount)
+          const skillsToMove = placedSkills.filter(
+            (ps) =>
+              ps.lineIndex > selectedSkill.lineIndex ||
+              (ps.lineIndex === selectedSkill.lineIndex &&
+                ps.startCount > selectedSkill.startCount),
           );
 
           // Check if all skills to move can be moved right by calculating their new absolute end positions
-          const canMoveRight = skillsToMove.every(ps => {
-            const skill = skills.find(s => s.id === ps.skillId);
+          const canMoveRight = skillsToMove.every((ps) => {
+            const skill = skills.find((s) => s.id === ps.skillId);
             if (!skill) return false;
 
             // Calculate absolute start position (0-indexed) and new position
@@ -681,54 +865,80 @@ export const RoutineBuilder = () => {
           });
 
           if (canMoveRight) {
-            setPlacedSkills(prev => prev.map(ps => {
-              if (skillsToMove.some(stm => stm.id === ps.id)) {
-                // Calculate absolute start position (0-indexed) and new position
-                const absoluteStartPos = ps.lineIndex * 8 + ps.startCount - 1;
-                const newAbsoluteStartPos = absoluteStartPos + 1;
+            setPlacedSkills((prev) =>
+              prev.map((ps) => {
+                if (skillsToMove.some((stm) => stm.id === ps.id)) {
+                  // Calculate absolute start position (0-indexed) and new position
+                  const absoluteStartPos = ps.lineIndex * 8 + ps.startCount - 1;
+                  const newAbsoluteStartPos = absoluteStartPos + 1;
 
-                // Calculate new line and start count
-                const newLineIndex = Math.floor(newAbsoluteStartPos / 8);
-                const newStartCount = (newAbsoluteStartPos % 8) + 1;
+                  // Calculate new line and start count
+                  const newLineIndex = Math.floor(newAbsoluteStartPos / 8);
+                  const newStartCount = (newAbsoluteStartPos % 8) + 1;
 
-                return { ...ps, lineIndex: newLineIndex, startCount: newStartCount };
-              }
-              return ps;
-            }));
+                  return {
+                    ...ps,
+                    lineIndex: newLineIndex,
+                    startCount: newStartCount,
+                  };
+                }
+                return ps;
+              }),
+            );
           }
           e.preventDefault();
         }
 
-        if (e.key === keyboardSettings.moveUp || e.key === keyboardSettings.altMoveUp) {
+        if (
+          e.key === keyboardSettings.moveUp ||
+          e.key === keyboardSettings.altMoveUp
+        ) {
           // Check if all skills to move can actually move up (not in first line)
-          const skillsToMove = placedSkills.filter(ps =>
-            ps.lineIndex > selectedSkill.lineIndex ||
-            (ps.lineIndex === selectedSkill.lineIndex && ps.startCount > selectedSkill.startCount)
+          const skillsToMove = placedSkills.filter(
+            (ps) =>
+              ps.lineIndex > selectedSkill.lineIndex ||
+              (ps.lineIndex === selectedSkill.lineIndex &&
+                ps.startCount > selectedSkill.startCount),
           );
 
-          const canAllSkillsMoveUp = skillsToMove.every(ps => ps.lineIndex > 0);
+          const canAllSkillsMoveUp = skillsToMove.every((ps) => ps.lineIndex > 0);
 
           if (canAllSkillsMoveUp) {
-            setPlacedSkills(prev => prev.map(ps =>
-              skillsToMove.some(stm => stm.id === ps.id) ? { ...ps, lineIndex: ps.lineIndex - 1 } : ps
-            ));
+            setPlacedSkills((prev) =>
+              prev.map((ps) =>
+                skillsToMove.some((stm) => stm.id === ps.id)
+                  ? { ...ps, lineIndex: ps.lineIndex - 1 }
+                  : ps,
+              ),
+            );
           }
           e.preventDefault();
         }
 
-        if (e.key === keyboardSettings.moveDown || e.key === keyboardSettings.altMoveDown) {
+        if (
+          e.key === keyboardSettings.moveDown ||
+          e.key === keyboardSettings.altMoveDown
+        ) {
           // Check if all skills to move can actually move down (not in last line)
-          const skillsToMove = placedSkills.filter(ps =>
-            ps.lineIndex > selectedSkill.lineIndex ||
-            (ps.lineIndex === selectedSkill.lineIndex && ps.startCount > selectedSkill.startCount)
+          const skillsToMove = placedSkills.filter(
+            (ps) =>
+              ps.lineIndex > selectedSkill.lineIndex ||
+              (ps.lineIndex === selectedSkill.lineIndex &&
+                ps.startCount > selectedSkill.startCount),
           );
 
-          const canAllSkillsMoveDown = skillsToMove.every(ps => ps.lineIndex < totalLines - 1);
+          const canAllSkillsMoveDown = skillsToMove.every(
+            (ps) => ps.lineIndex < totalLines - 1,
+          );
 
           if (canAllSkillsMoveDown) {
-            setPlacedSkills(prev => prev.map(ps =>
-              skillsToMove.some(stm => stm.id === ps.id) ? { ...ps, lineIndex: ps.lineIndex + 1 } : ps
-            ));
+            setPlacedSkills((prev) =>
+              prev.map((ps) =>
+                skillsToMove.some((stm) => stm.id === ps.id)
+                  ? { ...ps, lineIndex: ps.lineIndex + 1 }
+                  : ps,
+              ),
+            );
           }
           e.preventDefault();
         }
@@ -736,21 +946,28 @@ export const RoutineBuilder = () => {
 
       if (selectedSkillId && e.shiftKey && e.altKey) {
         // Shift + Alt + Arrow keys: Move selected skill and all skills before it
-        const selectedSkill = placedSkills.find(ps => ps.id === selectedSkillId);
+        const selectedSkill = placedSkills.find(
+          (ps) => ps.id === selectedSkillId,
+        );
         if (!selectedSkill) return;
 
-        const totalLines = Math.ceil((config.length * config.bpm) / 60 / 8);
+        const totalLines = Math.ceil(((config.length * config.bpm) / 60 / 8));
 
-        if (e.key === keyboardSettings.moveLeft || e.key === keyboardSettings.altMoveLeft) {
+        if (
+          e.key === keyboardSettings.moveLeft ||
+          e.key === keyboardSettings.altMoveLeft
+        ) {
           // Check if we can move left - calculate absolute positions for all affected skills
-          const skillsToMove = placedSkills.filter(ps =>
-            ps.lineIndex < selectedSkill.lineIndex ||
-            (ps.lineIndex === selectedSkill.lineIndex && ps.startCount < selectedSkill.startCount)
+          const skillsToMove = placedSkills.filter(
+            (ps) =>
+              ps.lineIndex < selectedSkill.lineIndex ||
+              (ps.lineIndex === selectedSkill.lineIndex &&
+                ps.startCount < selectedSkill.startCount),
           );
 
           // Check if all skills to move can be moved left by calculating their new absolute positions
-          const canMoveLeft = skillsToMove.every(ps => {
-            const skill = skills.find(s => s.id === ps.skillId);
+          const canMoveLeft = skillsToMove.every((ps) => {
+            const skill = skills.find((s) => s.id === ps.skillId);
             if (!skill) return false;
 
             // Calculate absolute start position (0-indexed)
@@ -762,34 +979,45 @@ export const RoutineBuilder = () => {
           });
 
           if (canMoveLeft) {
-            setPlacedSkills(prev => prev.map(ps => {
-              if (skillsToMove.some(stm => stm.id === ps.id)) {
-                // Calculate absolute start position (0-indexed)
-                const absoluteStartPos = ps.lineIndex * 8 + ps.startCount - 1;
-                const newAbsoluteStartPos = absoluteStartPos - 1;
+            setPlacedSkills((prev) =>
+              prev.map((ps) => {
+                if (skillsToMove.some((stm) => stm.id === ps.id)) {
+                  // Calculate absolute start position (0-indexed)
+                  const absoluteStartPos = ps.lineIndex * 8 + ps.startCount - 1;
+                  const newAbsoluteStartPos = absoluteStartPos - 1;
 
-                // Calculate new line and start count
-                const newLineIndex = Math.floor(newAbsoluteStartPos / 8);
-                const newStartCount = (newAbsoluteStartPos % 8) + 1;
+                  // Calculate new line and start count
+                  const newLineIndex = Math.floor(newAbsoluteStartPos / 8);
+                  const newStartCount = (newAbsoluteStartPos % 8) + 1;
 
-                return { ...ps, lineIndex: newLineIndex, startCount: newStartCount };
-              }
-              return ps;
-            }));
+                  return {
+                    ...ps,
+                    lineIndex: newLineIndex,
+                    startCount: newStartCount,
+                  };
+                }
+                return ps;
+              }),
+            );
           }
           e.preventDefault();
         }
 
-        if (e.key === keyboardSettings.moveRight || e.key === keyboardSettings.altMoveRight) {
+        if (
+          e.key === keyboardSettings.moveRight ||
+          e.key === keyboardSettings.altMoveRight
+        ) {
           // Check if we can move right - calculate absolute positions for all affected skills
-          const skillsToMove = placedSkills.filter(ps =>
-            ps.lineIndex < selectedSkill.lineIndex ||
-            (ps.lineIndex === selectedSkill.lineIndex && ps.startCount < selectedSkill.startCount)
+          const skillsToMove = placedSkills.filter(
+            (ps) =>
+              ps.lineIndex < selectedSkill.lineIndex ||
+              (ps.lineIndex === selectedSkill.lineIndex &&
+                ps.startCount < selectedSkill.startCount),
           );
 
           // Check if all skills to move can be moved right by calculating their new absolute end positions
-          const canMoveRight = skillsToMove.every(ps => {
-            const skill = skills.find(s => s.id === ps.skillId);
+          const canMoveRight = skillsToMove.every((ps) => {
+            const skill = skills.find((s) => s.id === ps.skillId);
             if (!skill) return false;
 
             // Calculate absolute start position (0-indexed) and new position
@@ -805,54 +1033,80 @@ export const RoutineBuilder = () => {
           });
 
           if (canMoveRight) {
-            setPlacedSkills(prev => prev.map(ps => {
-              if (skillsToMove.some(stm => stm.id === ps.id)) {
-                // Calculate absolute start position (0-indexed) and new position
-                const absoluteStartPos = ps.lineIndex * 8 + ps.startCount - 1;
-                const newAbsoluteStartPos = absoluteStartPos + 1;
+            setPlacedSkills((prev) =>
+              prev.map((ps) => {
+                if (skillsToMove.some((stm) => stm.id === ps.id)) {
+                  // Calculate absolute start position (0-indexed) and new position
+                  const absoluteStartPos = ps.lineIndex * 8 + ps.startCount - 1;
+                  const newAbsoluteStartPos = absoluteStartPos + 1;
 
-                // Calculate new line and start count
-                const newLineIndex = Math.floor(newAbsoluteStartPos / 8);
-                const newStartCount = (newAbsoluteStartPos % 8) + 1;
+                  // Calculate new line and start count
+                  const newLineIndex = Math.floor(newAbsoluteStartPos / 8);
+                  const newStartCount = (newAbsoluteStartPos % 8) + 1;
 
-                return { ...ps, lineIndex: newLineIndex, startCount: newStartCount };
-              }
-              return ps;
-            }));
+                  return {
+                    ...ps,
+                    lineIndex: newLineIndex,
+                    startCount: newStartCount,
+                  };
+                }
+                return ps;
+              }),
+            );
           }
           e.preventDefault();
         }
 
-        if (e.key === keyboardSettings.moveUp || e.key === keyboardSettings.altMoveUp) {
+        if (
+          e.key === keyboardSettings.moveUp ||
+          e.key === keyboardSettings.altMoveUp
+        ) {
           // Check if all skills to move can actually move up (not in first line)
-          const skillsToMove = placedSkills.filter(ps =>
-            ps.lineIndex < selectedSkill.lineIndex ||
-            (ps.lineIndex === selectedSkill.lineIndex && ps.startCount < selectedSkill.startCount)
+          const skillsToMove = placedSkills.filter(
+            (ps) =>
+              ps.lineIndex < selectedSkill.lineIndex ||
+              (ps.lineIndex === selectedSkill.lineIndex &&
+                ps.startCount < selectedSkill.startCount),
           );
 
-          const canAllSkillsMoveUp = skillsToMove.every(ps => ps.lineIndex > 0);
+          const canAllSkillsMoveUp = skillsToMove.every((ps) => ps.lineIndex > 0);
 
           if (canAllSkillsMoveUp) {
-            setPlacedSkills(prev => prev.map(ps =>
-              skillsToMove.some(stm => stm.id === ps.id) ? { ...ps, lineIndex: ps.lineIndex - 1 } : ps
-            ));
+            setPlacedSkills((prev) =>
+              prev.map((ps) =>
+                skillsToMove.some((stm) => stm.id === ps.id)
+                  ? { ...ps, lineIndex: ps.lineIndex - 1 }
+                  : ps,
+              ),
+            );
           }
           e.preventDefault();
         }
 
-        if (e.key === keyboardSettings.moveDown || e.key === keyboardSettings.altMoveDown) {
+        if (
+          e.key === keyboardSettings.moveDown ||
+          e.key === keyboardSettings.altMoveDown
+        ) {
           // Check if all skills to move can actually move down (not in last line)
-          const skillsToMove = placedSkills.filter(ps =>
-            ps.lineIndex < selectedSkill.lineIndex ||
-            (ps.lineIndex === selectedSkill.lineIndex && ps.startCount < selectedSkill.startCount)
+          const skillsToMove = placedSkills.filter(
+            (ps) =>
+              ps.lineIndex < selectedSkill.lineIndex ||
+              (ps.lineIndex === selectedSkill.lineIndex &&
+                ps.startCount < selectedSkill.startCount),
           );
 
-          const canAllSkillsMoveDown = skillsToMove.every(ps => ps.lineIndex < totalLines - 1);
+          const canAllSkillsMoveDown = skillsToMove.every(
+            (ps) => ps.lineIndex < totalLines - 1,
+          );
 
           if (canAllSkillsMoveDown) {
-            setPlacedSkills(prev => prev.map(ps =>
-              skillsToMove.some(stm => stm.id === ps.id) ? { ...ps, lineIndex: ps.lineIndex + 1 } : ps
-            ));
+            setPlacedSkills((prev) =>
+              prev.map((ps) =>
+                skillsToMove.some((stm) => stm.id === ps.id)
+                  ? { ...ps, lineIndex: ps.lineIndex + 1 }
+                  : ps,
+              ),
+            );
           }
           e.preventDefault();
         }
@@ -861,20 +1115,31 @@ export const RoutineBuilder = () => {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectedLine, config, autoFollow, positionIcons, selectedSkillId, placedSkills, keyboardSettings]);
+  }, [
+    selectedLine,
+    config,
+    autoFollow,
+    positionIcons,
+    selectedSkillId,
+    placedSkills,
+    keyboardSettings,
+  ]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
         distance: 8,
       },
-    })
+    }),
   );
 
   /**
    * Generate position icons for team categories (team-16 or team-24) in evenly distributed positions
    */
-  const generateTeamIcons = (category: string, lineIndex: number): PositionIcon[] => {
+  const generateTeamIcons = (
+    category: string,
+    lineIndex: number,
+  ): PositionIcon[] => {
     const gridSize = 800 / 36; // ≈22.222 units per cell
     const icons: PositionIcon[] = [];
     const timestamp = Date.now();
@@ -887,7 +1152,7 @@ export const RoutineBuilder = () => {
         icons.push({
           id: `icon-${timestamp}-${lineIndex}-base1-${i}`,
           type: "square",
-          x: Math.round((basePositions[i] * gridSize)),
+          x: Math.round(basePositions[i] * gridSize),
           y: Math.round(6 * gridSize), // Row 6
           lineIndex,
         });
@@ -896,7 +1161,7 @@ export const RoutineBuilder = () => {
         icons.push({
           id: `icon-${timestamp}-${lineIndex}-base2-${i}`,
           type: "square",
-          x: Math.round((basePositions[i] * gridSize)),
+          x: Math.round(basePositions[i] * gridSize),
           y: Math.round(12 * gridSize), // Row 12
           lineIndex,
         });
@@ -907,7 +1172,7 @@ export const RoutineBuilder = () => {
         icons.push({
           id: `icon-${timestamp}-${lineIndex}-mid-${i}`,
           type: "circle",
-          x: Math.round((midPositions[i] * gridSize)),
+          x: Math.round(midPositions[i] * gridSize),
           y: Math.round(17 * gridSize), // Row 17
           lineIndex,
         });
@@ -918,7 +1183,7 @@ export const RoutineBuilder = () => {
         icons.push({
           id: `icon-${timestamp}-${lineIndex}-fly-${i}`,
           type: "x",
-          x: Math.round((flyPositions[i] * gridSize)),
+          x: Math.round(flyPositions[i] * gridSize),
           y: Math.round(22 * gridSize), // Row 22
           lineIndex,
         });
@@ -931,7 +1196,7 @@ export const RoutineBuilder = () => {
         icons.push({
           id: `icon-${timestamp}-${lineIndex}-base1-${i}`,
           type: "square",
-          x: Math.round((basePositions[i] * gridSize)),
+          x: Math.round(basePositions[i] * gridSize),
           y: Math.round(6 * gridSize), // Row 6
           lineIndex,
         });
@@ -940,7 +1205,7 @@ export const RoutineBuilder = () => {
         icons.push({
           id: `icon-${timestamp}-${lineIndex}-base2-${i}`,
           type: "square",
-          x: Math.round((basePositions[i] * gridSize)),
+          x: Math.round(basePositions[i] * gridSize),
           y: Math.round(12 * gridSize), // Row 12
           lineIndex,
         });
@@ -951,7 +1216,7 @@ export const RoutineBuilder = () => {
         icons.push({
           id: `icon-${timestamp}-${lineIndex}-mid-${i}`,
           type: "circle",
-          x: Math.round((midPositions[i] * gridSize)),
+          x: Math.round(midPositions[i] * gridSize),
           y: Math.round(17 * gridSize), // Row 17
           lineIndex,
         });
@@ -962,7 +1227,7 @@ export const RoutineBuilder = () => {
         icons.push({
           id: `icon-${timestamp}-${lineIndex}-fly-${i}`,
           type: "x",
-          x: Math.round((flyPositions[i] * gridSize)),
+          x: Math.round(flyPositions[i] * gridSize),
           y: Math.round(22 * gridSize), // Row 22
           lineIndex,
         });
@@ -976,36 +1241,49 @@ export const RoutineBuilder = () => {
    * Helper functions for scoped history management
    * History is now scoped by saveStateSlot -> category -> lineIndex to avoid conflicts between contexts
    */
-  const getScopedHistory = (saveStateSlot: number, category: string, lineIndex: number): { history: PositionIcon[][], index: number } | undefined => {
+  const getScopedHistory = (
+    saveStateSlot: number,
+    category: string,
+    lineIndex: number,
+  ): { history: PositionIcon[][]; index: number } | undefined => {
     return lineHistories[saveStateSlot]?.[category]?.[lineIndex];
   };
 
-  const setScopedHistory = (saveStateSlot: number, category: string, lineIndex: number, history: { history: PositionIcon[][], index: number }) => {
-    setLineHistories(prev => ({
+  const setScopedHistory = (
+    saveStateSlot: number,
+    category: string,
+    lineIndex: number,
+    history: { history: PositionIcon[][]; index: number },
+  ) => {
+    setLineHistories((prev) => ({
       ...prev,
       [saveStateSlot]: {
         ...prev[saveStateSlot],
         [category]: {
           ...prev[saveStateSlot]?.[category],
-          [lineIndex]: history
-        }
-      }
+          [lineIndex]: history,
+        },
+      },
     }));
   };
 
-  const getCurrentScopedHistory = (lineIndex: number): { history: PositionIcon[][], index: number } | undefined => {
+  const getCurrentScopedHistory = (
+    lineIndex: number,
+  ): { history: PositionIcon[][]; index: number } | undefined => {
     if (!loadedSaveStateSlot) return undefined;
     return getScopedHistory(loadedSaveStateSlot, config.category, lineIndex);
   };
 
   // Computed history data for the current context (save state + category)
-  const currentContextLineHistories = loadedSaveStateSlot ? lineHistories[loadedSaveStateSlot]?.[config.category] || {} : {};
+  const currentContextLineHistories = loadedSaveStateSlot
+    ? lineHistories[loadedSaveStateSlot]?.[config.category] || {}
+    : {};
 
   /**
    * Helper functions for category-based state management
    * Category states are now scoped per save state to avoid conflicts
    */
-  const saveCategoryState = (category: RoutineConfig['category']) => {
+  const saveCategoryState = (category: RoutineConfig["category"]) => {
     if (!loadedSaveStateSlot) return; // Shouldn't happen, but safety check
     const key = `category-${loadedSaveStateSlot}-${category}`;
     const data: CategoryStateData = {
@@ -1013,13 +1291,14 @@ export const RoutineBuilder = () => {
       positionIcons: [...positionIcons],
       notes: { ...notes },
       segmentNames: { ...segmentNames },
-      timestamp: Date.now()
-
+      timestamp: Date.now(),
     };
     localStorage.setItem(key, JSON.stringify(data));
   };
 
-  const loadCategoryState = (category: RoutineConfig['category']): CategoryStateData | null => {
+  const loadCategoryState = (
+    category: RoutineConfig["category"],
+  ): CategoryStateData | null => {
     if (!loadedSaveStateSlot) return null; // Shouldn't happen, but safety check
     const key = `category-${loadedSaveStateSlot}-${category}`;
     const saved = localStorage.getItem(key);
@@ -1034,14 +1313,14 @@ export const RoutineBuilder = () => {
       config: { ...config },
       notes: { ...notes },
       segmentNames: { ...segmentNames },
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
     localStorage.setItem(key, JSON.stringify(data));
     setCurrentSaveState(data);
     setLoadedSaveStateSlot(slotNumber);
 
     // Save the current save names
-    localStorage.setItem('save-names', JSON.stringify(saveNames));
+    localStorage.setItem("save-names", JSON.stringify(saveNames));
   };
 
   const loadFromSlot = (slotNumber: 1 | 2 | 3) => {
@@ -1068,9 +1347,11 @@ export const RoutineBuilder = () => {
       let defaultPositionIcons: PositionIcon[] = [];
       if (config.category === "team-16" || config.category === "team-24") {
         // Generate default team icons
-        const totalLines = Math.ceil((config.length * config.bpm) / 60 / 8);
+        const totalLines = Math.ceil(((config.length * config.bpm) / 60 / 8));
         for (let lineIndex = 0; lineIndex < totalLines; lineIndex++) {
-          defaultPositionIcons.push(...generateTeamIcons(config.category, lineIndex));
+          defaultPositionIcons.push(
+            ...generateTeamIcons(config.category, lineIndex),
+          );
         }
       }
       // For individual categories, positionIcons remains empty
@@ -1082,7 +1363,7 @@ export const RoutineBuilder = () => {
         config: { ...config },
         notes: defaultNotes,
         segmentNames: defaultSegmentNames,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
 
       // Apply the default state
@@ -1110,20 +1391,21 @@ export const RoutineBuilder = () => {
   const customCollisionDetection: CollisionDetection = (args) => {
     // 1. Check for collisions using rectIntersection (for trash zone and prioritized areas)
     const rectCollisions = rectIntersection(args);
-    const trashCollision = rectCollisions.find(collision =>
-      collision.id === 'trash-zone' ||
-      (collision.data?.current?.type === 'trash-zone')
+    const trashCollision = rectCollisions.find(
+      (collision) =>
+        collision.id === "trash-zone" ||
+        collision.data?.current?.type === "trash-zone",
     );
 
     // If we have a collision with the trash zone, only return that.
     if (trashCollision) {
-        return [trashCollision];
+      return [trashCollision];
     }
 
     // 2. When dragging position icons, prioritize the position sheet grid
     if (args.active.data?.current?.type === "position-icon") {
-      const positionSheetGridCollision = rectCollisions.find(collision =>
-        collision.id === 'position-sheet-grid'
+      const positionSheetGridCollision = rectCollisions.find(
+        (collision) => collision.id === "position-sheet-grid",
       );
 
       // If dragging a position icon over the position sheet grid, prioritize it
@@ -1134,7 +1416,7 @@ export const RoutineBuilder = () => {
 
     // 3. Use left-edge collision detection only for placed skills being dragged back onto countsheet
     if (setIsDraggingPlacedSkill) {
-      return rectCollisions.filter(collision => {
+      return rectCollisions.filter((collision) => {
         const activeRect = args.active.rect.current?.translated;
         const droppableRect = args.droppableRects.get(collision.id);
 
@@ -1146,8 +1428,11 @@ export const RoutineBuilder = () => {
 
         // The left edge intersects if its x-position is within the droppable's width
         // and the active rect overlaps with the droppable in the y-direction
-        const xIntersects = leftEdgeX >= droppableRect.left && leftEdgeX <= droppableRect.right;
-        const yIntersects = activeRect.top < droppableRect.bottom && activeRect.bottom > droppableRect.top;
+        const xIntersects =
+          leftEdgeX >= droppableRect.left && leftEdgeX <= droppableRect.right;
+        const yIntersects =
+          activeRect.top < droppableRect.bottom &&
+          activeRect.bottom > droppableRect.top;
 
         return xIntersects && yIntersects;
       });
@@ -1159,8 +1444,12 @@ export const RoutineBuilder = () => {
 
   // Auto-populate position icons for Team categories (only when not loaded from saved state)
   useEffect(() => {
-    if (!hasLoadedState && (config.category === "team-16" || config.category === "team-24") && positionIcons.length === 0) {
-      const totalLines = Math.ceil((config.length * config.bpm) / 60 / 8);
+    if (
+      !hasLoadedState &&
+      (config.category === "team-16" || config.category === "team-24") &&
+      positionIcons.length === 0
+    ) {
+      const totalLines = Math.ceil(((config.length * config.bpm) / 60 / 8));
 
       const newIcons: PositionIcon[] = [];
 
@@ -1170,15 +1459,27 @@ export const RoutineBuilder = () => {
 
       setPositionIcons(newIcons);
     }
-  }, [hasLoadedState, config.category, config.length, config.bpm, positionIcons.length]);
+  }, [
+    hasLoadedState,
+    config.category,
+    config.length,
+    config.bpm,
+    positionIcons.length,
+  ]);
 
   // Initialize history for the selected line when it changes
   useEffect(() => {
-    if (selectedLine !== null && loadedSaveStateSlot && !getCurrentScopedHistory(selectedLine)) {
-      const currentLineIcons = positionIcons.filter(i => i.lineIndex === selectedLine);
+    if (
+      selectedLine !== null &&
+      loadedSaveStateSlot &&
+      !getCurrentScopedHistory(selectedLine)
+    ) {
+      const currentLineIcons = positionIcons.filter(
+        (i) => i.lineIndex === selectedLine,
+      );
       setScopedHistory(loadedSaveStateSlot, config.category, selectedLine, {
         history: [currentLineIcons],
-        index: 0
+        index: 0,
       });
     }
   }, [selectedLine, positionIcons, loadedSaveStateSlot, config.category]);
@@ -1189,7 +1490,9 @@ export const RoutineBuilder = () => {
       const lineHistory = getCurrentScopedHistory(selectedLine);
       if (!lineHistory) return;
 
-      const currentState = positionIcons.filter(i => i.lineIndex === selectedLine);
+      const currentState = positionIcons.filter(
+        (i) => i.lineIndex === selectedLine,
+      );
 
       // Don't record if state hasn't changed from current history position
       const lastState = lineHistory.history[lineHistory.index];
@@ -1199,34 +1502,56 @@ export const RoutineBuilder = () => {
       }
 
       // If states are different, add a new history entry
-      const newHistory = [...lineHistory.history.slice(0, lineHistory.index + 1), currentState];
+      const newHistory = [
+        ...lineHistory.history.slice(0, lineHistory.index + 1),
+        currentState,
+      ];
 
       setScopedHistory(loadedSaveStateSlot, config.category, selectedLine, {
         history: newHistory,
-        index: newHistory.length - 1
+        index: newHistory.length - 1,
       });
     }
   }, [positionIcons, selectedLine, loadedSaveStateSlot, config.category]);
 
-const handleDragMove = (event: DragMoveEvent) => {
-    console.log(`Drag Move: Type='${event.active.data?.current?.type || (skills.find(s => s.id === event.active.id) ? 'new skill' : 'unknown')}', ID='${event.active.id}'`);
+  const handleDragMove = (event: DragMoveEvent) => {
+    console.log(
+      `Drag Move: Type='${
+        event.active.data?.current?.type ||
+        (skills.find((s) => s.id === event.active.id) ? "new skill" : "unknown")
+      }', ID='${event.active.id}'`,
+    );
     const { active, delta, over } = event; // Add 'over' here
-    
+
     if (active.data?.current?.type === "position-icon") {
       setDragOffset({ x: delta.x, y: delta.y });
     }
 
     // --- Add This New Logic Block for Skill Resize ---
-    if (active.data?.current?.type === "skill-resize" && over && over.id.toString().startsWith("cell-")) {
-      const { skill, placedSkill, direction } = active.data.current as { skill: Skill, placedSkill: PlacedSkill, direction: 'left' | 'right', originalCellsToSpan: number };
-      const { lineIndex: overLine, count: overCount } = over.data.current as { lineIndex: number, count: number };
+    if (
+      active.data?.current?.type === "skill-resize" &&
+      over &&
+      over.id.toString().startsWith("cell-")
+    ) {
+      const {
+        skill,
+        placedSkill,
+        direction,
+      } = active.data.current as {
+        skill: Skill;
+        placedSkill: PlacedSkill;
+        direction: "left" | "right";
+        originalCellsToSpan: number;
+      };
+      const { lineIndex: overLine, count: overCount } =
+        over.data.current as { lineIndex: number; count: number };
 
       // Find the placed skill's starting position *at the beginning of the drag*
       const { lineIndex: startLine, startCount: startCol } = placedSkill;
-      
+
       // Calculate the absolute start position (0-indexed) *at the beginning of the drag*
       const absoluteStartPos = startLine * 8 + (startCol - 1);
-      
+
       // Calculate the absolute position of the cell we're hovering over (0-indexed)
       const absoluteOverPos = overLine * 8 + (overCount - 1);
 
@@ -1236,13 +1561,14 @@ const handleDragMove = (event: DragMoveEvent) => {
       if (direction === "right") {
         // New count is the difference from the start pos to the over pos
         newCounts = absoluteOverPos - absoluteStartPos + 1;
-      } else { // direction === "left"
+      } else {
+        // direction === "left"
         // The skill's original end position (at drag start)
         const originalAbsoluteEndPos = absoluteStartPos + skill.counts - 1;
-        
+
         // New count is the difference from the original end pos to the new start pos
         newCounts = originalAbsoluteEndPos - absoluteOverPos + 1;
-        
+
         // The new start position is the cell we're over
         newAbsoluteStartPos = absoluteOverPos;
       }
@@ -1253,44 +1579,65 @@ const handleDragMove = (event: DragMoveEvent) => {
       // --- Update State (with checks to prevent thrashing) ---
 
       // 1. Update the base skill's counts if it has changed
-      const currentSkill = skills.find(s => s.id === skill.id);
+      const currentSkill = skills.find((s) => s.id === skill.id);
       if (currentSkill && currentSkill.counts !== newCounts) {
         updateSkillCounts(skill.id, newCounts);
       }
 
       // 2. If it's the left handle, update the placedSkill's position if it has changed
       if (direction === "left" && newAbsoluteStartPos !== -1) {
-        const currentPlacedSkill = placedSkills.find(ps => ps.id === placedSkill.id);
+        const currentPlacedSkill = placedSkills.find(
+          (ps) => ps.id === placedSkill.id,
+        );
         const newLineIndex = Math.floor(newAbsoluteStartPos / 8);
         const newStartCount = (newAbsoluteStartPos % 8) + 1;
 
-        if (currentPlacedSkill && (currentPlacedSkill.lineIndex !== newLineIndex || currentPlacedSkill.startCount !== newStartCount)) {
-          setPlacedSkills(prev => prev.map(ps =>
-            ps.id === placedSkill.id
-              ? { ...ps, lineIndex: newLineIndex, startCount: newStartCount }
-              : ps
-          ));
+        if (
+          currentPlacedSkill &&
+          (currentPlacedSkill.lineIndex !== newLineIndex ||
+            currentPlacedSkill.startCount !== newStartCount)
+        ) {
+          setPlacedSkills((prev) =>
+            prev.map((ps) =>
+              ps.id === placedSkill.id
+                ? {
+                    ...ps,
+                    lineIndex: newLineIndex,
+                    startCount: newStartCount,
+                  }
+                : ps,
+            ),
+          );
         }
       }
     }
   };
 
   const handleDragStart = (event: DragStartEvent) => {
-    console.log(`Drag Start: Type='${event.active.data?.current?.type || (skills.find(s => s.id === event.active.id) ? 'new skill' : 'unknown')}', ID='${event.active.id}'`);
+    console.log(
+      `Drag Start: Type='${
+        event.active.data?.current?.type ||
+        (skills.find((s) => s.id === event.active.id) ? "new skill" : "unknown")
+      }', ID='${event.active.id}'`,
+    );
     const skill = skills.find((s) => s.id === event.active.id);
     if (skill) {
       setDraggedSkill(skill);
       // Prevent scrolling during drag
-      document.body.style.overflow = 'hidden';
+      document.body.style.overflow = "hidden";
       return;
     }
 
     if (event.active.data?.current?.type === "placed-skill") {
       setIsDraggingPlacedSkill(true);
       setDraggedPlacedSkillId(event.active.data.current.placedSkill.id);
-      setDraggedSkill(skills.find(s => s.id === event.active.data.current.placedSkill.skillId) || null);
+      setDraggedSkill(
+        skills.find(
+          (s) => s.id === event.active.data.current.placedSkill.skillId,
+        ) || null,
+      );
       // Prevent scrolling during drag
-      document.body.style.overflow = 'hidden';
+      document.body.style.overflow = "hidden";
     }
 
     if (event.active.data?.current?.type === "position-icon") {
@@ -1306,18 +1653,30 @@ const handleDragMove = (event: DragMoveEvent) => {
     }
   };
 
-const handleDragOver = (event: DragOverEvent) => {
+  const handleDragOver = (event: DragOverEvent) => {
     const overId = event.over?.id.toString();
-    if (overId && overId.startsWith('cell-')) {
+    if (overId && overId.startsWith("cell-")) {
       setOverCellId(overId);
     } else {
       setOverCellId(null);
     }
   };
 
-const handleDragEnd = (event: DragEndEvent) => {
+  const handleDragEnd = (event: DragEndEvent) => {
     // Console log using state variables for accurate type reporting
-    console.log(`Drag End: Type='${isDraggingPlacedSkill ? 'placed skill' : isDraggingIcon ? 'position icon' : (skills.find(s => s.id === event.active.id) ? 'new skill' : 'unknown')}', ID='${event.active.id}', Over='${event.over?.id}', Over Data Type='${event.over?.data?.current?.type || 'N/A'}'`);
+    console.log(
+      `Drag End: Type='${
+        isDraggingPlacedSkill
+          ? "placed skill"
+          : isDraggingIcon
+          ? "position icon"
+          : skills.find((s) => s.id === event.active.id)
+          ? "new skill"
+          : "unknown"
+      }', ID='${event.active.id}', Over='${
+        event.over?.id
+      }', Over Data Type='${event.over?.data?.current?.type || "N/A"}'`,
+    );
 
     // Store state before resetting, as we need it for logic below
     const wasDraggingPlacedSkill = isDraggingPlacedSkill;
@@ -1335,27 +1694,32 @@ const handleDragEnd = (event: DragEndEvent) => {
     setDraggedIconId(null);
     setOverCellId(null);
     // Re-enable scrolling
-    document.body.style.overflow = '';
+    document.body.style.overflow = "";
 
     const { active, over, delta } = event;
     // Exit if dropped outside a droppable area
     if (!over) return;
 
-// --- Skill Resize Handle Logic ---
+    // --- Skill Resize Handle Logic ---
     if (active.data?.current?.type === "skill-resize") {
       // All logic is now handled in onDragMove.
       // We just need to stop further processing here.
-      return; 
+      return;
     }
 
     // --- Trash Zone Logic ---
     // Check for trash zone drop with robust detection
-    if (over.id === "trash-zone" || over.id === "trash-drop-zone" || over.data?.current?.type === "trash-zone") {
+    if (
+      over.id === "trash-zone" ||
+      over.id === "trash-drop-zone" ||
+      over.data?.current?.type === "trash-zone"
+    ) {
       // Use stored state to check if it was a placed skill
       if (wasDraggingPlacedSkill && originalPlacedSkillId) {
         handleRemoveSkill(originalPlacedSkillId);
         setSelectedSkillId(null); // Deselect if the deleted skill was selected
-      } else if (active.data?.current?.type === "position-icon") { // Check original data for icon type
+      } else if (active.data?.current?.type === "position-icon") {
+        // Check original data for icon type
         // Handle position icon deletion
         const iconId = active.id as string;
         handleRemovePositionIcon(iconId); // Assuming you have this function
@@ -1366,20 +1730,31 @@ const handleDragEnd = (event: DragEndEvent) => {
     // --- Position Icon Drag Logic ---
     // Use the original active.data.current.type for icons as overlay isn't used for them
     if (active.data?.current?.type === "position-icon") {
-      const icon = positionIcons.find(i => i.id === active.id);
+      const icon = positionIcons.find((i) => i.id === active.id);
       if (!icon) return;
 
       // Handle multi-icon drag
-      const selectedIcons = positionIcons.filter(i => i.selected && i.lineIndex === selectedLine);
-      if (selectedIcons.length > 1 && selectedIcons.some(i => i.id === active.id)) {
+      const selectedIcons = positionIcons.filter(
+        (i) => i.selected && i.lineIndex === selectedLine,
+      );
+      if (
+        selectedIcons.length > 1 &&
+        selectedIcons.some((i) => i.id === active.id)
+      ) {
         // Multi-icon drag - update all selected icons and propagate if autoFollow is on
-        selectedIcons.forEach(selectedIcon => {
+        selectedIcons.forEach((selectedIcon) => {
           // Calculate new position based on delta, ensuring it stays within bounds (e.g., 0 to 800/600)
           // Scale delta by zoom level to account for visual scaling
           const scaledDeltaX = delta.x * (1 / currentZoomLevel);
           const scaledDeltaY = delta.y * (1 / currentZoomLevel);
-          const newX = Math.max(0, Math.min(800, selectedIcon.x + scaledDeltaX)); // Assuming 800 width
-          const newY = Math.max(0, Math.min(600, selectedIcon.y + scaledDeltaY)); // Assuming 600 height
+          const newX = Math.max(
+            0,
+            Math.min(800, selectedIcon.x + scaledDeltaX),
+          ); // Assuming 800 width
+          const newY = Math.max(
+            0,
+            Math.min(600, selectedIcon.y + scaledDeltaY),
+          ); // Assuming 600 height
           handleUpdatePositionIcon(selectedIcon.id, newX, newY, autoFollow);
         });
       } else {
@@ -1403,7 +1778,8 @@ const handleDragEnd = (event: DragEndEvent) => {
         // Calculate coordinates relative to the position sheet grid area
         // The position sheet has padding and the grid area is offset by p-1.5 (6px on each side)
         const offsetX = delta.x + (active.rect?.current?.initial?.width || 0) / 2;
-        const offsetY = delta.y + (active.rect?.current?.initial?.height || 0) / 2;
+        const offsetY =
+          delta.y + (active.rect?.current?.initial?.height || 0) / 2;
 
         // Ensure coordinates are within grid bounds (0-800, 0-600)
         const dropX = Math.max(0, Math.min(800, offsetX));
@@ -1427,49 +1803,51 @@ const handleDragEnd = (event: DragEndEvent) => {
           const tempIcons = [...positionIcons, newIcon];
           setPositionIcons(tempIcons);
           // Mark the new icon as selected
-          setPositionIcons(prev => prev.map(icon =>
-            icon.id === newIcon.id ? { ...icon, selected: true } : { ...icon, selected: false }
-          ));
+          setPositionIcons((prev) =>
+            prev.map((icon) =>
+              icon.id === newIcon.id
+                ? { ...icon, selected: true }
+                : { ...icon, selected: false },
+            ),
+          );
         }
       }
       return; // Stop further processing
     }
 
-
     // --- Skill Drop Logic ---
     // Check if dropping onto a valid cell
     if (over.id.toString().startsWith("cell-")) {
-        const lineIndex = over.data?.current?.lineIndex;
-        const count = over.data?.current?.count;
+      const lineIndex = over.data?.current?.lineIndex;
+      const count = over.data?.current?.count;
 
-        if (typeof lineIndex === "number" && typeof count === "number") {
-            // Check if we *started* dragging a PLACED skill
-            if (wasDraggingPlacedSkill && originalPlacedSkillId) {
-                setPlacedSkills(
-                    (prevSkills) => prevSkills.map((ps) =>
-                        ps.id === originalPlacedSkillId // Use the ID stored from drag start
-                        ? { ...ps, lineIndex, startCount: count }
-                        : ps
-                    )
-                );
-            } else {
-                // Check if we are dropping a NEW skill from the panel
-                const skillFromPanel = skills.find((s) => s.id === active.id);
-                if (skillFromPanel) {
-                    const newPlacedSkill: PlacedSkill = {
-                        id: `placed-${Date.now()}-${Math.random()}`,
-                        skillId: skillFromPanel.id,
-                        lineIndex,
-                        startCount: count,
-                    };
-                    setPlacedSkills((prevSkills) => [...prevSkills, newPlacedSkill]);
-                }
-            }
+      if (typeof lineIndex === "number" && typeof count === "number") {
+        // Check if we *started* dragging a PLACED skill
+        if (wasDraggingPlacedSkill && originalPlacedSkillId) {
+          setPlacedSkills((prevSkills) =>
+            prevSkills.map((ps) =>
+              ps.id === originalPlacedSkillId // Use the ID stored from drag start
+                ? { ...ps, lineIndex, startCount: count }
+                : ps,
+            ),
+          );
+        } else {
+          // Check if we are dropping a NEW skill from the panel
+          const skillFromPanel = skills.find((s) => s.id === active.id);
+          if (skillFromPanel) {
+            const newPlacedSkill: PlacedSkill = {
+              id: `placed-${Date.now()}-${Math.random()}`,
+              skillId: skillFromPanel.id,
+              lineIndex,
+              startCount: count,
+            };
+            setPlacedSkills((prevSkills) => [...prevSkills, newPlacedSkill]);
+          }
         }
+      }
     }
     // No further actions if not dropped on a cell or trash
   };
-
 
   const handleRemoveSkill = (id: string) => {
     setPlacedSkills(placedSkills.filter((ps) => ps.id !== id));
@@ -1479,16 +1857,22 @@ const handleDragEnd = (event: DragEndEvent) => {
   };
 
   const handleAddPositionIcon = (type: PositionIcon["type"]) => {
-    console.log(`handleAddPositionIcon called with type: ${type}, selectedLine: ${selectedLine}`);
+    console.log(
+      `handleAddPositionIcon called with type: ${type}, selectedLine: ${selectedLine}`,
+    );
     if (selectedLine === null) {
       console.log("selectedLine is null, returning early");
       return;
     }
 
     const gridSize = 800 / 36;
-    const lineIcons = positionIcons.filter(i => i.lineIndex === selectedLine);
-    console.log(`Found ${lineIcons.length} icons already on line ${selectedLine}`);
-    const occupied = new Set(lineIcons.map(i => `${i.x},${i.y}`));
+    const lineIcons = positionIcons.filter(
+      (i) => i.lineIndex === selectedLine,
+    );
+    console.log(
+      `Found ${lineIcons.length} icons already on line ${selectedLine}`,
+    );
+    const occupied = new Set(lineIcons.map((i) => `${i.x},${i.y}`));
 
     // Start from a visible middle-left area, like where team formations typically start
     let x = Math.round(2 * gridSize); // Column 2 - left side but not edge
@@ -1497,7 +1881,11 @@ const handleDragEnd = (event: DragEndEvent) => {
 
     // Try common formation positions first (rows 6, 12, 17, 22)
     const preferredRows = [6, 12, 17, 22, 9, 15, 21, 27];
-    for (let rowIndex = 0; rowIndex < preferredRows.length && !found; rowIndex++) {
+    for (
+      let rowIndex = 0;
+      rowIndex < preferredRows.length && !found;
+      rowIndex++
+    ) {
       const row = preferredRows[rowIndex];
       for (let col = 1; col < 35 && !found; col++) {
         const testX = Math.round(col * gridSize);
@@ -1525,7 +1913,9 @@ const handleDragEnd = (event: DragEndEvent) => {
       }
     }
 
-    console.log(`Adding icon at position (${x}, ${y}) for line ${selectedLine}. Found free position: ${found}`);
+    console.log(
+      `Adding icon at position (${x}, ${y}) for line ${selectedLine}. Found free position: ${found}`,
+    );
     const newIcon: PositionIcon = {
       id: `icon-${Date.now()}-${Math.random()}`,
       type,
@@ -1533,51 +1923,60 @@ const handleDragEnd = (event: DragEndEvent) => {
       y,
       lineIndex: selectedLine,
     };
-    setPositionIcons(prev => {
+    setPositionIcons((prev) => {
       const newIcons = [...prev, newIcon];
       console.log(`Total positionIcons after adding: ${newIcons.length}`);
       return newIcons;
     });
   };
 
-  const handleUpdatePositionIcon = (id: string, x: number, y: number, shouldPropagate: boolean = false) => {
-    const icon = positionIcons.find(i => i.id === id);
+  const handleUpdatePositionIcon = (
+    id: string,
+    x: number,
+    y: number,
+    shouldPropagate: boolean = false,
+  ) => {
+    const icon = positionIcons.find((i) => i.id === id);
     if (!icon) return;
 
     const gridSize = 800 / 36;
     const snappedX = Math.round(x / gridSize) * gridSize;
     const snappedY = Math.round(y / gridSize) * gridSize;
 
-    setPositionIcons(prev => {
-      const updated = prev.map((i) => (i.id === id ? { ...i, x: snappedX, y: snappedY } : i));
-      
+    setPositionIcons((prev) => {
+      const updated = prev.map((i) =>
+        i.id === id ? { ...i, x: snappedX, y: snappedY } : i,
+      );
+
       if (shouldPropagate && autoFollow) {
         const currentLine = icon.lineIndex;
-        const totalLines = Math.ceil((config.length * config.bpm) / 60 / 8);
-        
+        const totalLines = Math.ceil(((config.length * config.bpm) / 60 / 8));
+
         // Get all icons at current line with their new positions
-        const currentLineIcons = updated.filter(i => i.lineIndex === currentLine);
-        
+        const currentLineIcons = updated.filter(
+          (i) => i.lineIndex === currentLine,
+        );
+
         // For each subsequent line, copy the entire icon layout from current line
         const result = [...updated];
         for (let line = currentLine + 1; line < totalLines; line++) {
           // Remove existing icons at this line
-          const otherIcons = result.filter(i => i.lineIndex !== line);
-          
+          const otherIcons = result.filter((i) => i.lineIndex !== line);
+
           // Copy current line icons to this line
-          const copiedIcons = currentLineIcons.map(i => ({
+          const copiedIcons = currentLineIcons.map((i) => ({
             ...i,
             id: `icon-${Date.now()}-${Math.random()}-${line}`,
             lineIndex: line,
           }));
-          
+
           result.length = 0;
           result.push(...otherIcons, ...copiedIcons);
         }
-        
+
         return result;
       }
-      
+
       return updated;
     });
   };
@@ -1586,11 +1985,16 @@ const handleDragEnd = (event: DragEndEvent) => {
     setPositionIcons(positionIcons.filter((icon) => icon.id !== id));
   };
 
-  const handleRestoreLineState = (lineIndex: number, newLineIcons: PositionIcon[]) => {
+  const handleRestoreLineState = (
+    lineIndex: number,
+    newLineIcons: PositionIcon[],
+  ) => {
     // Replace all icons for the specified line with the new state
-    setPositionIcons(prev => {
+    setPositionIcons((prev) => {
       // Remove all existing icons for this line
-      const filteredIcons = prev.filter(icon => icon.lineIndex !== lineIndex);
+      const filteredIcons = prev.filter(
+        (icon) => icon.lineIndex !== lineIndex,
+      );
       // Add the new line icons
       return [...filteredIcons, ...newLineIcons];
     });
@@ -1610,21 +2014,27 @@ const handleDragEnd = (event: DragEndEvent) => {
 
     // If auto-follow is enabled, propagate the undo to subsequent lines
     if (autoFollow) {
-      const totalLines = Math.ceil((config.length * config.bpm) / 60 / 8);
+      const totalLines = Math.ceil(((config.length * config.bpm) / 60 / 8));
       const currentLineIcons = prevState;
 
       // Restore subsequent lines to match the undone state
-      for (let subsequentLine = lineIndex + 1; subsequentLine < totalLines; subsequentLine++) {
+      for (
+        let subsequentLine = lineIndex + 1;
+        subsequentLine < totalLines;
+        subsequentLine++
+      ) {
         // Create copied icons for this subsequent line
-        const copiedIcons = currentLineIcons.map(icon => ({
+        const copiedIcons = currentLineIcons.map((icon) => ({
           ...icon,
           id: `icon-${Date.now()}-${Math.random()}-${subsequentLine}`,
           lineIndex: subsequentLine,
         }));
 
         // Replace icons for this line
-        setPositionIcons(prev => {
-          const otherIcons = prev.filter(icon => icon.lineIndex !== subsequentLine);
+        setPositionIcons((prev) => {
+          const otherIcons = prev.filter(
+            (icon) => icon.lineIndex !== subsequentLine,
+          );
           return [...otherIcons, ...copiedIcons];
         });
       }
@@ -1633,14 +2043,15 @@ const handleDragEnd = (event: DragEndEvent) => {
     // Update history index
     setScopedHistory(loadedSaveStateSlot, config.category, lineIndex, {
       ...lineHistory,
-      index: lineHistory.index - 1
+      index: lineHistory.index - 1,
     });
   };
 
   const handleRedoLine = (lineIndex: number) => {
     if (!loadedSaveStateSlot) return;
     const lineHistory = getCurrentScopedHistory(lineIndex);
-    if (!lineHistory || lineHistory.index >= lineHistory.history.length - 1) return;
+    if (!lineHistory || lineHistory.index >= lineHistory.history.length - 1)
+      return;
 
     // Get the next state for this line
     const nextState = lineHistory.history[lineHistory.index + 1];
@@ -1651,21 +2062,27 @@ const handleDragEnd = (event: DragEndEvent) => {
 
     // If auto-follow is enabled, propagate the redo to subsequent lines
     if (autoFollow) {
-      const totalLines = Math.ceil((config.length * config.bpm) / 60 / 8);
+      const totalLines = Math.ceil(((config.length * config.bpm) / 60 / 8));
       const currentLineIcons = nextState;
 
       // Restore subsequent lines to match the redone state
-      for (let subsequentLine = lineIndex + 1; subsequentLine < totalLines; subsequentLine++) {
+      for (
+        let subsequentLine = lineIndex + 1;
+        subsequentLine < totalLines;
+        subsequentLine++
+      ) {
         // Create copied icons for this subsequent line
-        const copiedIcons = currentLineIcons.map(icon => ({
+        const copiedIcons = currentLineIcons.map((icon) => ({
           ...icon,
           id: `icon-${Date.now()}-${Math.random()}-${subsequentLine}`,
           lineIndex: subsequentLine,
         }));
 
         // Replace icons for this line
-        setPositionIcons(prev => {
-          const otherIcons = prev.filter(icon => icon.lineIndex !== subsequentLine);
+        setPositionIcons((prev) => {
+          const otherIcons = prev.filter(
+            (icon) => icon.lineIndex !== subsequentLine,
+          );
           return [...otherIcons, ...copiedIcons];
         });
       }
@@ -1674,7 +2091,7 @@ const handleDragEnd = (event: DragEndEvent) => {
     // Update history index
     setScopedHistory(loadedSaveStateSlot, config.category, lineIndex, {
       ...lineHistory,
-      index: lineHistory.index + 1
+      index: lineHistory.index + 1,
     });
   };
 
@@ -1683,24 +2100,27 @@ const handleDragEnd = (event: DragEndEvent) => {
   };
 
   const handleNamePositionIcon = (id: string, name: string) => {
-    setPositionIcons(prev => {
-      const updated = prev.map((icon) => (icon.id === id ? { ...icon, name } : icon));
+    setPositionIcons((prev) => {
+      const updated = prev.map((icon) =>
+        icon.id === id ? { ...icon, name } : icon,
+      );
 
       if (autoFollow) {
-        const namedIcon = updated.find(i => i.id === id);
+        const namedIcon = updated.find((i) => i.id === id);
         if (!namedIcon) return updated;
 
-        const totalLines = Math.ceil((config.length * config.bpm) / 60 / 8);
+        const totalLines = Math.ceil(((config.length * config.bpm) / 60 / 8));
         const currentLine = namedIcon.lineIndex;
 
         // For each subsequent line, find icons with matching position and type
         const result = [...updated];
         for (let line = currentLine + 1; line < totalLines; line++) {
-          const matchingIconIndex = result.findIndex(i =>
-            i.lineIndex === line &&
-            i.x === namedIcon.x &&
-            i.y === namedIcon.y &&
-            i.type === namedIcon.type
+          const matchingIconIndex = result.findIndex(
+            (i) =>
+              i.lineIndex === line &&
+              i.x === namedIcon.x &&
+              i.y === namedIcon.y &&
+              i.type === namedIcon.type,
           );
 
           if (matchingIconIndex !== -1) {
@@ -1718,11 +2138,11 @@ const handleDragEnd = (event: DragEndEvent) => {
   const handleUpdateSegmentName = (lineIndex: number, name: string) => {
     if (lineIndex === null) return;
 
-    setSegmentNames(prev => {
+    setSegmentNames((prev) => {
       const newSegmentNames = { ...prev, [lineIndex]: name };
 
       if (autoFollow) {
-        const totalLines = Math.ceil((config.length * config.bpm) / 60 / 8);
+        const totalLines = Math.ceil(((config.length * config.bpm) / 60 / 8));
         for (let line = lineIndex + 1; line < totalLines; line++) {
           newSegmentNames[line] = name;
         }
@@ -1747,7 +2167,7 @@ const handleDragEnd = (event: DragEndEvent) => {
 
     // For team categories, reset icons to default positions
     if (config.category === "team-16" || config.category === "team-24") {
-      const totalLines = Math.ceil((config.length * config.bpm) / 60 / 8);
+      const totalLines = Math.ceil(((config.length * config.bpm) / 60 / 8));
       const resetIcons: PositionIcon[] = [];
 
       for (let lineIndex = 0; lineIndex < totalLines; lineIndex++) {
@@ -1768,16 +2188,19 @@ const handleDragEnd = (event: DragEndEvent) => {
     if (!loadedSaveStateSlot || !renameInput.trim()) return;
 
     const trimmedName = renameInput.trim();
-    setSaveNames(prev => ({
+    setSaveNames((prev) => ({
       ...prev,
-      [loadedSaveStateSlot]: trimmedName
+      [loadedSaveStateSlot]: trimmedName,
     }));
 
     // Save to localStorage
-    localStorage.setItem('save-names', JSON.stringify({
-      ...saveNames,
-      [loadedSaveStateSlot]: trimmedName
-    }));
+    localStorage.setItem(
+      "save-names",
+      JSON.stringify({
+        ...saveNames,
+        [loadedSaveStateSlot]: trimmedName,
+      }),
+    );
 
     setShowRenameDialog(false);
     setRenameInput("");
@@ -1789,7 +2212,11 @@ const handleDragEnd = (event: DragEndEvent) => {
         <div className="flex items-center justify-between mb-2">
           <h1 className="text-xl font-bold">Cheerleading Routine Builder</h1>
           <div className="flex gap-1">
-            <Button variant="outline" size="sm" onClick={() => setShowAboutModal(true)}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowAboutModal(true)}
+            >
               <Info className="h-4 w-4" />
             </Button>
             <Button variant="destructive" size="sm" onClick={handleReset}>
@@ -1818,7 +2245,7 @@ const handleDragEnd = (event: DragEndEvent) => {
             <ThemeToggle />
           </div>
         </div>
-        
+
         <div className="flex gap-3 items-center">
           <div className="flex items-center gap-1">
             <Label className="text-xs">Length:</Label>
@@ -1860,7 +2287,9 @@ const handleDragEnd = (event: DragEndEvent) => {
             <Label className="text-xs">Cat:</Label>
             <Select
               value={config.category}
-              onValueChange={(v) => setConfig({ ...config, category: v as any })}
+              onValueChange={(v) =>
+                setConfig({ ...config, category: v as any })
+              }
             >
               <SelectTrigger className="w-36 h-8">
                 <SelectValue />
@@ -1889,7 +2318,7 @@ const handleDragEnd = (event: DragEndEvent) => {
                     config: { ...config },
                     notes: { ...notes },
                     segmentNames: { ...segmentNames },
-                    timestamp: Date.now()
+                    timestamp: Date.now(),
                   };
                   localStorage.setItem(key, JSON.stringify(data));
                 }
@@ -1901,7 +2330,7 @@ const handleDragEnd = (event: DragEndEvent) => {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {([1, 2, 3] as const).map(slot => (
+                {([1, 2, 3] as const).map((slot) => (
                   <SelectItem key={slot} value={slot.toString()}>
                     {saveNames[slot]}
                   </SelectItem>
@@ -1937,13 +2366,21 @@ const handleDragEnd = (event: DragEndEvent) => {
         modifiers={[snapCenterToCursor]}
       >
         <ResizablePanelGroup direction="horizontal" className="flex-1 w-full">
-          <ResizablePanel defaultSize={15} minSize={10} maxSize={40} collapsible className="min-w-40">
+          <ResizablePanel
+            defaultSize={15}
+            minSize={10}
+            maxSize={40}
+            collapsible
+            className="min-w-40"
+          >
             <SkillsPanel
               skills={skills}
               onAddCustomSkill={addCustomSkill}
               onDeleteSkill={(id) => {
                 deleteSkill(id);
-                setPlacedSkills(placedSkills.filter(ps => ps.skillId !== id));
+                setPlacedSkills(
+                  placedSkills.filter((ps) => ps.skillId !== id),
+                );
               }}
               onUpdateSkillCounts={updateSkillCounts}
               currentLevel={config.level}
@@ -1954,13 +2391,16 @@ const handleDragEnd = (event: DragEndEvent) => {
           <ResizableHandle withHandle />
 
           <ResizablePanel defaultSize={75}>
-            {(config.category === "team-16" || config.category === "team-24") ? (
+            {config.category === "team-16" ||
+            config.category === "team-24" ? (
               <ResizablePanelGroup direction="vertical" className="h-full">
                 <ResizablePanel defaultSize={50}>
                   <CountSheet
                     routineLength={config.length}
                     bpm={config.bpm}
-                    placedSkills={placedSkills.filter(ps => ps.id !== draggedPlacedSkillId)}
+                    placedSkills={placedSkills.filter(
+                      (ps) => ps.id !== draggedPlacedSkillId,
+                    )}
                     skills={skills}
                     onRemoveSkill={handleRemoveSkill}
                     onLineClick={setSelectedLine}
@@ -1968,16 +2408,24 @@ const handleDragEnd = (event: DragEndEvent) => {
                     selectedSkillId={selectedSkillId}
                     onSelectSkill={setSelectedSkillId}
                     onMoveSkill={(id, newLineIndex, newStartCount) => {
-                      setPlacedSkills(placedSkills.map(ps =>
-                        ps.id === id ? { ...ps, lineIndex: newLineIndex, startCount: newStartCount } : ps
-                      ));
+                      setPlacedSkills(
+                        placedSkills.map((ps) =>
+                          ps.id === id
+                            ? {
+                                ...ps,
+                                lineIndex: newLineIndex,
+                                startCount: newStartCount,
+                              }
+                            : ps,
+                        ),
+                      );
                     }}
                     onUpdateSkillCounts={updateSkillCounts}
                     draggedSkill={draggedSkill}
                     overCellId={overCellId}
                     notes={notes}
                     onUpdateNote={(lineIndex, note) => {
-                      setNotes(prev => ({ ...prev, [lineIndex]: note }));
+                      setNotes((prev) => ({ ...prev, [lineIndex]: note }));
                     }}
                     isPdfRender={isGeneratingPdf}
                   />
@@ -2005,17 +2453,25 @@ const handleDragEnd = (event: DragEndEvent) => {
                     dragOffset={dragOffset}
                     draggedIconId={draggedIconId}
                     onSelectIcon={(id) => {
-                      setPositionIcons(prev => prev.map(icon =>
-                        ({ ...icon, selected: icon.id === id ? !icon.selected : false })
-                      ));
+                      setPositionIcons((prev) =>
+                        prev.map((icon) => ({
+                          ...icon,
+                          selected: icon.id === id ? !icon.selected : false,
+                        })),
+                      );
                     }}
                     onSelectMultiple={(ids) => {
-                      setPositionIcons(prev => prev.map(icon =>
-                        ({ ...icon, selected: ids.includes(icon.id) })
-                      ));
+                      setPositionIcons((prev) =>
+                        prev.map((icon) => ({
+                          ...icon,
+                          selected: ids.includes(icon.id),
+                        })),
+                      );
                     }}
                     onNextLine={() => {
-                      const totalLines = Math.ceil((config.length * config.bpm) / 60 / 8);
+                      const totalLines = Math.ceil(
+                        ((config.length * config.bpm) / 60 / 8),
+                      );
                       if (selectedLine !== null && selectedLine < totalLines - 1) {
                         setSelectedLine(selectedLine + 1);
                       }
@@ -2038,15 +2494,16 @@ const handleDragEnd = (event: DragEndEvent) => {
                       setCurrentZoomLevel(event.zoomLevel);
                     }}
                     onZoomChange={(zoomLevel) => setCurrentZoomLevel(zoomLevel)}
-                    segmentName={selectedLine !== null ? segmentNames[selectedLine] || "" : ""}
+                    segmentName={
+                      selectedLine !== null ? segmentNames[selectedLine] || "" : ""
+                    }
                     onUpdateSegmentName={(name) => {
                       if (selectedLine !== null) {
                         handleUpdateSegmentName(selectedLine, name);
                       }
                     }}
-                    pdfIcons={pdfIcons}
-                    pdfSegmentName={pdfSegmentName} // ----- ADD THIS PROP -----
-                    zoomLevel={pdfZoomLevel}
+                    // Pass the current zoom state to the visible sheet
+                    zoomLevel={currentZoomLevel}
                   />
                 </ResizablePanel>
               </ResizablePanelGroup>
@@ -2062,31 +2519,38 @@ const handleDragEnd = (event: DragEndEvent) => {
                 selectedSkillId={selectedSkillId}
                 onSelectSkill={setSelectedSkillId}
                 onMoveSkill={(id, newLineIndex, newStartCount) => {
-                  setPlacedSkills(placedSkills.map(ps =>
-                    ps.id === id ? { ...ps, lineIndex: newLineIndex, startCount: newStartCount } : ps
-                  ));
+                  setPlacedSkills(
+                    placedSkills.map((ps) =>
+                      ps.id === id
+                        ? {
+                            ...ps,
+                            lineIndex: newLineIndex,
+                            startCount: newStartCount,
+                          }
+                        : ps,
+                    ),
+                  );
                 }}
                 onUpdateSkillCounts={updateSkillCounts}
                 draggedSkill={draggedSkill}
                 overCellId={overCellId}
-                                    notes={notes}
-                    onUpdateNote={(lineIndex, note) => {
-                      setNotes(prev => ({ ...prev, [lineIndex]: note }));
-                    }}
+                notes={notes}
+                onUpdateNote={(lineIndex, note) => {
+                  setNotes((prev) => ({ ...prev, [lineIndex]: note }));
+                }}
                 isPdfRender={isGeneratingPdf}
               />
             )}
           </ResizablePanel>
         </ResizablePanelGroup>
 
-<DragOverlay className="z-[3000]">
-
-{draggedSkill ? (
-<div className={isDraggingPlacedSkill ? "" : ""}>
-<SkillCard skill={draggedSkill} showDescription={false} />
-</div>
-) : null}
-</DragOverlay>
+        <DragOverlay className="z-[3000]">
+          {draggedSkill ? (
+            <div className={isDraggingPlacedSkill ? "" : ""}>
+              <SkillCard skill={draggedSkill} showDescription={false} />
+            </div>
+          ) : null}
+        </DragOverlay>
         <TrashDropZone isDragging={isDraggingPlacedSkill} />
       </DndContext>
 
@@ -2104,7 +2568,13 @@ const handleDragEnd = (event: DragEndEvent) => {
                 className="w-full h-[600px] border rounded"
                 title="PDF Preview"
               >
-                <p>Your browser doesn't support PDF preview. <a href={pdfBlobUrl} download="routine.pdf">Download the PDF</a> instead.</p>
+                <p>
+                  Your browser doesn't support PDF preview.{" "}
+                  <a href={pdfBlobUrl} download="routine.pdf">
+                    Download the PDF
+                  </a>{" "}
+                  instead.
+                </p>
               </object>
             )}
           </div>
@@ -2115,9 +2585,9 @@ const handleDragEnd = (event: DragEndEvent) => {
             <Button
               onClick={() => {
                 if (pdfBlobUrl) {
-                  const a = document.createElement('a');
+                  const a = document.createElement("a");
                   a.href = pdfBlobUrl;
-                  a.download = 'routine.pdf';
+                  a.download = "routine.pdf";
                   document.body.appendChild(a);
                   a.click();
                   document.body.removeChild(a);
@@ -2150,7 +2620,7 @@ const handleDragEnd = (event: DragEndEvent) => {
                 className="col-span-3"
                 placeholder="Enter save name..."
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
+                  if (e.key === "Enter") {
                     handleRenameSave();
                   }
                 }}
@@ -2161,9 +2631,7 @@ const handleDragEnd = (event: DragEndEvent) => {
             <Button variant="outline" onClick={() => setShowRenameDialog(false)}>
               Cancel
             </Button>
-            <Button onClick={handleRenameSave}>
-              Save
-            </Button>
+            <Button onClick={handleRenameSave}>Save</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
