@@ -6,6 +6,7 @@ import { useSkills } from "@/hooks/useSkills";
 import { useRoutineConfig } from "@/hooks/useRoutineConfig";
 import { usePdfExport } from "@/hooks/usePdfExport";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { exportCurrentSlot, importSlotData, validateImportedData, type ExportedData } from "@/lib/exportImport";
 import AboutModal from "./AboutModal";
 import { RoutineHeader } from "./RoutineHeader";
@@ -26,6 +27,7 @@ declare global {
 
 export const RoutineBuilder = () => {
   const { theme } = useTheme();
+  const isMobile = useIsMobile();
   const { skills, exportToCSV, addCustomSkill, deleteSkill, updateSkillCounts, resetToDefault } =
     useSkills();
   const { config, updateLength, updateCategory, updateLevel, updateBpm, updateConfig } = useRoutineConfig();
@@ -385,9 +387,14 @@ export const RoutineBuilder = () => {
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8,
-      },
+      activationConstraint: isMobile
+        ? {
+            delay: 200,
+            tolerance: 5,
+          }
+        : {
+            distance: 8,
+          },
     }),
   );
 
