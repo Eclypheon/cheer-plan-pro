@@ -93,7 +93,7 @@ export const RoutineHeader = ({
         </div>
       </div>
 
-      <div className="flex gap-3 items-center">
+      <div className="flex flex-wrap gap-3 items-center">
         <div className="flex items-center gap-1">
           <Label className="text-xs">Length:</Label>
           <Select
