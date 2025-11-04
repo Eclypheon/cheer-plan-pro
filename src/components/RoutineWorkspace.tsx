@@ -1,387 +1,145 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, DragMoveEvent, CollisionDetection, rectIntersection, DragOverEvent, useSensor, useSensors, PointerSensor } from "@dnd-kit/core";
+import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, DragMoveEvent, CollisionDetection, rectIntersection, closestCenter, DragOverEvent, useSensor, useSensors, PointerSensor } from "@dnd-kit/core";
 import { snapCenterToCursor } from "@dnd-kit/modifiers";
 import type { PlacedSkill, RoutineConfig, Skill, PositionIcon, CategoryStateData, SaveStateData } from "@/types/routine";
 import { useSkills } from "@/hooks/useSkills";
 import { useRoutineConfig } from "@/hooks/useRoutineConfig";
 import { usePdfExport } from "@/hooks/usePdfExport";
-import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
-import { exportCurrentSlot, importSlotData, validateImportedData, type ExportedData } from "@/lib/exportImport";
-import AboutModal from "./AboutModal";
-import { RoutineHeader } from "./RoutineHeader";
-import { RoutineWorkspace } from "./RoutineWorkspace";
-import { PdfPreviewDialog } from "./PdfPreviewDialog";
-import { SaveRenameDialog } from "./SaveRenameDialog";
-import { useTheme } from "next-themes";
+import { SkillsPanel } from "./SkillsPanel";
+import { CountSheet } from "./CountSheet";
+import { PositionSheet } from "./PositionSheet";
+import { SkillCard } from "./SkillCard";
+import { TrashDropZone } from "./TrashDropZone";
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 
-// Define global functions for TypeScript
-declare global {
-  interface Window {
-    showPdfProgress: (totalSteps: number) => void;
-    updatePdfProgress: (currentStep: number, message: string) => void;
-    hidePdfProgress: () => void;
-    pdfTotalSteps: number;
-  }
-}
-
-export const RoutineBuilder = () => {
-  const { theme } = useTheme();
-  const { skills, exportToCSV, addCustomSkill, deleteSkill, updateSkillCounts, resetToDefault } =
-    useSkills();
-  const { config, updateLength, updateCategory, updateLevel, updateBpm, updateConfig } = useRoutineConfig();
-
-  const [placedSkills, setPlacedSkills] = useState<PlacedSkill[]>([]);
-  const [positionIcons, setPositionIcons] = useState<PositionIcon[]>([]);
-  const [notes, setNotes] = useState<Record<number, string>>({});
-  const [segmentNames, setSegmentNames] = useState<Record<number, string>>({});
-  const [selectedLine, setSelectedLine] = useState<number | null>(null);
-  const [lineHistories, setLineHistories] = useState<{
+interface RoutineWorkspaceProps {
+  config: RoutineConfig;
+  placedSkills: PlacedSkill[];
+  setPlacedSkills: React.Dispatch<React.SetStateAction<PlacedSkill[]>>;
+  positionIcons: PositionIcon[];
+  setPositionIcons: React.Dispatch<React.SetStateAction<PositionIcon[]>>;
+  notes: Record<number, string>;
+  setNotes: React.Dispatch<React.SetStateAction<Record<number, string>>>;
+  segmentNames: Record<number, string>;
+  setSegmentNames: React.Dispatch<React.SetStateAction<Record<number, string>>>;
+  selectedLine: number | null;
+  setSelectedLine: React.Dispatch<React.SetStateAction<number | null>>;
+  lineHistories: {
     [saveStateSlot: number]: {
       [category: string]: {
         [lineIndex: number]: { history: PositionIcon[][]; index: number };
       };
     };
-  }>({});
-  const [draggedSkill, setDraggedSkill] = useState<Skill | null>(null);
-  const [isDraggingPlacedSkill, setIsDraggingPlacedSkill] = useState(false);
-  const [isResizing, setIsResizing] = useState(false);
-  const [draggedPlacedSkillId, setDraggedPlacedSkillId] = useState<string | null>(
-    null,
-  );
-  const [selectedSkillId, setSelectedSkillId] = useState<string | null>(null);
-  const [showGrid, setShowGrid] = useState(false);
-  const [autoFollow, setAutoFollow] = useState(true);
-  const [isDraggingIcon, setIsDraggingIcon] = useState(false);
-  const [dragOffset, setDragOffset] = useState<{ x: number; y: number } | null>(
-    null,
-  );
-  const [draggedIconId, setDraggedIconId] = useState<string | null>(null);
-  const [currentZoomLevel, setCurrentZoomLevel] = useState<number>(0.55);
-  const [overCellId, setOverCellId] = useState<string | null>(null);
+  };
+  setLineHistories: React.Dispatch<React.SetStateAction<{
+    [saveStateSlot: number]: {
+      [category: string]: {
+        [lineIndex: number]: { history: PositionIcon[][]; index: number };
+      };
+    };
+  }>>;
+  draggedSkill: Skill | null;
+  setDraggedSkill: React.Dispatch<React.SetStateAction<Skill | null>>;
+  isDraggingPlacedSkill: boolean;
+  setIsDraggingPlacedSkill: React.Dispatch<React.SetStateAction<boolean>>;
+  isResizing: boolean;
+  setIsResizing: React.Dispatch<React.SetStateAction<boolean>>;
+  draggedPlacedSkillId: string | null;
+  setDraggedPlacedSkillId: React.Dispatch<React.SetStateAction<string | null>>;
+  selectedSkillId: string | null;
+  setSelectedSkillId: React.Dispatch<React.SetStateAction<string | null>>;
+  showGrid: boolean;
+  setShowGrid: React.Dispatch<React.SetStateAction<boolean>>;
+  autoFollow: boolean;
+  setAutoFollow: React.Dispatch<React.SetStateAction<boolean>>;
+  isDraggingIcon: boolean;
+  setIsDraggingIcon: React.Dispatch<React.SetStateAction<boolean>>;
+  dragOffset: { x: number; y: number } | null;
+  setDragOffset: React.Dispatch<React.SetStateAction<{ x: number; y: number } | null>>;
+  draggedIconId: string | null;
+  setDraggedIconId: React.Dispatch<React.SetStateAction<string | null>>;
+  currentZoomLevel: number;
+  setCurrentZoomLevel: React.Dispatch<React.SetStateAction<number>>;
+  overCellId: string | null;
+  setOverCellId: React.Dispatch<React.SetStateAction<string | null>>;
+  hasLoadedState: boolean;
+  initialLoadedCategoryRef: React.MutableRefObject<string | null>;
+  currentSaveState: SaveStateData | null;
+  setCurrentSaveState: React.Dispatch<React.SetStateAction<SaveStateData | null>>;
+  loadedSaveStateSlot: 1 | 2 | 3 | null;
+  keyboardSettings: any;
+  skills: Skill[];
+  updateSkillCounts: (id: string, counts: number) => void;
+  addCustomSkill: (skill: Omit<Skill, "id">) => void;
+  deleteSkill: (id: string) => void;
+  updateConfig: (config: Partial<RoutineConfig>) => void;
+  getUniquePositionConfigurations: () => {
+    icons: PositionIcon[];
+    lineIndex: number;
+  }[];
+  handleExportPDF: () => void;
+  isGeneratingPdf: boolean;
+  resetToDefault: () => void;
+}
 
+export const RoutineWorkspace = ({
+  config,
+  placedSkills,
+  setPlacedSkills,
+  positionIcons,
+  setPositionIcons,
+  notes,
+  setNotes,
+  segmentNames,
+  setSegmentNames,
+  selectedLine,
+  setSelectedLine,
+  lineHistories,
+  setLineHistories,
+  draggedSkill,
+  setDraggedSkill,
+  isDraggingPlacedSkill,
+  setIsDraggingPlacedSkill,
+  isResizing,
+  setIsResizing,
+  draggedPlacedSkillId,
+  setDraggedPlacedSkillId,
+  selectedSkillId,
+  setSelectedSkillId,
+  showGrid,
+  setShowGrid,
+  autoFollow,
+  setAutoFollow,
+  isDraggingIcon,
+  setIsDraggingIcon,
+  dragOffset,
+  setDragOffset,
+  draggedIconId,
+  setDraggedIconId,
+  currentZoomLevel,
+  setCurrentZoomLevel,
+  overCellId,
+  setOverCellId,
+  hasLoadedState,
+  initialLoadedCategoryRef,
+  currentSaveState,
+  setCurrentSaveState,
+  loadedSaveStateSlot,
+  keyboardSettings,
+  skills,
+  updateSkillCounts,
+  addCustomSkill,
+  deleteSkill,
+  updateConfig,
+  getUniquePositionConfigurations,
+  handleExportPDF,
+  isGeneratingPdf,
+  resetToDefault,
+}: RoutineWorkspaceProps) => {
   // Handle zoom level changes from PositionSheet
   const handleZoomChange = useCallback((zoomLevel: number) => {
     setCurrentZoomLevel(zoomLevel);
   }, []);
-  const [hasLoadedState, setHasLoadedState] = useState(false);
-  const initialLoadedCategoryRef = useRef<string | null>(null);
-  const [currentSaveState, setCurrentSaveState] =
-    useState<SaveStateData | null>(null);
-  const [loadedSaveStateSlot, setLoadedSaveStateSlot] = useState<
-    null | 1 | 2 | 3
-  >(null);
-  const [showPdfPreview, setShowPdfPreview] = useState(false);
-  const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
-  const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
-  // const [shouldGeneratePdf, setShouldGeneratePdf] = useState(false); // <-- REMOVED
-  const [saveNames, setSaveNames] = useState<Record<1 | 2 | 3, string>>({
-    1: "Save 1",
-    2: "Save 2",
-    3: "Save 3",
-  });
-  const [showRenameDialog, setShowRenameDialog] = useState(false);
-  const [renameInput, setRenameInput] = useState("");
-  const [showAboutModal, setShowAboutModal] = useState(false);
-
-  // Load keyboard settings
-  const [keyboardSettings] = useState(() => {
-    const saved = localStorage.getItem("keyboardSettings");
-    return saved
-      ? JSON.parse(saved)
-      : {
-          nextLine: "ArrowDown",
-          prevLine: "ArrowUp",
-          undo: "z",
-          redo: "y",
-          toggleAutoFollow: "f",
-          deleteIcon: "Delete",
-          moveLeft: "ArrowLeft",
-          moveRight: "ArrowRight",
-          moveUp: "ArrowUp",
-          moveDown: "ArrowDown",
-          altMoveLeft: "a",
-          altMoveRight: "d",
-          altMoveUp: "w",
-          altMoveDown: "s",
-        };
-  });
-
-  // Load saved state on component mount - auto-load State 1 if available
-  useEffect(() => {
-    // Load save names
-    const savedNames = localStorage.getItem("save-names");
-    if (savedNames) {
-      try {
-        const names = JSON.parse(savedNames);
-        setSaveNames((prev) => ({ ...prev, ...names }));
-      } catch (e) {
-        console.error("Failed to load save names:", e);
-      }
-    }
-
-    const state1Key = "save-state-1";
-    const savedState1 = localStorage.getItem(state1Key);
-    if (savedState1) {
-      try {
-        const data: SaveStateData = JSON.parse(savedState1);
-        setPlacedSkills(data.placedSkills);
-        setPositionIcons(data.positionIcons);
-        setNotes(data.notes || {});
-        setSegmentNames(data.segmentNames || {});
-        updateConfig(data.config);
-        setCurrentSaveState(data);
-        setLoadedSaveStateSlot(1);
-        // Store the initially loaded category so we know when user manually changes it
-        initialLoadedCategoryRef.current = data.config.category;
-      } catch (e) {
-        console.error("Failed to load State 1:", e);
-      }
-    } else {
-      // No State 1 exists - start fresh but default to State 1
-      setLoadedSaveStateSlot(1);
-    }
-    // Mark that we've attempted to load saved state
-    setHasLoadedState(true);
-  }, []);
-
-  // Manage PDF blob URL creation and cleanup
-  useEffect(() => {
-    if (pdfBlob && !pdfBlobUrl) {
-      const url = URL.createObjectURL(pdfBlob);
-      setPdfBlobUrl(url);
-    }
-
-    // Cleanup function
-    return () => {
-      if (pdfBlobUrl) {
-        URL.revokeObjectURL(pdfBlobUrl);
-      }
-    };
-  }, [pdfBlob, pdfBlobUrl]);
-
-  // Cleanup blob URL when dialog closes
-  useEffect(() => {
-    if (!showPdfPreview && pdfBlobUrl) {
-      URL.revokeObjectURL(pdfBlobUrl);
-      setPdfBlobUrl(null);
-      setPdfBlob(null);
-    }
-  }, [showPdfPreview, pdfBlobUrl]);
-
-  // Helper function to get unique position sheet configurations
-  // ----- MODIFY THIS FUNCTION -----
-  const getUniquePositionConfigurations = (): {
-    icons: PositionIcon[];
-    lineIndex: number;
-  }[] => {
-    const totalLines = Math.ceil(((config.length * config.bpm) / 60 / 8));
-    const configurations: { icons: PositionIcon[]; lineIndex: number }[] = [];
-    const seenConfigurations = new Set<string>();
-
-    for (let lineIndex = 0; lineIndex < totalLines; lineIndex++) {
-      const lineIcons = positionIcons.filter(
-        (icon) => icon.lineIndex === lineIndex,
-      );
-
-      // Create a normalized representation of the configuration
-      // Sort icons by position and create a hash string
-      const normalizedIcons = lineIcons
-        .map((icon) => ({
-          type: icon.type,
-          x: icon.x,
-          y: icon.y,
-          name: icon.name || "",
-        }))
-        .sort((a, b) => {
-          if (a.y !== b.y) return a.y - b.y;
-          if (a.x !== b.x) return a.x - b.x;
-          return a.type.localeCompare(b.type);
-        });
-
-      const configHash = JSON.stringify(normalizedIcons);
-
-      // Only add if we haven't seen this configuration before
-      if (!seenConfigurations.has(configHash)) {
-        seenConfigurations.add(configHash);
-        configurations.push({ icons: lineIcons, lineIndex }); // Store lineIndex
-      }
-    }
-
-    return configurations;
-  };
-
-  const { handleExportPDF, isGeneratingPdf } = usePdfExport({
-    config,
-    getUniquePositionConfigurations,
-    segmentNames,
-    setPdfBlob,
-    setShowPdfPreview,
-  });
-
-  // Handle category changes - auto-save/load category states
-  useEffect(() => {
-    // Only handle category changes after initial load
-    if (!hasLoadedState) return;
-
-    // Save current category state before switching (only for user-initiated changes)
-    if (
-      initialLoadedCategoryRef.current !== null &&
-      initialLoadedCategoryRef.current !== config.category
-    ) {
-      saveCategoryState(
-        initialLoadedCategoryRef.current as RoutineConfig["category"],
-      );
-    }
-
-    // Always start with fresh history when changing categories to ensure complete isolation
-    if (loadedSaveStateSlot) {
-      setLineHistories((prev) => {
-        if (!prev[loadedSaveStateSlot]) {
-          return prev;
-        }
-        const newSaveStateHistories = { ...prev[loadedSaveStateSlot] };
-        // Clear history for all categories in this save state to ensure complete isolation
-        delete newSaveStateHistories[initialLoadedCategoryRef.current as string];
-        delete newSaveStateHistories[config.category]; // Clear new category history too
-        return {
-          ...prev,
-          [loadedSaveStateSlot]: newSaveStateHistories,
-        };
-      });
-    }
-
-    // Load saved state for new category if it exists
-    const savedCategoryData = loadCategoryState(config.category);
-    if (savedCategoryData) {
-      setPlacedSkills(savedCategoryData.placedSkills);
-      setPositionIcons(savedCategoryData.positionIcons);
-      setNotes(savedCategoryData.notes || {});
-      setSegmentNames(savedCategoryData.segmentNames || {});
-    } else {
-      // No saved state - create default state for category
-      setPlacedSkills([]);
-      setNotes({});
-      setSegmentNames({});
-      if (config.category === "team-16" || config.category === "team-24") {
-        // Generate default team icons
-        const totalLines = Math.ceil(((config.length * config.bpm) / 60 / 8));
-        const newIcons: PositionIcon[] = [];
-        for (let lineIndex = 0; lineIndex < totalLines; lineIndex++) {
-          newIcons.push(...generateTeamIcons(config.category, lineIndex));
-        }
-        setPositionIcons(newIcons);
-      } else {
-        // For individual categories, start with empty position sheet
-        setPositionIcons([]);
-      }
-    }
-
-    // Update the reference
-    initialLoadedCategoryRef.current = config.category;
-  }, [config.category, config.length, config.bpm, hasLoadedState]);
-
-  // Auto-save to current slot whenever state changes
-  useEffect(() => {
-    if (loadedSaveStateSlot) {
-      const key = `save-state-${loadedSaveStateSlot}`;
-      const data: SaveStateData = {
-        placedSkills: [...placedSkills],
-        positionIcons: [...positionIcons],
-        config: { ...config },
-        notes: { ...notes },
-        segmentNames: { ...segmentNames },
-        timestamp: Date.now(),
-      };
-      localStorage.setItem(key, JSON.stringify(data));
-      setCurrentSaveState(data);
-
-      // Also save to current category state if we have loaded state
-      if (hasLoadedState) {
-        saveCategoryState(config.category);
-      }
-    }
-  }, [
-    placedSkills,
-    positionIcons,
-    config,
-    loadedSaveStateSlot,
-    hasLoadedState,
-    notes,
-    segmentNames,
-  ]);
-
-  // Auto-scroll to keep selected skill in view after keyboard movement
-  useEffect(() => {
-    if (!selectedSkillId) return;
-
-    const selectedSkill = placedSkills.find((ps) => ps.id === selectedSkillId);
-    if (!selectedSkill) return;
-
-    // Find the count sheet container (the scrollable div)
-    const countSheetContainer = document.querySelector(
-      ".flex-1.overflow-auto.relative",
-    ) as HTMLElement;
-    if (!countSheetContainer) return;
-
-    // Find the specific skill element for the selected skill
-    const skillElement = document.querySelector(
-      `[data-skill-id="${selectedSkillId}"]`,
-    ) as HTMLElement;
-    if (!skillElement) return;
-
-    const containerRect = countSheetContainer.getBoundingClientRect();
-    const skillRect = skillElement.getBoundingClientRect();
-
-    // Calculate if the skill is outside the visible area
-    const isAboveViewport = skillRect.top < containerRect.top;
-    const isBelowViewport = skillRect.bottom > containerRect.bottom;
-    const isLeftOfViewport = skillRect.left < containerRect.left;
-    const isRightOfViewport = skillRect.right > containerRect.right;
-
-    // If any part of the skill is outside the viewport, scroll to bring it into view
-    if (
-      isAboveViewport ||
-      isBelowViewport ||
-      isLeftOfViewport ||
-      isRightOfViewport
-    ) {
-      const currentScrollTop = countSheetContainer.scrollTop;
-      const currentScrollLeft = countSheetContainer.scrollLeft;
-
-      // Calculate how much to scroll to center the skill vertically
-      let newScrollTop = currentScrollTop;
-      if (isAboveViewport) {
-        // Scroll up to show skill at top of viewport (with small margin)
-        newScrollTop = currentScrollTop + (skillRect.top - containerRect.top) - 20;
-      } else if (isBelowViewport) {
-        // Scroll down to show skill at bottom of viewport (with small margin)
-        newScrollTop =
-          currentScrollTop + (skillRect.bottom - containerRect.bottom) + 20;
-      }
-
-      // For horizontal scrolling, we need to scroll the cell table itself
-      let newScrollLeft = currentScrollLeft;
-      if (isLeftOfViewport) {
-        newScrollLeft =
-          currentScrollLeft + (skillRect.left - containerRect.left) - 20;
-      } else if (isRightOfViewport) {
-        newScrollLeft =
-          currentScrollLeft + (skillRect.right - containerRect.right) + 20;
-      }
-
-      // Apply the scroll
-      if (
-        newScrollTop !== currentScrollTop ||
-        newScrollLeft !== currentScrollLeft
-      ) {
-        countSheetContainer.scrollTo({
-          top: Math.max(0, newScrollTop),
-          left: Math.max(0, newScrollLeft),
-          behavior: "smooth",
-        });
-      }
-    }
-  }, [selectedSkillId, placedSkills]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -575,10 +333,10 @@ export const RoutineBuilder = () => {
     };
     localStorage.setItem(key, JSON.stringify(data));
     setCurrentSaveState(data);
-    setLoadedSaveStateSlot(slotNumber);
+    // setLoadedSaveStateSlot(slotNumber); // Removed to avoid prop drilling
 
     // Save the current save names
-    localStorage.setItem("save-names", JSON.stringify(saveNames));
+    // localStorage.setItem("save-names", JSON.stringify(saveNames)); // Removed to avoid prop drilling
   };
 
   const loadFromSlot = (slotNumber: 1 | 2 | 3) => {
@@ -594,7 +352,7 @@ export const RoutineBuilder = () => {
       setNotes(data.notes || {});
       setSegmentNames(data.segmentNames || {});
       setCurrentSaveState(data);
-      setLoadedSaveStateSlot(slotNumber);
+      // setLoadedSaveStateSlot(slotNumber); // Removed to avoid prop drilling
       initialLoadedCategoryRef.current = data.config.category;
     } else {
       // Create default state for new slot
@@ -634,7 +392,7 @@ export const RoutineBuilder = () => {
       // Save as the initial state for this slot
       localStorage.setItem(key, JSON.stringify(defaultData));
       setCurrentSaveState(defaultData);
-      setLoadedSaveStateSlot(slotNumber);
+      // setLoadedSaveStateSlot(slotNumber); // Removed to avoid prop drilling
       initialLoadedCategoryRef.current = config.category;
     }
   };
@@ -682,6 +440,7 @@ export const RoutineBuilder = () => {
 
         // Check if the left edge (vertical line at activeRect.left) intersects with the droppable
         // This means the left edge x-position is within the droppable's bounds
+        // and the active rect overlaps with the droppable in the y-direction
         const leftEdgeX = activeRect.left;
 
         // The left edge intersects if its x-position is within the droppable's width
@@ -903,6 +662,23 @@ export const RoutineBuilder = () => {
       setIsDraggingIcon(true);
       setDraggedIconId(event.active.id as string);
       setDragOffset({ x: 0, y: 0 });
+
+      // Handle selection behavior when starting to drag an icon
+      const draggedIconId = event.active.id as string;
+      setPositionIcons((prev) => {
+        const currentlySelected = prev.filter(icon => icon.selected && icon.lineIndex === selectedLine);
+        const isDraggedIconSelected = currentlySelected.some(icon => icon.id === draggedIconId);
+
+        if (!isDraggedIconSelected) {
+          // Dragging an icon that's not selected: deselect all, select only this icon
+          return prev.map((icon) => ({
+            ...icon,
+            selected: icon.id === draggedIconId,
+          }));
+        }
+        // If the dragged icon is already selected, keep current selection
+        return prev;
+      });
     }
 
     if (event.active.data?.current?.type === "skill-resize") {
@@ -1409,273 +1185,231 @@ export const RoutineBuilder = () => {
     });
   };
 
-
-
-  const handleReset = () => {
-    // Reset to default state
-    setPlacedSkills([]);
-    setSelectedLine(null);
-    setSelectedSkillId(null);
-    setLineHistories({}); // Clear all history states
-    setNotes({});
-    setSegmentNames({});
-
-    // For team categories, reset icons to default positions
-    if (config.category === "team-16" || config.category === "team-24") {
-      const totalLines = Math.ceil(((config.length * config.bpm) / 60 / 8));
-      const resetIcons: PositionIcon[] = [];
-
-      for (let lineIndex = 0; lineIndex < totalLines; lineIndex++) {
-        resetIcons.push(...generateTeamIcons(config.category, lineIndex));
-      }
-
-      setPositionIcons(resetIcons);
-    } else {
-      // For non-team categories, clear icons (no auto-population happens)
-      setPositionIcons([]);
-    }
-
-    // Don't clear auto-saved states - reset is just for clearing current work
-    // The current state will auto-save as empty if the auto-save effect runs again
-  };
-
-  const handleRenameSave = () => {
-    if (!loadedSaveStateSlot || !renameInput.trim()) return;
-
-    const trimmedName = renameInput.trim();
-    setSaveNames((prev) => ({
-      ...prev,
-      [loadedSaveStateSlot]: trimmedName,
-    }));
-
-    // Save to localStorage
-    localStorage.setItem(
-      "save-names",
-      JSON.stringify({
-        ...saveNames,
-        [loadedSaveStateSlot]: trimmedName,
-      }),
-    );
-
-    setShowRenameDialog(false);
-    setRenameInput("");
-  };
-
-  // Handle click outside to deselect placed skills
-  const handleContainerClick = (e: React.MouseEvent) => {
-    // Only deselect if clicking on the main container background and a skill is selected
-    if (selectedSkillId) {
-      setSelectedSkillId(null);
-    }
-  };
-
-  // Export/Import handlers
-  const handleExportData = () => {
-    if (!loadedSaveStateSlot) return;
-
-    const slotName = saveNames[loadedSaveStateSlot];
-    exportCurrentSlot(
-      loadedSaveStateSlot,
-      slotName,
-      placedSkills,
-      positionIcons,
-      config,
-      notes,
-      segmentNames
-    );
-  };
-
-  const handleImportData = () => {
-    if (!loadedSaveStateSlot) return;
-
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = ".json";
-
-    input.onchange = async (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (!file) return;
-
-      try {
-        const importedData = await importSlotData(file);
-        const validation = validateImportedData(importedData);
-
-        if (!validation.isValid) {
-          alert(`Invalid file: ${validation.errors.join(", ")}`);
-          return;
-        }
-
-        // Update the save slot name to match the imported data
-        setSaveNames(prev => ({
-          ...prev,
-          [loadedSaveStateSlot]: importedData.slotName
-        }));
-
-        // Update localStorage for save names
-        const updatedSaveNames = {
-          ...saveNames,
-          [loadedSaveStateSlot]: importedData.slotName
-        };
-        localStorage.setItem("save-names", JSON.stringify(updatedSaveNames));
-
-        // Save all category data for this save slot
-        Object.entries(importedData.categories).forEach(([category, categoryData]) => {
-          const categoryKey = `category-${loadedSaveStateSlot}-${category}`;
-          const categoryStateData = {
-            placedSkills: categoryData.placedSkills || [],
-            positionIcons: categoryData.positionIcons || [],
-            notes: categoryData.notes || {},
-            segmentNames: categoryData.segmentNames || {},
-            timestamp: Date.now(),
-          };
-          localStorage.setItem(categoryKey, JSON.stringify(categoryStateData));
-        });
-
-        // Load the current category's data to update the UI
-        const currentCategoryData = importedData.categories[config.category];
-        if (currentCategoryData) {
-          setPlacedSkills(currentCategoryData.placedSkills || []);
-          setPositionIcons(currentCategoryData.positionIcons || []);
-          setNotes(currentCategoryData.notes || {});
-          setSegmentNames(currentCategoryData.segmentNames || {});
-        } else {
-          // If current category doesn't exist in imported data, clear it
-          setPlacedSkills([]);
-          setPositionIcons([]);
-          setNotes({});
-          setSegmentNames({});
-        }
-
-        alert(`Successfully imported data to "${importedData.slotName}"`);
-      } catch (error) {
-        alert(`Failed to import file: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      }
-    };
-
-    input.click();
-  };
-
-  // Use keyboard shortcuts hook
-  useKeyboardShortcuts({
-    config,
-    selectedLine,
-    selectedSkillId,
-    placedSkills,
-    positionIcons,
-    skills,
-    autoFollow,
-    keyboardSettings,
-    setSelectedLine,
-    setAutoFollow,
-    setPositionIcons,
-    setPlacedSkills,
-    setSelectedSkillId,
-    handleUndoLine,
-    handleRedoLine,
-    handleRemoveSkill,
-  });
-
   return (
-    <div className="h-screen flex flex-col overflow-x-auto overflow-y-hidden" onClick={handleContainerClick}>
-      <div className="flex-shrink-0 sticky top-0 z-10 bg-card border-b">
-        <RoutineHeader
-        config={config}
-        saveNames={saveNames}
-        loadedSaveStateSlot={loadedSaveStateSlot}
-        showAboutModal={showAboutModal}
-        updateLength={updateLength}
-        updateBpm={updateBpm}
-        updateCategory={updateCategory}
-        updateLevel={updateLevel}
-        handleReset={handleReset}
-        handleExportPDF={handleExportPDF}
-        isGeneratingPdf={isGeneratingPdf}
-        setShowAboutModal={setShowAboutModal}
-        loadFromSlot={loadFromSlot}
-        setShowRenameDialog={setShowRenameDialog}
-        setRenameInput={setRenameInput}
-        placedSkills={placedSkills}
-        positionIcons={positionIcons}
-        notes={notes}
-        segmentNames={segmentNames}
-        onExportData={handleExportData}
-        onImportData={handleImportData}
-      />
-      </div>
+    <DndContext
+      sensors={sensors}
+      collisionDetection={customCollisionDetection}
+      onDragStart={handleDragStart}
+      onDragMove={handleDragMove}
+      onDragOver={handleDragOver}
+      onDragEnd={handleDragEnd}
+      autoScroll={false}
+      modifiers={[snapCenterToCursor]}
+    >
+      <ResizablePanelGroup direction="horizontal" className="flex-1 w-full">
+        <ResizablePanel
+          defaultSize={15}
+          minSize={10}
+          maxSize={40}
+          collapsible
+          className="min-w-40"
+        >
+          <SkillsPanel
+            skills={skills}
+            onAddCustomSkill={addCustomSkill}
+            onDeleteSkill={(id) => {
+              deleteSkill(id);
+              setPlacedSkills(
+                placedSkills.filter((ps) => ps.skillId !== id),
+              );
+            }}
+            onUpdateSkillCounts={updateSkillCounts}
+            currentLevel={config.level}
+            onLevelChange={(level) => updateConfig({ level })}
+            onResetToDefault={resetToDefault}
+          />
+        </ResizablePanel>
 
-      <RoutineWorkspace
-        config={config}
-        placedSkills={placedSkills}
-        setPlacedSkills={setPlacedSkills}
-        positionIcons={positionIcons}
-        setPositionIcons={setPositionIcons}
-        notes={notes}
-        setNotes={setNotes}
-        segmentNames={segmentNames}
-        setSegmentNames={setSegmentNames}
-        selectedLine={selectedLine}
-        setSelectedLine={setSelectedLine}
-        lineHistories={lineHistories}
-        setLineHistories={setLineHistories}
-        draggedSkill={draggedSkill}
-        setDraggedSkill={setDraggedSkill}
-        isDraggingPlacedSkill={isDraggingPlacedSkill}
-        setIsDraggingPlacedSkill={setIsDraggingPlacedSkill}
-        isResizing={isResizing}
-        setIsResizing={setIsResizing}
-        draggedPlacedSkillId={draggedPlacedSkillId}
-        setDraggedPlacedSkillId={setDraggedPlacedSkillId}
-        selectedSkillId={selectedSkillId}
-        setSelectedSkillId={setSelectedSkillId}
-        showGrid={showGrid}
-        setShowGrid={setShowGrid}
-        autoFollow={autoFollow}
-        setAutoFollow={setAutoFollow}
-        isDraggingIcon={isDraggingIcon}
-        setIsDraggingIcon={setIsDraggingIcon}
-        dragOffset={dragOffset}
-        setDragOffset={setDragOffset}
-        draggedIconId={draggedIconId}
-        setDraggedIconId={setDraggedIconId}
-        currentZoomLevel={currentZoomLevel}
-        setCurrentZoomLevel={setCurrentZoomLevel}
-        overCellId={overCellId}
-        setOverCellId={setOverCellId}
-        hasLoadedState={hasLoadedState}
-        initialLoadedCategoryRef={initialLoadedCategoryRef}
-        currentSaveState={currentSaveState}
-        setCurrentSaveState={setCurrentSaveState}
-        loadedSaveStateSlot={loadedSaveStateSlot}
-        keyboardSettings={keyboardSettings}
-        skills={skills}
-        updateSkillCounts={updateSkillCounts}
-        addCustomSkill={addCustomSkill}
-        deleteSkill={deleteSkill}
-        updateConfig={updateConfig}
-        getUniquePositionConfigurations={getUniquePositionConfigurations}
-        handleExportPDF={handleExportPDF}
-        isGeneratingPdf={isGeneratingPdf}
-        resetToDefault={resetToDefault}
-      />
+        <ResizableHandle withHandle />
 
-      <PdfPreviewDialog
-        showPdfPreview={showPdfPreview}
-        pdfBlobUrl={pdfBlobUrl}
-        setShowPdfPreview={setShowPdfPreview}
-      />
+        <ResizablePanel defaultSize={75} minSize={60}>
+          {config.category === "team-16" ||
+          config.category === "team-24" ? (
+            <ResizablePanelGroup direction="vertical" className="h-full">
+              <ResizablePanel defaultSize={50}>
+                <CountSheet
+                  routineLength={config.length}
+                  bpm={config.bpm}
+                  placedSkills={placedSkills.filter(
+                    (ps) => ps.id !== draggedPlacedSkillId,
+                  )}
+                  skills={skills}
+                  onRemoveSkill={handleRemoveSkill}
+                  onLineClick={setSelectedLine}
+                  selectedLine={selectedLine}
+                  selectedSkillId={selectedSkillId}
+                  onSelectSkill={(id) => {
+                    setSelectedSkillId(id);
+                    // Deselect all position icons when selecting a placed skill
+                    setPositionIcons(prev => prev.map(icon => ({ ...icon, selected: false })));
+                  }}
+                  onMoveSkill={(id, newLineIndex, newStartCount) => {
+                    setPlacedSkills(
+                      placedSkills.map((ps) =>
+                        ps.id === id
+                          ? {
+                              ...ps,
+                              lineIndex: newLineIndex,
+                              startCount: newStartCount,
+                            }
+                          : ps,
+                      ),
+                    );
+                  }}
+                  onUpdateSkillCounts={updateSkillCounts}
+                  draggedSkill={draggedSkill}
+                  overCellId={overCellId}
+                  notes={notes}
+                  onUpdateNote={(lineIndex, note) => {
+                    setNotes((prev) => ({ ...prev, [lineIndex]: note }));
+                  }}
+                  isPdfRender={isGeneratingPdf}
+                />
+              </ResizablePanel>
 
-      <SaveRenameDialog
-        showRenameDialog={showRenameDialog}
-        renameInput={renameInput}
-        loadedSaveStateSlot={loadedSaveStateSlot}
-        saveNames={saveNames}
-        setShowRenameDialog={setShowRenameDialog}
-        setRenameInput={setRenameInput}
-        handleRenameSave={handleRenameSave}
-      />
+              <ResizableHandle withHandle />
 
-      {/* About Modal */}
-      <AboutModal open={showAboutModal} onOpenChange={setShowAboutModal} />
-    </div>
+              <ResizablePanel defaultSize={50} minSize={30}>
+                <PositionSheet
+                  icons={positionIcons}
+                  selectedLine={selectedLine}
+                  onUpdateIcon={handleUpdatePositionIcon}
+                  onAddIcon={handleAddPositionIcon}
+                  onRemoveIcon={handleRemovePositionIcon}
+                  onRemoveMultipleIcons={handleRemoveMultiplePositionIcons}
+                  onNameIcon={handleNamePositionIcon}
+                  onRestoreLineState={handleRestoreLineState}
+                  lineHistories={currentContextLineHistories}
+                  onUndoLine={handleUndoLine}
+                  onRedoLine={handleRedoLine}
+                  showGrid={showGrid}
+                  autoFollow={autoFollow}
+                  onToggleAutoFollow={() => setAutoFollow(!autoFollow)}
+                  isDraggingIcon={isDraggingIcon}
+                  dragOffset={dragOffset}
+                  draggedIconId={draggedIconId}
+                  onSelectIcon={(id) => {
+                    setPositionIcons((prev) => {
+                      const currentlySelected = prev.filter(icon => icon.selected);
+                      const isCurrentlySelected = currentlySelected.some(icon => icon.id === id);
+
+                      if (currentlySelected.length === 1 && !isCurrentlySelected) {
+                        // Single icon selected, clicking another icon: deselect current, select new
+                        return prev.map((icon) => ({
+                          ...icon,
+                          selected: icon.id === id,
+                        }));
+                      } else if (currentlySelected.length > 1 && !isCurrentlySelected) {
+                        // Multiple icons selected, clicking an icon not in selection: deselect all, select new
+                        return prev.map((icon) => ({
+                          ...icon,
+                          selected: icon.id === id,
+                        }));
+                      } else {
+                        // Toggle behavior for clicking selected icon or when no icons selected
+                        return prev.map((icon) => ({
+                          ...icon,
+                          selected: icon.id === id ? !icon.selected : false,
+                        }));
+                      }
+                    });
+                  }}
+                  onSelectMultiple={(ids) => {
+                    setPositionIcons((prev) =>
+                      prev.map((icon) => ({
+                        ...icon,
+                        selected: ids.includes(icon.id),
+                      })),
+                    );
+                  }}
+                  onNextLine={() => {
+                    const totalLines = Math.ceil(
+                      ((config.length * config.bpm) / 60 / 8),
+                    );
+                    if (selectedLine !== null && selectedLine < totalLines - 1) {
+                      setSelectedLine(selectedLine + 1);
+                    }
+                  }}
+                  onPrevLine={() => {
+                    if (selectedLine !== null && selectedLine > 0) {
+                      setSelectedLine(selectedLine - 1);
+                    }
+                  }}
+                  onIconDragStart={() => {
+                    setShowGrid(true);
+                    setIsDraggingIcon(true);
+                  }}
+                  onIconDragEnd={() => {
+                    setShowGrid(false);
+                    setIsDraggingIcon(false);
+                  }}
+                  onIconDrop={(event) => {
+                    // Receive zoom level info and potentially handle scaled drag end
+                    setCurrentZoomLevel(event.zoomLevel);
+                  }}
+                  onZoomChange={(zoomLevel) => setCurrentZoomLevel(zoomLevel)}
+                  segmentName={
+                    selectedLine !== null ? segmentNames[selectedLine] || "" : ""
+                  }
+                  onUpdateSegmentName={(name) => {
+                    if (selectedLine !== null) {
+                      handleUpdateSegmentName(selectedLine, name);
+                    }
+                  }}
+                  // Pass the current zoom state to the visible sheet
+                  zoomLevel={currentZoomLevel}
+                />
+              </ResizablePanel>
+            </ResizablePanelGroup>
+          ) : (
+            <CountSheet
+              routineLength={config.length}
+              bpm={config.bpm}
+              placedSkills={placedSkills}
+              skills={skills}
+              onRemoveSkill={handleRemoveSkill}
+              onLineClick={setSelectedLine}
+              selectedLine={selectedLine}
+              selectedSkillId={selectedSkillId}
+              onSelectSkill={(id) => {
+                setSelectedSkillId(id);
+                // Deselect all position icons when selecting a placed skill
+                setPositionIcons(prev => prev.map(icon => ({ ...icon, selected: false })));
+              }}
+              onMoveSkill={(id, newLineIndex, newStartCount) => {
+                setPlacedSkills(
+                  placedSkills.map((ps) =>
+                    ps.id === id
+                      ? {
+                          ...ps,
+                          lineIndex: newLineIndex,
+                          startCount: newStartCount,
+                        }
+                      : ps,
+                  ),
+                );
+              }}
+              onUpdateSkillCounts={updateSkillCounts}
+              draggedSkill={draggedSkill}
+              overCellId={overCellId}
+              notes={notes}
+              onUpdateNote={(lineIndex, note) => {
+                setNotes((prev) => ({ ...prev, [lineIndex]: note }));
+              }}
+              isPdfRender={isGeneratingPdf}
+            />
+          )}
+        </ResizablePanel>
+      </ResizablePanelGroup>
+
+      <DragOverlay className="z-[3000]">
+        {draggedSkill ? (
+          <div className={isDraggingPlacedSkill ? "" : ""}>
+            <SkillCard skill={draggedSkill} showDescription={false} />
+          </div>
+        ) : null}
+      </DragOverlay>
+      <TrashDropZone isDragging={isDraggingPlacedSkill} />
+    </DndContext>
   );
 };
