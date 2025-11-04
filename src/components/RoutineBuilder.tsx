@@ -1,27 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import {
-  DndContext,
-  DragEndEvent,
-  DragOverlay,
-  DragStartEvent,
-  DragMoveEvent,
-  CollisionDetection,
-  rectIntersection,
-  closestCenter,
-  DragOverEvent,
-  useSensor,
-  useSensors,
-  PointerSensor,
-} from "@dnd-kit/core";
+import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, DragMoveEvent, CollisionDetection, rectIntersection, closestCenter, DragOverEvent, useSensor, useSensors, PointerSensor } from "@dnd-kit/core";
 import { snapCenterToCursor } from "@dnd-kit/modifiers";
-import type {
-  PlacedSkill,
-  RoutineConfig,
-  Skill,
-  PositionIcon,
-  CategoryStateData,
-  SaveStateData,
-} from "@/types/routine";
+import type { PlacedSkill, RoutineConfig, Skill, PositionIcon, CategoryStateData, SaveStateData } from "@/types/routine";
 import { useSkills } from "@/hooks/useSkills";
 import { useRoutineConfig } from "@/hooks/useRoutineConfig";
 import { usePdfExport } from "@/hooks/usePdfExport";
@@ -34,36 +14,12 @@ import { ThemeToggle } from "./ThemeToggle";
 import AboutModal from "./AboutModal";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import {
-  Download,
-  Info,
-  Library,
-  RotateCcw,
-  Settings as SettingsIcon,
-  Edit,
-} from "lucide-react";
+import { Download, Info, Library, RotateCcw, Settings as SettingsIcon, Edit } from "lucide-react";
 import { Link } from "react-router-dom";
-import {
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-} from "@/components/ui/resizable";
-import { lineBreak } from "html2canvas/dist/types/css/property-descriptors/line-break";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useTheme } from "next-themes";
 
 // Define global functions for TypeScript
