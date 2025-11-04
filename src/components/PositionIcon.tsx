@@ -69,6 +69,7 @@ export const PositionIcon = ({ icon, onUpdate, onClick, onRemove, dragOffset, is
           : "text-primary hover:text-primary/70",
         isDragging && "opacity-50"
       )}
+      data-dragging={isDragging ? "true" : "false"}
       style={style}
     >
       <IconComponent type={icon.type} />

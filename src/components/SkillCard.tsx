@@ -33,6 +33,7 @@ export const SkillCard = ({ skill, onUpdateCounts, showDescription = true, }: Sk
       className={`p-3 cursor-grab active:cursor-grabbing ${
         isDragging ? "opacity-50" : ""
       }`}
+      data-dragging={isDragging ? "true" : "false"}
       {...attributes}
       {...listeners}
     >

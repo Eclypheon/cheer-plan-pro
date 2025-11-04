@@ -1,8 +1,9 @@
+import { useState } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Download, Info, Library, RotateCcw, Settings as SettingsIcon, Edit, Upload, Save } from "lucide-react";
+import { Download, Info, Library, RotateCcw, Settings as SettingsIcon, Edit, Upload, Save, ChevronUp, ChevronDown } from "lucide-react";
 import { Link } from "react-router-dom";
 import { ThemeToggle } from "./ThemeToggle";
 import type { RoutineConfig, SkillLevel } from "@/types/routine";
@@ -54,46 +55,49 @@ export const RoutineHeader = ({
   onExportData,
   onImportData,
 }: RoutineHeaderProps) => {
-  return (
-    <header className="border-b bg-card p-2">
-      <div className="flex items-center justify-between mb-2">
-        <h1 className="text-xl font-bold">Cheer Routine Builder</h1>
-        <div className="flex gap-1">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowAboutModal(true)}
-          >
-            <Info className="h-4 w-4" />
-          </Button>
-          <Button variant="destructive" size="sm" onClick={handleReset}>
-            <RotateCcw className="h-4 w-4" />
-          </Button>
-          <Link to="/settings">
-            <Button variant="outline" size="sm">
-              <SettingsIcon className="h-4 w-4" />
-            </Button>
-          </Link>
-          <Link to="/skills-editor">
-            <Button variant="outline" size="sm">
-              <Library className="h-4 w-4 mr-1" />
-              Skills Editor
-            </Button>
-          </Link>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleExportPDF}
-            disabled={isGeneratingPdf}
-          >
-            <Download className="h-4 w-4 mr-1" />
-            {isGeneratingPdf ? "Generating..." : "Export PDF"}
-          </Button>
-          <ThemeToggle />
-        </div>
-      </div>
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
-      <div className="flex flex-wrap gap-3 items-center">
+  return (
+    <header className="border-b bg-card p-2 relative">
+      <div className={`transition-all duration-300 ease-in-out overflow-hidden ${isCollapsed ? 'max-h-0 opacity-0 pb-0' : 'max-h-96 opacity-100 pb-2'}`}>
+        <div className="flex items-center justify-between mb-2">
+          <h1 className="text-xl font-bold">Cheer Routine Builder</h1>
+          <div className="flex flex-wrap gap-1">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowAboutModal(true)}
+            >
+              <Info className="h-4 w-4" />
+            </Button>
+            <Button variant="destructive" size="sm" onClick={handleReset}>
+              <RotateCcw className="h-4 w-4" />
+            </Button>
+            <Link to="/settings">
+              <Button variant="outline" size="sm">
+                <SettingsIcon className="h-4 w-4" />
+              </Button>
+            </Link>
+            <Link to="/skills-editor">
+              <Button variant="outline" size="sm">
+                <Library className="h-4 w-4 mr-1" />
+                Skills Editor
+              </Button>
+            </Link>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportPDF}
+              disabled={isGeneratingPdf}
+            >
+              <Download className="h-4 w-4 mr-1" />
+              {isGeneratingPdf ? "Generating..." : "Export PDF"}
+            </Button>
+            <ThemeToggle />
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-3 items-center">
         <div className="flex items-center gap-1">
           <Label className="text-xs">Length:</Label>
           <Select
@@ -219,6 +223,20 @@ export const RoutineHeader = ({
             <Upload className="h-4 w-4" />
           </Button>
         </div>
+      </div>
+      </div>
+
+      {/* Toggle button positioned at bottom border */}
+      <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2 z-10">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          className="h-6 w-6 p-0 rounded-full bg-card border shadow-sm hover:bg-accent"
+          title={isCollapsed ? "Expand header" : "Collapse header"}
+        >
+          {isCollapsed ? <ChevronDown className="h-3 w-3" /> : <ChevronUp className="h-3 w-3" />}
+        </Button>
       </div>
     </header>
   );
