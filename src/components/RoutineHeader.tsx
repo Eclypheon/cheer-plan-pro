@@ -57,7 +57,7 @@ export const RoutineHeader = ({
   return (
     <header className="border-b bg-card p-2">
       <div className="flex items-center justify-between mb-2">
-        <h1 className="text-xl font-bold">Cheerleading Routine Builder</h1>
+        <h1 className="text-xl font-bold">Cheer Routine Builder</h1>
         <div className="flex gap-1">
           <Button
             variant="outline"
