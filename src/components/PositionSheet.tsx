@@ -7,8 +7,10 @@ import { Slider } from "@/components/ui/slider";
 import { Plus, Undo, Redo, ToggleLeft, ToggleRight, Square, Circle, Triangle, X, ZoomIn, ZoomOut } from "lucide-react";
 import { PositionIcon as PositionIconComponent } from "./PositionIcon";
 import { PositionIconNameDialog } from "./PositionIconNameDialog";
+import { MobileDragPreview } from "./MobileDragPreview";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface PositionSheetProps {
   icons: PositionIcon[];
@@ -86,7 +88,9 @@ export const PositionSheet = ({
   const [isPinching, setIsPinching] = useState(false);
   const [initialPinchDistance, setInitialPinchDistance] = useState(0);
   const [initialZoomLevel, setInitialZoomLevel] = useState(1.0);
+  const [touchPosition, setTouchPosition] = useState<{ x: number; y: number } | null>(null);
   const sheetRef = useRef<HTMLDivElement>(null);
+  const isMobile = useIsMobile();
 
   // Set up droppable area for the position sheet grid
   const { setNodeRef, isOver } = useDroppable({
@@ -159,6 +163,19 @@ export const PositionSheet = ({
       setInitialPinchDistance(0);
     }
   }, []);
+
+  // Handle touch/mouse movement during dragging for mobile preview
+  const handlePointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (isDraggingIcon && isMobile) {
+      setTouchPosition({ x: e.clientX, y: e.clientY });
+    }
+  }, [isDraggingIcon, isMobile]);
+
+  const handlePointerLeave = useCallback(() => {
+    if (isMobile) {
+      setTouchPosition(null);
+    }
+  }, [isMobile]);
 
   // Convert screen coordinates to zoom-adjusted coordinates
   const getZoomedCoordinates = useCallback((clientX: number, clientY: number) => {
@@ -508,6 +525,8 @@ return (
               onTouchStart={handleTouchStart}
               onTouchMove={handleTouchMove}
               onTouchEnd={handleTouchEnd}
+              onPointerMove={handlePointerMove}
+              onPointerLeave={handlePointerLeave}
             >
               {/* Grid overlay - 36x36 grid */}
               {(showGrid || isDraggingIcon) && (
@@ -593,6 +612,14 @@ return (
       onOpenChange={setNameDialogOpen}
       currentName={selectedIcon?.name || ""}
       onSave={handleSaveName}
+    />
+
+    <MobileDragPreview
+      isVisible={isDraggingIcon && isMobile}
+      touchPosition={touchPosition}
+      icons={lineIcons}
+      zoomLevel={effectiveZoomLevel}
+      sheetRect={sheetRef.current?.getBoundingClientRect() || null}
     />
   </>
 );
