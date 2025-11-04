@@ -1235,7 +1235,11 @@ export const RoutineWorkspace = ({
                   onLineClick={setSelectedLine}
                   selectedLine={selectedLine}
                   selectedSkillId={selectedSkillId}
-                  onSelectSkill={setSelectedSkillId}
+                  onSelectSkill={(id) => {
+                    setSelectedSkillId(id);
+                    // Deselect all position icons when selecting a placed skill
+                    setPositionIcons(prev => prev.map(icon => ({ ...icon, selected: false })));
+                  }}
                   onMoveSkill={(id, newLineIndex, newStartCount) => {
                     setPlacedSkills(
                       placedSkills.map((ps) =>
@@ -1364,7 +1368,11 @@ export const RoutineWorkspace = ({
               onLineClick={setSelectedLine}
               selectedLine={selectedLine}
               selectedSkillId={selectedSkillId}
-              onSelectSkill={setSelectedSkillId}
+              onSelectSkill={(id) => {
+                setSelectedSkillId(id);
+                // Deselect all position icons when selecting a placed skill
+                setPositionIcons(prev => prev.map(icon => ({ ...icon, selected: false })));
+              }}
               onMoveSkill={(id, newLineIndex, newStartCount) => {
                 setPlacedSkills(
                   placedSkills.map((ps) =>

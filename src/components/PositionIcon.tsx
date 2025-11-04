@@ -61,7 +61,7 @@ export const PositionIcon = ({ icon, onUpdate, onClick, onRemove, dragOffset, is
       data-position-icon
       data-dnd-handle="position-icon-drag"
       className={cn(
-        "absolute w-32 h-32 -ml-16 -mt-16 cursor-grab active:cursor-grabbing z-[2000]",
+        "absolute w-20 h-20 -ml-12 -mt-12 cursor-grab active:cursor-grabbing z-[2000]",
         "flex items-center justify-center",
         "transition-colors",
         icon.selected

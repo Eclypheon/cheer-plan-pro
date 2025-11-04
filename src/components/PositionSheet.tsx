@@ -267,13 +267,17 @@ export const PositionSheet = ({
     const isMatLine = target.closest('.border-l'); // Mat division lines
 
     // If clicking on empty space (not on an icon, grid line, or mat line), deselect all
+    // But only if we didn't just finish creating a selection rectangle
     if (!isIcon && !isGridLine && !isMatLine && (e.target === e.currentTarget || target.closest('.sheet-background'))) {
-      // Deselect all icons by updating their selected state to false
-      icons.forEach(icon => {
-        if (icon.selected) {
-          onUpdateIcon(icon.id, icon.x, icon.y, false);
-        }
-      });
+      // Don't deselect if we just finished creating a selection rectangle
+      if (!selectionStart || !selectionEnd) {
+        // Deselect all icons by updating their selected state to false
+        icons.forEach(icon => {
+          if (icon.selected) {
+            onUpdateIcon(icon.id, icon.x, icon.y, false);
+          }
+        });
+      }
     }
   };
 
