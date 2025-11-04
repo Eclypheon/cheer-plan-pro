@@ -5,6 +5,7 @@ import type { PlacedSkill, RoutineConfig, Skill, PositionIcon, CategoryStateData
 import { useSkills } from "@/hooks/useSkills";
 import { useRoutineConfig } from "@/hooks/useRoutineConfig";
 import { usePdfExport } from "@/hooks/usePdfExport";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { SkillsPanel } from "./SkillsPanel";
 import { CountSheet } from "./CountSheet";
 import { PositionSheet } from "./PositionSheet";
@@ -136,6 +137,8 @@ export const RoutineWorkspace = ({
   isGeneratingPdf,
   resetToDefault,
 }: RoutineWorkspaceProps) => {
+  const isMobile = useIsMobile();
+
   // Handle zoom level changes from PositionSheet
   const handleZoomChange = useCallback((zoomLevel: number) => {
     setCurrentZoomLevel(zoomLevel);
@@ -143,9 +146,14 @@ export const RoutineWorkspace = ({
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8,
-      },
+      activationConstraint: isMobile
+        ? {
+            delay: 200,
+            tolerance: 5,
+          }
+        : {
+            distance: 8,
+          },
     }),
   );
 
