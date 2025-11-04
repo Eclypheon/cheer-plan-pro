@@ -2,7 +2,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Download, Info, Library, RotateCcw, Settings as SettingsIcon, Edit } from "lucide-react";
+import { Download, Info, Library, RotateCcw, Settings as SettingsIcon, Edit, Upload, Save } from "lucide-react";
 import { Link } from "react-router-dom";
 import { ThemeToggle } from "./ThemeToggle";
 import type { RoutineConfig, SkillLevel } from "@/types/routine";
@@ -27,6 +27,8 @@ interface RoutineHeaderProps {
   positionIcons: any[];
   notes: Record<number, string>;
   segmentNames: Record<number, string>;
+  onExportData?: () => void;
+  onImportData?: () => void;
 }
 
 export const RoutineHeader = ({
@@ -49,6 +51,8 @@ export const RoutineHeader = ({
   positionIcons,
   notes,
   segmentNames,
+  onExportData,
+  onImportData,
 }: RoutineHeaderProps) => {
   return (
     <header className="border-b bg-card p-2">
@@ -193,6 +197,26 @@ export const RoutineHeader = ({
             title="Rename current save"
           >
             <Edit className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onExportData}
+            disabled={!loadedSaveStateSlot}
+            className="h-8 w-8 p-0"
+            title="Export current save slot data"
+          >
+            <Save className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onImportData}
+            disabled={!loadedSaveStateSlot}
+            className="h-8 w-8 p-0"
+            title="Import data to current save slot"
+          >
+            <Upload className="h-4 w-4" />
           </Button>
         </div>
       </div>

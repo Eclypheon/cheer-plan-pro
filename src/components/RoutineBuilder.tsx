@@ -6,6 +6,7 @@ import { useSkills } from "@/hooks/useSkills";
 import { useRoutineConfig } from "@/hooks/useRoutineConfig";
 import { usePdfExport } from "@/hooks/usePdfExport";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
+import { exportCurrentSlot, importSlotData, validateImportedData, type ExportedData } from "@/lib/exportImport";
 import AboutModal from "./AboutModal";
 import { RoutineHeader } from "./RoutineHeader";
 import { RoutineWorkspace } from "./RoutineWorkspace";
@@ -1468,6 +1469,92 @@ export const RoutineBuilder = () => {
     }
   };
 
+  // Export/Import handlers
+  const handleExportData = () => {
+    if (!loadedSaveStateSlot) return;
+
+    const slotName = saveNames[loadedSaveStateSlot];
+    exportCurrentSlot(
+      loadedSaveStateSlot,
+      slotName,
+      placedSkills,
+      positionIcons,
+      config,
+      notes,
+      segmentNames
+    );
+  };
+
+  const handleImportData = () => {
+    if (!loadedSaveStateSlot) return;
+
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".json";
+
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+
+      try {
+        const importedData = await importSlotData(file);
+        const validation = validateImportedData(importedData);
+
+        if (!validation.isValid) {
+          alert(`Invalid file: ${validation.errors.join(", ")}`);
+          return;
+        }
+
+        // Update the save slot name to match the imported data
+        setSaveNames(prev => ({
+          ...prev,
+          [loadedSaveStateSlot]: importedData.slotName
+        }));
+
+        // Update localStorage for save names
+        const updatedSaveNames = {
+          ...saveNames,
+          [loadedSaveStateSlot]: importedData.slotName
+        };
+        localStorage.setItem("save-names", JSON.stringify(updatedSaveNames));
+
+        // Save all category data for this save slot
+        Object.entries(importedData.categories).forEach(([category, categoryData]) => {
+          const categoryKey = `category-${loadedSaveStateSlot}-${category}`;
+          const categoryStateData = {
+            placedSkills: categoryData.placedSkills || [],
+            positionIcons: categoryData.positionIcons || [],
+            notes: categoryData.notes || {},
+            segmentNames: categoryData.segmentNames || {},
+            timestamp: Date.now(),
+          };
+          localStorage.setItem(categoryKey, JSON.stringify(categoryStateData));
+        });
+
+        // Load the current category's data to update the UI
+        const currentCategoryData = importedData.categories[config.category];
+        if (currentCategoryData) {
+          setPlacedSkills(currentCategoryData.placedSkills || []);
+          setPositionIcons(currentCategoryData.positionIcons || []);
+          setNotes(currentCategoryData.notes || {});
+          setSegmentNames(currentCategoryData.segmentNames || {});
+        } else {
+          // If current category doesn't exist in imported data, clear it
+          setPlacedSkills([]);
+          setPositionIcons([]);
+          setNotes({});
+          setSegmentNames({});
+        }
+
+        alert(`Successfully imported data to "${importedData.slotName}"`);
+      } catch (error) {
+        alert(`Failed to import file: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    };
+
+    input.click();
+  };
+
   // Use keyboard shortcuts hook
   useKeyboardShortcuts({
     config,
@@ -1510,6 +1597,8 @@ export const RoutineBuilder = () => {
         positionIcons={positionIcons}
         notes={notes}
         segmentNames={segmentNames}
+        onExportData={handleExportData}
+        onImportData={handleImportData}
       />
 
       <RoutineWorkspace
