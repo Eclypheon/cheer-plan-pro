@@ -12,6 +12,10 @@ import { SkillCard } from "./SkillCard";
 import { TrashDropZone } from "./TrashDropZone";
 import { ThemeToggle } from "./ThemeToggle";
 import AboutModal from "./AboutModal";
+import { RoutineHeader } from "./RoutineHeader";
+import { RoutineWorkspace } from "./RoutineWorkspace";
+import { PdfPreviewDialog } from "./PdfPreviewDialog";
+import { SaveRenameDialog } from "./SaveRenameDialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -225,9 +229,6 @@ export const RoutineBuilder = () => {
     setPdfBlob,
     setShowPdfPreview,
   });
-
-  // Generate PDF when shouldGeneratePdf flag is set
-  // ----- THIS ENTIRE useEffect(..., [shouldGeneratePdf, ...]) IS REMOVED -----
 
   // Handle category changes - auto-save/load category states
   useEffect(() => {
@@ -1999,433 +2000,97 @@ export const RoutineBuilder = () => {
 
   return (
     <div className="h-screen flex flex-col overflow-hidden">
-      <header className="border-b bg-card p-2">
-        <div className="flex items-center justify-between mb-2">
-          <h1 className="text-xl font-bold">Cheerleading Routine Builder</h1>
-          <div className="flex gap-1">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowAboutModal(true)}
-            >
-              <Info className="h-4 w-4" />
-            </Button>
-            <Button variant="destructive" size="sm" onClick={handleReset}>
-              <RotateCcw className="h-4 w-4" />
-            </Button>
-            <Link to="/settings">
-              <Button variant="outline" size="sm">
-                <SettingsIcon className="h-4 w-4" />
-              </Button>
-            </Link>
-            <Link to="/skills-editor">
-              <Button variant="outline" size="sm">
-                <Library className="h-4 w-4 mr-1" />
-                Skills Editor
-              </Button>
-            </Link>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleExportPDF}
-              disabled={isGeneratingPdf}
-            >
-              <Download className="h-4 w-4 mr-1" />
-              {isGeneratingPdf ? "Generating..." : "Export PDF"}
-            </Button>
-            <ThemeToggle />
-          </div>
-        </div>
+      <RoutineHeader
+        config={config}
+        saveNames={saveNames}
+        loadedSaveStateSlot={loadedSaveStateSlot}
+        showAboutModal={showAboutModal}
+        updateLength={updateLength}
+        updateBpm={updateBpm}
+        updateCategory={updateCategory}
+        updateLevel={updateLevel}
+        handleReset={handleReset}
+        handleExportPDF={handleExportPDF}
+        isGeneratingPdf={isGeneratingPdf}
+        setShowAboutModal={setShowAboutModal}
+        loadFromSlot={loadFromSlot}
+        setShowRenameDialog={setShowRenameDialog}
+        setRenameInput={setRenameInput}
+        placedSkills={placedSkills}
+        positionIcons={positionIcons}
+        notes={notes}
+        segmentNames={segmentNames}
+      />
 
-        <div className="flex gap-3 items-center">
-          <div className="flex items-center gap-1">
-            <Label className="text-xs">Length:</Label>
-            <Select
-              value={config.length.toString()}
-              onValueChange={(v) => updateLength(parseInt(v))}
-            >
-              <SelectTrigger className="w-20 h-8">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="60">1:00</SelectItem>
-                <SelectItem value="90">1:30</SelectItem>
-                <SelectItem value="120">2:00</SelectItem>
-                <SelectItem value="135">2:15</SelectItem>
-                <SelectItem value="150">2:30</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+      <RoutineWorkspace
+        config={config}
+        placedSkills={placedSkills}
+        setPlacedSkills={setPlacedSkills}
+        positionIcons={positionIcons}
+        setPositionIcons={setPositionIcons}
+        notes={notes}
+        setNotes={setNotes}
+        segmentNames={segmentNames}
+        setSegmentNames={setSegmentNames}
+        selectedLine={selectedLine}
+        setSelectedLine={setSelectedLine}
+        lineHistories={lineHistories}
+        setLineHistories={setLineHistories}
+        draggedSkill={draggedSkill}
+        setDraggedSkill={setDraggedSkill}
+        isDraggingPlacedSkill={isDraggingPlacedSkill}
+        setIsDraggingPlacedSkill={setIsDraggingPlacedSkill}
+        isResizing={isResizing}
+        setIsResizing={setIsResizing}
+        draggedPlacedSkillId={draggedPlacedSkillId}
+        setDraggedPlacedSkillId={setDraggedPlacedSkillId}
+        selectedSkillId={selectedSkillId}
+        setSelectedSkillId={setSelectedSkillId}
+        showGrid={showGrid}
+        setShowGrid={setShowGrid}
+        autoFollow={autoFollow}
+        setAutoFollow={setAutoFollow}
+        isDraggingIcon={isDraggingIcon}
+        setIsDraggingIcon={setIsDraggingIcon}
+        dragOffset={dragOffset}
+        setDragOffset={setDragOffset}
+        draggedIconId={draggedIconId}
+        setDraggedIconId={setDraggedIconId}
+        currentZoomLevel={currentZoomLevel}
+        setCurrentZoomLevel={setCurrentZoomLevel}
+        overCellId={overCellId}
+        setOverCellId={setOverCellId}
+        hasLoadedState={hasLoadedState}
+        initialLoadedCategoryRef={initialLoadedCategoryRef}
+        currentSaveState={currentSaveState}
+        setCurrentSaveState={setCurrentSaveState}
+        loadedSaveStateSlot={loadedSaveStateSlot}
+        keyboardSettings={keyboardSettings}
+        skills={skills}
+        updateSkillCounts={updateSkillCounts}
+        addCustomSkill={addCustomSkill}
+        deleteSkill={deleteSkill}
+        updateConfig={updateConfig}
+        getUniquePositionConfigurations={getUniquePositionConfigurations}
+        handleExportPDF={handleExportPDF}
+        isGeneratingPdf={isGeneratingPdf}
+      />
 
-          <div className="flex items-center gap-1">
-            <Label className="text-xs">BPM:</Label>
-            <Input
-              type="number"
-              min="120"
-              max="160"
-              value={config.bpm}
-              onChange={(e) => {
-                const bpm = parseInt(e.target.value);
-                if (!isNaN(bpm) && bpm >= 120 && bpm <= 160) {
-                  updateBpm(bpm);
-                }
-              }}
-              className="w-[80px] h-8"
-            />
-          </div>
+      <PdfPreviewDialog
+        showPdfPreview={showPdfPreview}
+        pdfBlobUrl={pdfBlobUrl}
+        setShowPdfPreview={setShowPdfPreview}
+      />
 
-          <div className="flex items-center gap-1">
-            <Label className="text-xs">Cat:</Label>
-            <Select
-              value={config.category}
-              onValueChange={(v) =>
-                updateCategory(v as any)
-              }
-            >
-              <SelectTrigger className="w-36 h-8">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="partner-stunts">Partner Stunts</SelectItem>
-                <SelectItem value="group-stunts">Group Stunts</SelectItem>
-                <SelectItem value="team-16">Team (16)</SelectItem>
-                <SelectItem value="team-24">Team (24)</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex items-center gap-1">
-            <Label className="text-xs">Saves:</Label>
-            <Select
-              value={loadedSaveStateSlot?.toString() || "1"}
-              onValueChange={(slot) => {
-                const newSlot = parseInt(slot) as 1 | 2 | 3;
-                // Auto-save current state before switching to new slot
-                if (loadedSaveStateSlot) {
-                  const key = `save-state-${loadedSaveStateSlot}`;
-                  const data: SaveStateData = {
-                    placedSkills: [...placedSkills],
-                    positionIcons: [...positionIcons],
-                    config: { ...config },
-                    notes: { ...notes },
-                    segmentNames: { ...segmentNames },
-                    timestamp: Date.now(),
-                  };
-                  localStorage.setItem(key, JSON.stringify(data));
-                }
-                // Load the new slot
-                loadFromSlot(newSlot);
-              }}
-            >
-              <SelectTrigger className="w-32 h-8">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {([1, 2, 3] as const).map((slot) => (
-                  <SelectItem key={slot} value={slot.toString()}>
-                    {saveNames[slot]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                if (loadedSaveStateSlot) {
-                  setRenameInput(saveNames[loadedSaveStateSlot]);
-                  setShowRenameDialog(true);
-                }
-              }}
-              className="h-8 w-8 p-0"
-              title="Rename current save"
-            >
-              <Edit className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      </header>
-
-      <DndContext
-        sensors={sensors}
-        collisionDetection={customCollisionDetection}
-        onDragStart={handleDragStart}
-        onDragMove={handleDragMove}
-        onDragOver={handleDragOver}
-        onDragEnd={handleDragEnd}
-        autoScroll={false}
-        modifiers={[snapCenterToCursor]}
-      >
-        <ResizablePanelGroup direction="horizontal" className="flex-1 w-full">
-          <ResizablePanel
-            defaultSize={15}
-            minSize={10}
-            maxSize={40}
-            collapsible
-            className="min-w-40"
-          >
-            <SkillsPanel
-              skills={skills}
-              onAddCustomSkill={addCustomSkill}
-              onDeleteSkill={(id) => {
-                deleteSkill(id);
-                setPlacedSkills(
-                  placedSkills.filter((ps) => ps.skillId !== id),
-                );
-              }}
-              onUpdateSkillCounts={updateSkillCounts}
-              currentLevel={config.level}
-              onLevelChange={(level) => updateLevel(level)}
-            />
-          </ResizablePanel>
-
-          <ResizableHandle withHandle />
-
-          <ResizablePanel defaultSize={75}>
-            {config.category === "team-16" ||
-            config.category === "team-24" ? (
-              <ResizablePanelGroup direction="vertical" className="h-full">
-                <ResizablePanel defaultSize={50}>
-                  <CountSheet
-                    routineLength={config.length}
-                    bpm={config.bpm}
-                    placedSkills={placedSkills.filter(
-                      (ps) => ps.id !== draggedPlacedSkillId,
-                    )}
-                    skills={skills}
-                    onRemoveSkill={handleRemoveSkill}
-                    onLineClick={setSelectedLine}
-                    selectedLine={selectedLine}
-                    selectedSkillId={selectedSkillId}
-                    onSelectSkill={setSelectedSkillId}
-                    onMoveSkill={(id, newLineIndex, newStartCount) => {
-                      setPlacedSkills(
-                        placedSkills.map((ps) =>
-                          ps.id === id
-                            ? {
-                                ...ps,
-                                lineIndex: newLineIndex,
-                                startCount: newStartCount,
-                              }
-                            : ps,
-                        ),
-                      );
-                    }}
-                    onUpdateSkillCounts={updateSkillCounts}
-                    draggedSkill={draggedSkill}
-                    overCellId={overCellId}
-                    notes={notes}
-                    onUpdateNote={(lineIndex, note) => {
-                      setNotes((prev) => ({ ...prev, [lineIndex]: note }));
-                    }}
-                    isPdfRender={isGeneratingPdf}
-                  />
-                </ResizablePanel>
-
-                <ResizableHandle withHandle />
-
-                <ResizablePanel defaultSize={50} minSize={30}>
-                  <PositionSheet
-                    icons={positionIcons}
-                    selectedLine={selectedLine}
-                    onUpdateIcon={handleUpdatePositionIcon}
-                    onAddIcon={handleAddPositionIcon}
-                    onRemoveIcon={handleRemovePositionIcon}
-                    onRemoveMultipleIcons={handleRemoveMultiplePositionIcons}
-                    onNameIcon={handleNamePositionIcon}
-                    onRestoreLineState={handleRestoreLineState}
-                    lineHistories={currentContextLineHistories}
-                    onUndoLine={handleUndoLine}
-                    onRedoLine={handleRedoLine}
-                    showGrid={showGrid}
-                    autoFollow={autoFollow}
-                    onToggleAutoFollow={() => setAutoFollow(!autoFollow)}
-                    isDraggingIcon={isDraggingIcon}
-                    dragOffset={dragOffset}
-                    draggedIconId={draggedIconId}
-                    onSelectIcon={(id) => {
-                      setPositionIcons((prev) =>
-                        prev.map((icon) => ({
-                          ...icon,
-                          selected: icon.id === id ? !icon.selected : false,
-                        })),
-                      );
-                    }}
-                    onSelectMultiple={(ids) => {
-                      setPositionIcons((prev) =>
-                        prev.map((icon) => ({
-                          ...icon,
-                          selected: ids.includes(icon.id),
-                        })),
-                      );
-                    }}
-                    onNextLine={() => {
-                      const totalLines = Math.ceil(
-                        ((config.length * config.bpm) / 60 / 8),
-                      );
-                      if (selectedLine !== null && selectedLine < totalLines - 1) {
-                        setSelectedLine(selectedLine + 1);
-                      }
-                    }}
-                    onPrevLine={() => {
-                      if (selectedLine !== null && selectedLine > 0) {
-                        setSelectedLine(selectedLine - 1);
-                      }
-                    }}
-                    onIconDragStart={() => {
-                      setShowGrid(true);
-                      setIsDraggingIcon(true);
-                    }}
-                    onIconDragEnd={() => {
-                      setShowGrid(false);
-                      setIsDraggingIcon(false);
-                    }}
-                    onIconDrop={(event) => {
-                      // Receive zoom level info and potentially handle scaled drag end
-                      setCurrentZoomLevel(event.zoomLevel);
-                    }}
-                    onZoomChange={(zoomLevel) => setCurrentZoomLevel(zoomLevel)}
-                    segmentName={
-                      selectedLine !== null ? segmentNames[selectedLine] || "" : ""
-                    }
-                    onUpdateSegmentName={(name) => {
-                      if (selectedLine !== null) {
-                        handleUpdateSegmentName(selectedLine, name);
-                      }
-                    }}
-                    // Pass the current zoom state to the visible sheet
-                    zoomLevel={currentZoomLevel}
-                  />
-                </ResizablePanel>
-              </ResizablePanelGroup>
-            ) : (
-              <CountSheet
-                routineLength={config.length}
-                bpm={config.bpm}
-                placedSkills={placedSkills}
-                skills={skills}
-                onRemoveSkill={handleRemoveSkill}
-                onLineClick={setSelectedLine}
-                selectedLine={selectedLine}
-                selectedSkillId={selectedSkillId}
-                onSelectSkill={setSelectedSkillId}
-                onMoveSkill={(id, newLineIndex, newStartCount) => {
-                  setPlacedSkills(
-                    placedSkills.map((ps) =>
-                      ps.id === id
-                        ? {
-                            ...ps,
-                            lineIndex: newLineIndex,
-                            startCount: newStartCount,
-                          }
-                        : ps,
-                    ),
-                  );
-                }}
-                onUpdateSkillCounts={updateSkillCounts}
-                draggedSkill={draggedSkill}
-                overCellId={overCellId}
-                notes={notes}
-                onUpdateNote={(lineIndex, note) => {
-                  setNotes((prev) => ({ ...prev, [lineIndex]: note }));
-                }}
-                isPdfRender={isGeneratingPdf}
-              />
-            )}
-          </ResizablePanel>
-        </ResizablePanelGroup>
-
-        <DragOverlay className="z-[3000]">
-          {draggedSkill ? (
-            <div className={isDraggingPlacedSkill ? "" : ""}>
-              <SkillCard skill={draggedSkill} showDescription={false} />
-            </div>
-          ) : null}
-        </DragOverlay>
-        <TrashDropZone isDragging={isDraggingPlacedSkill} />
-      </DndContext>
-
-      {/* PDF Preview Dialog */}
-      <Dialog open={showPdfPreview} onOpenChange={setShowPdfPreview}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
-          <DialogHeader>
-            <DialogTitle>PDF Preview</DialogTitle>
-          </DialogHeader>
-          <div className="flex flex-col items-center space-y-4">
-            {pdfBlobUrl && (
-              <object
-                data={pdfBlobUrl}
-                type="application/pdf"
-                className="w-full h-[600px] border rounded"
-                title="PDF Preview"
-              >
-                <p>
-                  Your browser doesn't support PDF preview.{" "}
-                  <a href={pdfBlobUrl} download="routine.pdf">
-                    Download the PDF
-                  </a>{" "}
-                  instead.
-                </p>
-              </object>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowPdfPreview(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={() => {
-                if (pdfBlobUrl) {
-                  const a = document.createElement("a");
-                  a.href = pdfBlobUrl;
-                  a.download = "routine.pdf";
-                  document.body.appendChild(a);
-                  a.click();
-                  document.body.removeChild(a);
-                  setShowPdfPreview(false);
-                }
-              }}
-            >
-              <Download className="h-4 w-4 mr-2" />
-              Download PDF
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Rename Save Dialog */}
-      <Dialog open={showRenameDialog} onOpenChange={setShowRenameDialog}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Rename Save Slot</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="save-name" className="text-right">
-                Name
-              </Label>
-              <Input
-                id="save-name"
-                value={renameInput}
-                onChange={(e) => setRenameInput(e.target.value)}
-                className="col-span-3"
-                placeholder="Enter save name..."
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    handleRenameSave();
-                  }
-                }}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowRenameDialog(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleRenameSave}>Save</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <SaveRenameDialog
+        showRenameDialog={showRenameDialog}
+        renameInput={renameInput}
+        loadedSaveStateSlot={loadedSaveStateSlot}
+        saveNames={saveNames}
+        setShowRenameDialog={setShowRenameDialog}
+        setRenameInput={setRenameInput}
+        handleRenameSave={handleRenameSave}
+      />
 
       {/* About Modal */}
       <AboutModal open={showAboutModal} onOpenChange={setShowAboutModal} />
