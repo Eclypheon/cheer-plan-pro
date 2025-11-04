@@ -1202,7 +1202,6 @@ export const RoutineWorkspace = ({
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
       autoScroll={false}
-      modifiers={[snapCenterToCursor]}
     >
       <ResizablePanelGroup direction="horizontal" className="flex-1 w-full">
         <ResizablePanel
