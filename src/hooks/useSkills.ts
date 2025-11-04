@@ -93,6 +93,10 @@ export const useSkills = () => {
     return csv;
   };
 
+  const resetToDefault = () => {
+    setSkills(defaultSkills);
+  };
+
   return {
     skills,
     importFromCSV,
@@ -103,5 +107,6 @@ export const useSkills = () => {
     updateSkillName,
     updateSkillDescription,
     updateSkillLevel,
+    resetToDefault,
   };
 };

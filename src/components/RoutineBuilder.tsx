@@ -26,7 +26,7 @@ declare global {
 
 export const RoutineBuilder = () => {
   const { theme } = useTheme();
-  const { skills, exportToCSV, addCustomSkill, deleteSkill, updateSkillCounts } =
+  const { skills, exportToCSV, addCustomSkill, deleteSkill, updateSkillCounts, resetToDefault } =
     useSkills();
   const { config, updateLength, updateCategory, updateLevel, updateBpm, updateConfig } = useRoutineConfig();
 
@@ -1576,8 +1576,9 @@ export const RoutineBuilder = () => {
   });
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden" onClick={handleContainerClick}>
-      <RoutineHeader
+    <div className="h-screen flex flex-col overflow-x-auto overflow-y-hidden" onClick={handleContainerClick}>
+      <div className="flex-shrink-0 sticky top-0 z-10 bg-card border-b">
+        <RoutineHeader
         config={config}
         saveNames={saveNames}
         loadedSaveStateSlot={loadedSaveStateSlot}
@@ -1600,6 +1601,7 @@ export const RoutineBuilder = () => {
         onExportData={handleExportData}
         onImportData={handleImportData}
       />
+      </div>
 
       <RoutineWorkspace
         config={config}
@@ -1653,6 +1655,7 @@ export const RoutineBuilder = () => {
         getUniquePositionConfigurations={getUniquePositionConfigurations}
         handleExportPDF={handleExportPDF}
         isGeneratingPdf={isGeneratingPdf}
+        resetToDefault={resetToDefault}
       />
 
       <PdfPreviewDialog

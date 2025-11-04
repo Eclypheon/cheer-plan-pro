@@ -79,6 +79,7 @@ interface RoutineWorkspaceProps {
   }[];
   handleExportPDF: () => void;
   isGeneratingPdf: boolean;
+  resetToDefault: () => void;
 }
 
 export const RoutineWorkspace = ({
@@ -133,6 +134,7 @@ export const RoutineWorkspace = ({
   getUniquePositionConfigurations,
   handleExportPDF,
   isGeneratingPdf,
+  resetToDefault,
 }: RoutineWorkspaceProps) => {
   // Handle zoom level changes from PositionSheet
   const handleZoomChange = useCallback((zoomLevel: number) => {
@@ -1214,12 +1216,13 @@ export const RoutineWorkspace = ({
             onUpdateSkillCounts={updateSkillCounts}
             currentLevel={config.level}
             onLevelChange={(level) => updateConfig({ level })}
+            onResetToDefault={resetToDefault}
           />
         </ResizablePanel>
 
         <ResizableHandle withHandle />
 
-        <ResizablePanel defaultSize={75}>
+        <ResizablePanel defaultSize={75} minSize={60}>
           {config.category === "team-16" ||
           config.category === "team-24" ? (
             <ResizablePanelGroup direction="vertical" className="h-full">
