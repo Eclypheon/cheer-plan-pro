@@ -1474,6 +1474,14 @@ export const RoutineBuilder = () => {
     setRenameInput("");
   };
 
+  // Handle click outside to deselect placed skills
+  const handleContainerClick = (e: React.MouseEvent) => {
+    // Only deselect if clicking on the main container background and a skill is selected
+    if (selectedSkillId) {
+      setSelectedSkillId(null);
+    }
+  };
+
   // Use keyboard shortcuts hook
   useKeyboardShortcuts({
     config,
@@ -1495,7 +1503,7 @@ export const RoutineBuilder = () => {
   });
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden">
+    <div className="h-screen flex flex-col overflow-hidden" onClick={handleContainerClick}>
       <RoutineHeader
         config={config}
         saveNames={saveNames}
