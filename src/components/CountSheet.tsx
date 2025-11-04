@@ -137,6 +137,7 @@ const baseClasses = `w-3 h-3 rounded flex items-center justify-center text-gray-
         transform: `translate3d(${transform.x}px, 0px, 0)`, // Lock to horizontal only movement
       } : undefined}
       className={`${baseClasses} ${positionClasses}`}
+      data-dragging={isDragging ? "true" : "false"}
       title={`${direction === "left" ? "Decrease" : "Increase"} skill counts`}
     >
       {direction === "left" ? <ChevronLeft className="h-2.5 w-2.5" /> : <ChevronRight className="h-2.5 w-2.5" />}
@@ -394,6 +395,7 @@ export const CountSheet = ({
               className={`${colors.background} ${colors.border} border-2 rounded-md shadow-md absolute flex items-center cursor-grab active:cursor-grabbing z-[2000] text-sm transition-all duration-200 hover:shadow-lg overflow-visible group ${
                 isDragging ? "opacity-50 shadow-xl" : "opacity-100"
               } ${selectedSkillId === sp.placedSkill.id ? "ring-2 ring-accent ring-offset-1" : ""} ${containerClass}`}
+              data-dragging={isDragging ? "true" : "false"}
             >
 {/* Left resize handle - positioned absolutely at left edge */}
               <div className="absolute -left-2 top-1/2 -translate-y-1/2 z-[2100]">
