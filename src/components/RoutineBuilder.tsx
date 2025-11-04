@@ -24,6 +24,7 @@ import type {
   SaveStateData,
 } from "@/types/routine";
 import { useSkills } from "@/hooks/useSkills";
+import { useRoutineConfig } from "@/hooks/useRoutineConfig";
 import { SkillsPanel } from "./SkillsPanel";
 import { CountSheet } from "./CountSheet";
 import { PositionSheet } from "./PositionSheet";
@@ -80,12 +81,7 @@ export const RoutineBuilder = () => {
   const { theme } = useTheme();
   const { skills, exportToCSV, addCustomSkill, deleteSkill, updateSkillCounts } =
     useSkills();
-  const [config, setConfig] = useState<RoutineConfig>({
-    length: 90,
-    category: "partner-stunts",
-    level: "premier",
-    bpm: 154,
-  });
+  const { config, updateLength, updateCategory, updateLevel, updateBpm, updateConfig } = useRoutineConfig();
 
   const [placedSkills, setPlacedSkills] = useState<PlacedSkill[]>([]);
   const [positionIcons, setPositionIcons] = useState<PositionIcon[]>([]);
@@ -186,7 +182,7 @@ export const RoutineBuilder = () => {
         setPositionIcons(data.positionIcons);
         setNotes(data.notes || {});
         setSegmentNames(data.segmentNames || {});
-        setConfig(data.config);
+        updateConfig(data.config);
         setCurrentSaveState(data);
         setLoadedSaveStateSlot(1);
         // Store the initially loaded category so we know when user manually changes it
@@ -1168,7 +1164,7 @@ export const RoutineBuilder = () => {
       const data: SaveStateData = JSON.parse(saved);
       setPlacedSkills(data.placedSkills);
       setPositionIcons(data.positionIcons);
-      setConfig(data.config);
+      updateConfig(data.config);
       setNotes(data.notes || {});
       setSegmentNames(data.segmentNames || {});
       setCurrentSaveState(data);
@@ -2257,7 +2253,7 @@ export const RoutineBuilder = () => {
             <Label className="text-xs">Length:</Label>
             <Select
               value={config.length.toString()}
-              onValueChange={(v) => setConfig({ ...config, length: parseInt(v) })}
+              onValueChange={(v) => updateLength(parseInt(v))}
             >
               <SelectTrigger className="w-20 h-8">
                 <SelectValue />
@@ -2282,7 +2278,7 @@ export const RoutineBuilder = () => {
               onChange={(e) => {
                 const bpm = parseInt(e.target.value);
                 if (!isNaN(bpm) && bpm >= 120 && bpm <= 160) {
-                  setConfig({ ...config, bpm });
+                  updateBpm(bpm);
                 }
               }}
               className="w-[80px] h-8"
@@ -2294,7 +2290,7 @@ export const RoutineBuilder = () => {
             <Select
               value={config.category}
               onValueChange={(v) =>
-                setConfig({ ...config, category: v as any })
+                updateCategory(v as any)
               }
             >
               <SelectTrigger className="w-36 h-8">
@@ -2390,7 +2386,7 @@ export const RoutineBuilder = () => {
               }}
               onUpdateSkillCounts={updateSkillCounts}
               currentLevel={config.level}
-              onLevelChange={(level) => setConfig({ ...config, level })}
+              onLevelChange={(level) => updateLevel(level)}
             />
           </ResizablePanel>
 
