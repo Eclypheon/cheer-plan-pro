@@ -660,6 +660,23 @@ export const RoutineWorkspace = ({
       setIsDraggingIcon(true);
       setDraggedIconId(event.active.id as string);
       setDragOffset({ x: 0, y: 0 });
+
+      // Handle selection behavior when starting to drag an icon
+      const draggedIconId = event.active.id as string;
+      setPositionIcons((prev) => {
+        const currentlySelected = prev.filter(icon => icon.selected && icon.lineIndex === selectedLine);
+        const isDraggedIconSelected = currentlySelected.some(icon => icon.id === draggedIconId);
+
+        if (!isDraggedIconSelected) {
+          // Dragging an icon that's not selected: deselect all, select only this icon
+          return prev.map((icon) => ({
+            ...icon,
+            selected: icon.id === draggedIconId,
+          }));
+        }
+        // If the dragged icon is already selected, keep current selection
+        return prev;
+      });
     }
 
     if (event.active.data?.current?.type === "skill-resize") {
@@ -1265,12 +1282,30 @@ export const RoutineWorkspace = ({
                   dragOffset={dragOffset}
                   draggedIconId={draggedIconId}
                   onSelectIcon={(id) => {
-                    setPositionIcons((prev) =>
-                      prev.map((icon) => ({
-                        ...icon,
-                        selected: icon.id === id ? !icon.selected : false,
-                      })),
-                    );
+                    setPositionIcons((prev) => {
+                      const currentlySelected = prev.filter(icon => icon.selected);
+                      const isCurrentlySelected = currentlySelected.some(icon => icon.id === id);
+
+                      if (currentlySelected.length === 1 && !isCurrentlySelected) {
+                        // Single icon selected, clicking another icon: deselect current, select new
+                        return prev.map((icon) => ({
+                          ...icon,
+                          selected: icon.id === id,
+                        }));
+                      } else if (currentlySelected.length > 1 && !isCurrentlySelected) {
+                        // Multiple icons selected, clicking an icon not in selection: deselect all, select new
+                        return prev.map((icon) => ({
+                          ...icon,
+                          selected: icon.id === id,
+                        }));
+                      } else {
+                        // Toggle behavior for clicking selected icon or when no icons selected
+                        return prev.map((icon) => ({
+                          ...icon,
+                          selected: icon.id === id ? !icon.selected : false,
+                        }));
+                      }
+                    });
                   }}
                   onSelectMultiple={(ids) => {
                     setPositionIcons((prev) =>
