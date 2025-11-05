@@ -22,6 +22,8 @@ interface CountSheetProps {
   notes?: Record<number, string>;
   onUpdateNote?: (lineIndex: number, note: string) => void;
   isPdfRender?: boolean;
+  onToggleSkillsPanel?: () => void;
+  skillsPanelCollapsed?: boolean;
 }
 
 interface SkillPlacement {
@@ -137,6 +139,7 @@ const baseClasses = `w-3 h-3 rounded flex items-center justify-center text-gray-
         transform: `translate3d(${transform.x}px, 0px, 0)`, // Lock to horizontal only movement
       } : undefined}
       className={`${baseClasses} ${positionClasses}`}
+      data-dragging={isDragging ? "true" : "false"}
       title={`${direction === "left" ? "Decrease" : "Increase"} skill counts`}
     >
       {direction === "left" ? <ChevronLeft className="h-2.5 w-2.5" /> : <ChevronRight className="h-2.5 w-2.5" />}
@@ -162,6 +165,8 @@ export const CountSheet = ({
   notes = {},
   onUpdateNote,
   isPdfRender = false,
+  onToggleSkillsPanel,
+  skillsPanelCollapsed = false,
 }: CountSheetProps) => {
   // State for resizable panels
   const [countSheetWidth, setCountSheetWidth] = React.useState(60); // percentage
@@ -394,6 +399,7 @@ export const CountSheet = ({
               className={`${colors.background} ${colors.border} border-2 rounded-md shadow-md absolute flex items-center cursor-grab active:cursor-grabbing z-[2000] text-sm transition-all duration-200 hover:shadow-lg overflow-visible group ${
                 isDragging ? "opacity-50 shadow-xl" : "opacity-100"
               } ${selectedSkillId === sp.placedSkill.id ? "ring-2 ring-accent ring-offset-1" : ""} ${containerClass}`}
+              data-dragging={isDragging ? "true" : "false"}
             >
 {/* Left resize handle - positioned absolutely at left edge */}
               <div className="absolute -left-2 top-1/2 -translate-y-1/2 z-[2100]">
@@ -499,7 +505,7 @@ const handleClick = (e: React.MouseEvent) => {
 
     return (
       <td
-        className="border border-border bg-card hover:bg-accent/50 h-10 p-1 text-xs cursor-text line-clamp-2 break-words max-w-[500px] min-w-[500px]"
+        className="border border-border bg-card hover:bg-accent/50 h-10 p-1 text-xs cursor-text line-clamp-2 break-words"
         onClick={handleClick}
       >
         {isEditing ? (
@@ -573,14 +579,14 @@ const handleClick = (e: React.MouseEvent) => {
       </div>
 
       <div className="flex-1 overflow-auto relative" id="count-sheet-container">
-        <div ref={containerRef} id="count-sheet-content-wrapper" className="flex min-w-max relative">
+        <div ref={containerRef} id="count-sheet-content-wrapper" className={`${!isPdfRender ? 'flex min-w-max relative' : 'flex w-1576px relative'}`}>
           {/* Count Sheet Table */}
           <div
-  style={!isPdfRender ? { width: `${countSheetWidth}%`, minWidth: '690px' } : { }}
+  style={!isPdfRender ? { width: `${countSheetWidth}%`, minWidth: '690px' } : { width: '1000px' }}
   className="flex-shrink-0"
 >
             <table className="border-collapse relative z-10 w-full" id="count-sheet-table">
-              <thead className="sticky top-0 bg-card z-20">
+              <thead className="sticky top-0 bg-card z-[4000]">
                 <tr>
                   <th className="border border-border bg-muted font-bold text-center px-2 py-1 text-xs">#</th>
                   {Array.from({ length: 8 }, (_, i) => (
@@ -611,14 +617,14 @@ const handleClick = (e: React.MouseEvent) => {
 
           {/* Notes Table */}
           <div
-  style={!isPdfRender ? { width: `${100 - countSheetWidth}%` } : { minWidth: '500px' }}
+  style={!isPdfRender ? { width: `${100 - countSheetWidth}%` } : { width: `300px` }}
   className="flex-shrink-0"
 >
             <table className={cn(
               "border-collapse relative z-10",
-              isPdfRender ? "max-w-xl" : "w-full" // <-- EDIT THIS "max-w-xl" (e.g., max-w-lg, max-w-2xl) FOR THE PDF
+              isPdfRender ? "w-full" : "w-full" // <-- EDIT THIS "max-w-xl" (e.g., max-w-lg, max-w-2xl) FOR THE PDF
             )}>
-              <thead className="sticky top-0 bg-card z-20">
+              <thead className="sticky top-0 bg-card z-[4000]">
                 <tr>
                   <th className="border border-border bg-muted font-bold text-center px-2 py-1 text-xs">Notes</th>
                 </tr>

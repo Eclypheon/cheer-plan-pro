@@ -61,7 +61,7 @@ export const PositionIcon = ({ icon, onUpdate, onClick, onRemove, dragOffset, is
       data-position-icon
       data-dnd-handle="position-icon-drag"
       className={cn(
-        "absolute w-32 h-32 -ml-16 -mt-16 cursor-grab active:cursor-grabbing z-[2000]",
+        "absolute w-20 h-20 -ml-12 -mt-12 cursor-grab active:cursor-grabbing z-[2000]",
         "flex items-center justify-center",
         "transition-colors",
         icon.selected
@@ -69,12 +69,13 @@ export const PositionIcon = ({ icon, onUpdate, onClick, onRemove, dragOffset, is
           : "text-primary hover:text-primary/70",
         isDragging && "opacity-50"
       )}
+      data-dragging={isDragging ? "true" : "false"}
       style={style}
     >
       <IconComponent type={icon.type} />
       {icon.name && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <span className="text-blue-900 dark:text-blue-100 text-xl font-medium text-center leading-tight max-w-full px-1">
+          <span className="text-blue-900 dark:text-blue-100 text-base font-medium text-center leading-tight max-w-full px-1">
             {icon.name}
           </span>
         </div>

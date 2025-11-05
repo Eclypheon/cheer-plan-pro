@@ -22,7 +22,7 @@ export const TrashDropZone = ({ isDragging }: TrashDropZoneProps) => {
       className={cn(
         "fixed bottom-8 left-0 z-50 transition-all pointer-events-auto",
         "flex items-center justify-center",
-        "w-1/5 h-screen rounded-full",
+        "w-1/6 h-screen rounded-full",
         "border-4 border-dashed",
         isOver
           ? "bg-destructive scale-110 border-destructive shadow-lg"

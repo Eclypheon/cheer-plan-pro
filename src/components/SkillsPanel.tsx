@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Check, Trash2 } from "lucide-react";
+import { Check, Trash2, RotateCcw } from "lucide-react";
 import { Card } from "@/components/ui/card";
 
 interface SkillsPanelProps {
@@ -16,6 +16,7 @@ interface SkillsPanelProps {
   onUpdateSkillCounts: (id: string, counts: number) => void;
   currentLevel: import("@/types/routine").SkillLevel;
   onLevelChange: (level: import("@/types/routine").SkillLevel) => void;
+  onResetToDefault: () => void;
 }
 
 const categoryLabels: Record<SkillCategory, string> = {
@@ -28,7 +29,7 @@ const categoryLabels: Record<SkillCategory, string> = {
   transitions: "Transitions",
 };
 
-export const SkillsPanel = ({ skills, onAddCustomSkill, onDeleteSkill, onUpdateSkillCounts, currentLevel, onLevelChange }: SkillsPanelProps) => {
+export const SkillsPanel = ({ skills, onAddCustomSkill, onDeleteSkill, onUpdateSkillCounts, currentLevel, onLevelChange, onResetToDefault }: SkillsPanelProps) => {
   const [newSkillName, setNewSkillName] = useState<Record<SkillCategory, string>>({} as any);
   const [newSkillCounts, setNewSkillCounts] = useState<Record<SkillCategory, string>>({} as any);
   const [newSkillDesc, setNewSkillDesc] = useState<Record<SkillCategory, string>>({} as any);
@@ -70,7 +71,18 @@ export const SkillsPanel = ({ skills, onAddCustomSkill, onDeleteSkill, onUpdateS
   return (
     <div className="h-full flex flex-col border-r bg-card relative z-10">
       <div className="p-2 border-b space-y-2">
-        <h2 className="text-sm font-semibold">Skills Library</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold">Skills Library</h2>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onResetToDefault}
+            className="h-6 w-6 p-0"
+            title="Reset to default skills"
+          >
+            <RotateCcw className="h-3 w-3" />
+          </Button>
+        </div>
         <Select value={currentLevel} onValueChange={onLevelChange}>
           <SelectTrigger className="w-full h-7 text-xs">
             <SelectValue />
@@ -101,14 +113,14 @@ export const SkillsPanel = ({ skills, onAddCustomSkill, onDeleteSkill, onUpdateS
               {getSkillsByCategory(category).map((skill) => (
                 <div key={skill.id} className="relative group">
                   <SkillCard skill={skill} onUpdateCounts={onUpdateSkillCounts} />
-                  {skill.id.startsWith("custom-") && (
+                  {
                     <button
                       onClick={() => onDeleteSkill(skill.id)}
                       className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-destructive text-destructive-foreground p-1 rounded"
                     >
                       <Trash2 className="h-3 w-3" />
                     </button>
-                  )}
+                  }
                 </div>
               ))}
               
