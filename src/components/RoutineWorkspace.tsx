@@ -6,6 +6,7 @@ import { useSkills } from "@/hooks/useSkills";
 import { useRoutineConfig } from "@/hooks/useRoutineConfig";
 import { usePdfExport } from "@/hooks/usePdfExport";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { SkillsPanel } from "./SkillsPanel";
 import { CountSheet } from "./CountSheet";
 import { PositionSheet } from "./PositionSheet";
@@ -138,6 +139,33 @@ export const RoutineWorkspace = ({
   resetToDefault,
 }: RoutineWorkspaceProps) => {
   const isMobile = useIsMobile();
+
+  // State for panel sizes and toggle
+  const [panelSizes, setPanelSizes] = useState([30, 70]); // [skillsPanel, mainPanel]
+  const [skillsPanelCollapsed, setSkillsPanelCollapsed] = useState(false);
+  const [previousSkillsSize, setPreviousSkillsSize] = useState(15);
+
+  // Handle panel layout changes
+  const handlePanelLayout = useCallback((sizes: number[]) => {
+    setPanelSizes(sizes);
+    // Update previous size when not collapsed
+    if (sizes[0] > 1) {
+      setPreviousSkillsSize(sizes[0]);
+    }
+  }, []);
+
+  // Toggle skills panel collapse
+  const toggleSkillsPanel = useCallback(() => {
+    if (skillsPanelCollapsed) {
+      // Expand to previous size
+      setPanelSizes([previousSkillsSize, 100 - previousSkillsSize]);
+      setSkillsPanelCollapsed(false);
+    } else {
+      // Collapse to 1%
+      setPanelSizes([1, 99]);
+      setSkillsPanelCollapsed(true);
+    }
+  }, [skillsPanelCollapsed, previousSkillsSize]);
 
   // Handle zoom level changes from PositionSheet
   const handleZoomChange = useCallback((zoomLevel: number) => {
@@ -1203,13 +1231,37 @@ export const RoutineWorkspace = ({
       onDragEnd={handleDragEnd}
       autoScroll={false}
     >
-      <ResizablePanelGroup direction="horizontal" className="flex-1 w-full">
+      {/* Chevron button for toggling skills panel - positioned at top level */}
+      <button
+        onClick={toggleSkillsPanel}
+        className="absolute left-0 top-1/3 -translate-y-1/2 -translate-x-1/2 z-[100] w-6 h-6 bg-card border border-border rounded-full shadow-md hover:bg-accent transition-colors flex items-center justify-center"
+        title={skillsPanelCollapsed ? "Show skills panel" : "Hide skills panel"}
+        style={{ left: `${panelSizes[0]}%` }}
+      >
+        {skillsPanelCollapsed ? (
+          <ChevronRight className="h-3 w-3 text-muted-foreground" />
+        ) : (
+          <ChevronLeft className="h-3 w-3 text-muted-foreground" />
+        )}
+      </button>
+
+      <ResizablePanelGroup
+        direction="horizontal"
+        className="flex-1 w-full relative"
+        onLayout={handlePanelLayout}
+      >
         <ResizablePanel
-          defaultSize={15}
-          minSize={10}
-          maxSize={40}
-          collapsible
-          className="min-w-40"
+          defaultSize={panelSizes[0]}
+          minSize={skillsPanelCollapsed ? 0 : 10}
+          maxSize={skillsPanelCollapsed ? 0 : 40}
+          className={skillsPanelCollapsed ? "" : ""}
+          onResize={(size) => {
+            const newSizes = [size, 100 - size];
+            setPanelSizes(newSizes);
+            if (size > 1) {
+              setPreviousSkillsSize(size);
+            }
+          }}
         >
           <SkillsPanel
             skills={skills}
@@ -1229,7 +1281,7 @@ export const RoutineWorkspace = ({
 
         <ResizableHandle withHandle />
 
-        <ResizablePanel defaultSize={75} minSize={60}>
+        <ResizablePanel defaultSize={panelSizes[1]} minSize={60}>
           {config.category === "team-16" ||
           config.category === "team-24" ? (
             <ResizablePanelGroup direction="vertical" className="h-full">
@@ -1271,6 +1323,8 @@ export const RoutineWorkspace = ({
                     setNotes((prev) => ({ ...prev, [lineIndex]: note }));
                   }}
                   isPdfRender={isGeneratingPdf}
+                  onToggleSkillsPanel={toggleSkillsPanel}
+                  skillsPanelCollapsed={skillsPanelCollapsed}
                 />
               </ResizablePanel>
 
@@ -1404,6 +1458,8 @@ export const RoutineWorkspace = ({
                 setNotes((prev) => ({ ...prev, [lineIndex]: note }));
               }}
               isPdfRender={isGeneratingPdf}
+              onToggleSkillsPanel={toggleSkillsPanel}
+              skillsPanelCollapsed={skillsPanelCollapsed}
             />
           )}
         </ResizablePanel>

@@ -22,6 +22,8 @@ interface CountSheetProps {
   notes?: Record<number, string>;
   onUpdateNote?: (lineIndex: number, note: string) => void;
   isPdfRender?: boolean;
+  onToggleSkillsPanel?: () => void;
+  skillsPanelCollapsed?: boolean;
 }
 
 interface SkillPlacement {
@@ -163,6 +165,8 @@ export const CountSheet = ({
   notes = {},
   onUpdateNote,
   isPdfRender = false,
+  onToggleSkillsPanel,
+  skillsPanelCollapsed = false,
 }: CountSheetProps) => {
   // State for resizable panels
   const [countSheetWidth, setCountSheetWidth] = React.useState(60); // percentage
