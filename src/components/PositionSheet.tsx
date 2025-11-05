@@ -173,11 +173,11 @@ export const PositionSheet = ({
     }
 
     // Clear preview position when touch ends
-    if (isMobile && isDraggingIcon) {
+    if (isMobile) {
       setPreviewPosition(null);
       setPreviewSheetCoords(null);
     }
-  }, [isMobile, isDraggingIcon]);
+  }, [isMobile]);
 
   // Convert screen coordinates to zoom-adjusted coordinates
   const getZoomedCoordinates = useCallback((clientX: number, clientY: number) => {
