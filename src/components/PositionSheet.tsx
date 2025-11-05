@@ -9,6 +9,7 @@ import { PositionIcon as PositionIconComponent } from "./PositionIcon";
 import { PositionIconNameDialog } from "./PositionIconNameDialog";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface PositionSheetProps {
   icons: PositionIcon[];
@@ -75,6 +76,7 @@ export const PositionSheet = ({
   pdfSegmentName, // ----- ADD THIS LINE -----
   zoomLevel: propZoomLevel,
 }: PositionSheetProps) => {
+  const isMobile = useIsMobile();
   const [selectedIconId, setSelectedIconId] = useState<string | null>(null);
   const [nameDialogOpen, setNameDialogOpen] = useState(false);
   const [clickCount, setClickCount] = useState(0);
@@ -86,6 +88,8 @@ export const PositionSheet = ({
   const [isPinching, setIsPinching] = useState(false);
   const [initialPinchDistance, setInitialPinchDistance] = useState(0);
   const [initialZoomLevel, setInitialZoomLevel] = useState(1.0);
+  const [previewPosition, setPreviewPosition] = useState<{ x: number; y: number } | null>(null);
+  const [previewSheetCoords, setPreviewSheetCoords] = useState<{ x: number; y: number } | null>(null);
   const sheetRef = useRef<HTMLDivElement>(null);
 
   // Set up droppable area for the position sheet grid
@@ -151,14 +155,29 @@ export const PositionSheet = ({
         onZoomChange?.(newZoomLevel);
       }
     }
-  }, [isPinching, initialPinchDistance, initialZoomLevel, getTouchDistance, onZoomChange]);
+
+    // Update preview position during icon dragging on mobile
+    if (isMobile && isDraggingIcon && e.touches.length === 1 && draggedIconId) {
+      const touch = e.touches[0];
+      const screenPos = { x: touch.clientX, y: touch.clientY };
+      const sheetCoords = getZoomedCoordinates(touch.clientX, touch.clientY);
+      setPreviewPosition(screenPos);
+      setPreviewSheetCoords(sheetCoords);
+    }
+  }, [isPinching, initialPinchDistance, initialZoomLevel, getTouchDistance, onZoomChange, isMobile, isDraggingIcon, draggedIconId]);
 
   const handleTouchEnd = useCallback((e: React.TouchEvent) => {
     if (e.touches.length < 2) {
       setIsPinching(false);
       setInitialPinchDistance(0);
     }
-  }, []);
+
+    // Clear preview position when touch ends
+    if (isMobile) {
+      setPreviewPosition(null);
+      setPreviewSheetCoords(null);
+    }
+  }, [isMobile]);
 
   // Convert screen coordinates to zoom-adjusted coordinates
   const getZoomedCoordinates = useCallback((clientX: number, clientY: number) => {
@@ -594,6 +613,147 @@ return (
       currentName={selectedIcon?.name || ""}
       onSave={handleSaveName}
     />
+
+    {/* Mobile drag preview */}
+    {isMobile && isDraggingIcon && previewPosition && previewSheetCoords && (
+      <div
+        className="fixed top-4 left-4 w-32 h-32 bg-background border-2 border-border rounded-lg shadow-lg z-[9999] pointer-events-none overflow-hidden"
+        style={{
+          transform: 'translateZ(0)', // Force hardware acceleration
+        }}
+      >
+        <div className="w-full h-full relative">
+          {/* Segment name overlay - positioned outside scaled container */}
+          <div
+            className="absolute top-1 left-1 right-1 flex justify-between items-center z-10"
+            style={{
+              transform: 'scale(0.25)',
+              transformOrigin: 'top left',
+              width: `${800 / 0.25}px`,
+            }}
+          >
+<div style={{ width: '33.33%', position: 'relative' }}>
+  <div 
+    className="text-lg font-medium" 
+    style={{ fontSize: '18px' }}
+  >
+    {/* Segment name on the left */}
+    <span style={{ position: 'absolute', left: 0 }}>
+      {currentSegmentName || 'Segment name'}
+    </span>
+    
+    {/* Audience in the center */}
+    <span style={{ 
+      position: 'absolute', 
+      left: 190, 
+    }}>
+      Audience
+    </span>
+  </div>
+</div>
+            <div style={{ width: '33.33%' }} />
+          </div>
+
+          {/* Mini position sheet background */}
+          <div
+            className="absolute inset-0 bg-background rounded"
+            style={{
+              transform: `scale(0.25) translate(${200 - previewSheetCoords.x}px, ${150 - previewSheetCoords.y}px)`,
+              transformOrigin: 'top left',
+            }}
+          >
+            {/* Grid overlay */}
+            {(showGrid || isDraggingIcon) && (
+              <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 5, width:'640%', height: '500%' }}>
+                {Array.from({ length: 37 }, (_, i) => (
+                  <line
+                    key={`preview-v-${i}`}
+                    x1={`${(i / 36) * 100}%`}
+                    y1="0"
+                    x2={`${(i / 36) * 100}%`}
+                    y2="100%"
+                    stroke="currentColor"
+                    strokeOpacity="0.2"
+                    strokeWidth="0.5"
+                  />
+                ))}
+                {Array.from({ length: 37 }, (_, i) => (
+                  <line
+                    key={`preview-h-${i}`}
+                    x1="0"
+                    y1={`${(i / 36) * 100}%`}
+                    x2="100%"
+                    y2={`${(i / 36) * 100}%`}
+                    stroke="currentColor"
+                    strokeOpacity="0.2"
+                    strokeWidth="0.5"
+                  />
+                ))}
+              </svg>
+            )}
+
+            {/* Mat lines */}
+            {Array.from({ length: 9 }, (_, i) => (
+              <div
+                key={`preview-mat-${i}`}
+                className="absolute top-0 bottom-0 border-l-2 border-muted pointer-events-none"
+                style={{ left: `${(i / 9) * 640}%`, zIndex: 1, height: '500%' }}
+              />
+            ))}
+
+            {/* Mini position icons - exclude dragged icon from static rendering */}
+            {lineIcons.filter(icon => icon.id !== draggedIconId).map((icon) => (
+              <div
+                key={`preview-${icon.id}`}
+                className="absolute w-20 h-20 -ml-12 -mt-12 flex items-center justify-center"
+                style={{
+                  left: `${icon.x}px`,
+                  top: `${icon.y}px`,
+                }}
+              >
+                {icon.type === "square" && <Square className="w-20 h-20" />}
+                {icon.type === "circle" && <Circle className="w-20 h-20" />}
+                {icon.type === "x" && <Triangle className="w-20 h-20" />}
+                {icon.name && (
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <span className="text-blue-900 dark:text-blue-100 text-base font-medium text-center leading-tight max-w-full px-1">
+                      {icon.name}
+                    </span>
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {/* Dragged icon positioned at current drag location */}
+            {(() => {
+              const draggedIcon = lineIcons.find(icon => icon.id === draggedIconId);
+              if (!draggedIcon) return null;
+
+              return (
+                <div
+                  className="absolute w-20 h-20 -ml-12 -mt-12 flex items-center justify-center z-10"
+                  style={{
+                    left: `${previewSheetCoords.x}px`,
+                    top: `${previewSheetCoords.y}px`,
+                  }}
+                >
+                  {draggedIcon.type === "square" && <Square className="w-20 h-20" />}
+                  {draggedIcon.type === "circle" && <Circle className="w-20 h-20" />}
+                  {draggedIcon.type === "x" && <Triangle className="w-20 h-20" />}
+                  {draggedIcon.name && (
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <span className="text-blue-900 dark:text-blue-100 text-base font-medium text-center leading-tight max-w-full px-1">
+                        {draggedIcon.name}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      </div>
+    )}
   </>
 );
 };
