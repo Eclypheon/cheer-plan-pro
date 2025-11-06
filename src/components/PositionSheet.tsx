@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from "react";
+import React, { useState, useRef, useCallback } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import type { PositionIcon } from "@/types/routine";
 import { Card } from "@/components/ui/card";
@@ -90,9 +90,7 @@ export const PositionSheet = ({
   const [initialZoomLevel, setInitialZoomLevel] = useState(1.0);
   const [previewPosition, setPreviewPosition] = useState<{ x: number; y: number } | null>(null);
   const [previewSheetCoords, setPreviewSheetCoords] = useState<{ x: number; y: number } | null>(null);
-  const [shouldCenter, setShouldCenter] = useState(true);
   const sheetRef = useRef<HTMLDivElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
 
   // Set up droppable area for the position sheet grid
   const { setNodeRef, isOver } = useDroppable({
@@ -335,48 +333,6 @@ export const PositionSheet = ({
   const selectedIconsCount = lineIcons.filter(i => i.selected).length;
   const isMultiDrag = selectedIconsCount > 1 && dragOffset !== null;
 
-  // Update alignment based on content overflow
-  useEffect(() => {
-    const updateAlignment = () => {
-      if (containerRef.current) {
-        const containerRect = containerRef.current.getBoundingClientRect();
-        const contentWidth = 800 * effectiveZoomLevel;
-
-        // Check if content overflows the container
-        const overflows = contentWidth > containerRect.width;
-        setShouldCenter(!overflows);
-      }
-    };
-
-    // Initial check
-    updateAlignment();
-
-    // Set up ResizeObserver to watch for container size changes
-    const resizeObserver = new ResizeObserver(updateAlignment);
-    if (containerRef.current) {
-      resizeObserver.observe(containerRef.current);
-    }
-
-    return () => {
-      resizeObserver.disconnect();
-    };
-  }, [effectiveZoomLevel]);
-
-  // Force layout recalculation when shouldCenter changes
-  useEffect(() => {
-    if (containerRef.current) {
-      // Temporarily set overflow to hidden to force recalculation
-      containerRef.current.style.overflow = 'hidden';
-
-      // Use setTimeout to ensure the change takes effect and layout settles
-      setTimeout(() => {
-        if (containerRef.current) {
-          containerRef.current.style.overflow = '';
-        }
-      }, 100); // Longer delay to ensure layout settles
-    }
-  }, [shouldCenter]);
-
 return (
   <>
     <Card className="h-full flex flex-col relative z-10" id="position-sheet">
@@ -495,13 +451,8 @@ return (
         </div>
 
         {/* Position sheet */}
-        <div
-          id="position-sheet-container"
-          ref={containerRef}
-          key={`container-${shouldCenter}`}
-          className={`flex-1 p-1.5 flex flex-col overflow-auto ${shouldCenter ? 'items-center' : 'items-start'}`}
-        >
-          <div id="position-sheet-content-wrapper" className={`flex flex-col ${shouldCenter ? 'items-center' : 'items-start'}`}>
+        <div id="position-sheet-container" className="flex-1 p-1.5 flex flex-col items-center overflow-auto">
+          <div id="position-sheet-content-wrapper" className="flex flex-col items-center">
           {/* ----- START OF MODIFIED CODE ----- */}
           <div
             className="flex justify-between items-center mb-1" // Use justify-between
