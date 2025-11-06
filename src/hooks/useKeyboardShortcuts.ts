@@ -2,22 +2,20 @@ import { useEffect } from "react";
 import type { PlacedSkill, PositionIcon, RoutineConfig } from "@/types/routine";
 import type { Skill } from "@/types/routine";
 
-interface KeyboardSettings {
-  nextLine: string;
-  prevLine: string;
-  undo: string;
-  redo: string;
-  toggleAutoFollow: string;
-  deleteIcon: string;
-  moveLeft: string;
-  moveRight: string;
-  moveUp: string;
-  moveDown: string;
-  altMoveLeft: string;
-  altMoveRight: string;
-  altMoveUp: string;
-  altMoveDown: string;
-}
+const defaultKeyboardSettings = {
+  nextLine: "ArrowDown",
+  prevLine: "ArrowUp",
+  undo: "z",
+  redo: "y",
+  toggleAutoFollow: "f",
+  deleteIcon: "Delete",
+  moveLeft: "ArrowLeft",
+  moveRight: "ArrowRight",
+  moveUp: "ArrowUp",
+  moveDown: "ArrowDown",
+};
+
+type KeyboardSettings = typeof defaultKeyboardSettings;
 
 interface UseKeyboardShortcutsProps {
   config: RoutineConfig;
@@ -133,10 +131,7 @@ export const useKeyboardShortcuts = ({
 
         const totalLines = Math.ceil(((config.length * config.bpm) / 60 / 8));
 
-        if (
-          e.key === keyboardSettings.moveLeft ||
-          e.key === keyboardSettings.altMoveLeft
-        ) {
+        if (e.key === keyboardSettings.moveLeft) {
           const skill = skills.find((s) => s.id === selectedSkill.skillId);
           if (!skill) return;
 
@@ -163,10 +158,7 @@ export const useKeyboardShortcuts = ({
           e.preventDefault();
         }
 
-        if (
-          e.key === keyboardSettings.moveRight ||
-          e.key === keyboardSettings.altMoveRight
-        ) {
+        if (e.key === keyboardSettings.moveRight) {
           const skill = skills.find((s) => s.id === selectedSkill.skillId);
           if (!skill) return;
 
@@ -197,10 +189,7 @@ export const useKeyboardShortcuts = ({
           e.preventDefault();
         }
 
-        if (
-          e.key === keyboardSettings.moveUp ||
-          e.key === keyboardSettings.altMoveUp
-        ) {
+        if (e.key === keyboardSettings.moveUp) {
           if (selectedSkill.lineIndex > 0) {
             setPlacedSkills((prev) =>
               prev.map((ps) =>
@@ -213,10 +202,7 @@ export const useKeyboardShortcuts = ({
           e.preventDefault();
         }
 
-        if (
-          e.key === keyboardSettings.moveDown ||
-          e.key === keyboardSettings.altMoveDown
-        ) {
+        if (e.key === keyboardSettings.moveDown) {
           if (selectedSkill.lineIndex < totalLines - 1) {
             setPlacedSkills((prev) =>
               prev.map((ps) =>
@@ -240,10 +226,7 @@ export const useKeyboardShortcuts = ({
 
         const totalLines = Math.ceil(((config.length * config.bpm) / 60 / 8));
 
-        if (
-          e.key === keyboardSettings.moveLeft ||
-          e.key === keyboardSettings.altMoveLeft
-        ) {
+        if (e.key === keyboardSettings.moveLeft) {
           // Check if we can move left - calculate absolute positions for all affected skills
           const skillsToMove = placedSkills.filter(
             (ps) =>
@@ -290,10 +273,7 @@ export const useKeyboardShortcuts = ({
           e.preventDefault();
         }
 
-        if (
-          e.key === keyboardSettings.moveRight ||
-          e.key === keyboardSettings.altMoveRight
-        ) {
+        if (e.key === keyboardSettings.moveRight) {
           // Check if we can move right - calculate absolute positions for all affected skills
           const skillsToMove = placedSkills.filter(
             (ps) =>
@@ -344,10 +324,7 @@ export const useKeyboardShortcuts = ({
           e.preventDefault();
         }
 
-        if (
-          e.key === keyboardSettings.moveUp ||
-          e.key === keyboardSettings.altMoveUp
-        ) {
+        if (e.key === keyboardSettings.moveUp) {
           // Check if all skills to move can actually move up (not in first line)
           const skillsToMove = placedSkills.filter(
             (ps) =>
@@ -370,10 +347,7 @@ export const useKeyboardShortcuts = ({
           e.preventDefault();
         }
 
-        if (
-          e.key === keyboardSettings.moveDown ||
-          e.key === keyboardSettings.altMoveDown
-        ) {
+        if (e.key === keyboardSettings.moveDown) {
           // Check if all skills to move can actually move down (not in last line)
           const skillsToMove = placedSkills.filter(
             (ps) =>
@@ -408,10 +382,7 @@ export const useKeyboardShortcuts = ({
 
         const totalLines = Math.ceil(((config.length * config.bpm) / 60 / 8));
 
-        if (
-          e.key === keyboardSettings.moveLeft ||
-          e.key === keyboardSettings.altMoveLeft
-        ) {
+        if (e.key === keyboardSettings.moveLeft) {
           // Check if we can move left - calculate absolute positions for all affected skills
           const skillsToMove = placedSkills.filter(
             (ps) =>
@@ -458,10 +429,7 @@ export const useKeyboardShortcuts = ({
           e.preventDefault();
         }
 
-        if (
-          e.key === keyboardSettings.moveRight ||
-          e.key === keyboardSettings.altMoveRight
-        ) {
+        if (e.key === keyboardSettings.moveRight) {
           // Check if we can move right - calculate absolute positions for all affected skills
           const skillsToMove = placedSkills.filter(
             (ps) =>
@@ -512,10 +480,7 @@ export const useKeyboardShortcuts = ({
           e.preventDefault();
         }
 
-        if (
-          e.key === keyboardSettings.moveUp ||
-          e.key === keyboardSettings.altMoveUp
-        ) {
+        if (e.key === keyboardSettings.moveUp) {
           // Check if all skills to move can actually move up (not in first line)
           const skillsToMove = placedSkills.filter(
             (ps) =>
@@ -538,10 +503,7 @@ export const useKeyboardShortcuts = ({
           e.preventDefault();
         }
 
-        if (
-          e.key === keyboardSettings.moveDown ||
-          e.key === keyboardSettings.altMoveDown
-        ) {
+        if (e.key === keyboardSettings.moveDown) {
           // Check if all skills to move can actually move down (not in last line)
           const skillsToMove = placedSkills.filter(
             (ps) =>

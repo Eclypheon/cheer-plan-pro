@@ -13,6 +13,7 @@ import { RoutineHeader } from "./RoutineHeader";
 import { RoutineWorkspace } from "./RoutineWorkspace";
 import { PdfPreviewDialog } from "./PdfPreviewDialog";
 import { SaveRenameDialog } from "./SaveRenameDialog";
+import { RoutineConfigModal } from "./RoutineConfigModal";
 import { useTheme } from "next-themes";
 
 // Define global functions for TypeScript
@@ -84,29 +85,21 @@ export const RoutineBuilder = () => {
   const [showRenameDialog, setShowRenameDialog] = useState(false);
   const [renameInput, setRenameInput] = useState("");
   const [showAboutModal, setShowAboutModal] = useState(false);
+  const [showConfigModal, setShowConfigModal] = useState(false);
 
   // Load keyboard settings
-  const [keyboardSettings] = useState(() => {
-    const saved = localStorage.getItem("keyboardSettings");
-    return saved
-      ? JSON.parse(saved)
-      : {
-          nextLine: "ArrowDown",
-          prevLine: "ArrowUp",
-          undo: "z",
-          redo: "y",
-          toggleAutoFollow: "f",
-          deleteIcon: "Delete",
-          moveLeft: "ArrowLeft",
-          moveRight: "ArrowRight",
-          moveUp: "ArrowUp",
-          moveDown: "ArrowDown",
-          altMoveLeft: "a",
-          altMoveRight: "d",
-          altMoveUp: "w",
-          altMoveDown: "s",
-        };
-  });
+  const keyboardSettings = {
+    nextLine: "ArrowDown",
+    prevLine: "ArrowUp",
+    undo: "z",
+    redo: "y",
+    toggleAutoFollow: "f",
+    deleteIcon: "Delete",
+    moveLeft: "ArrowLeft",
+    moveRight: "ArrowRight",
+    moveUp: "ArrowUp",
+    moveDown: "ArrowDown",
+  };
 
   // Load saved state on component mount - auto-load State 1 if available
   useEffect(() => {
@@ -1598,6 +1591,7 @@ export const RoutineBuilder = () => {
         handleExportPDF={handleExportPDF}
         isGeneratingPdf={isGeneratingPdf}
         setShowAboutModal={setShowAboutModal}
+        setShowConfigModal={setShowConfigModal}
         loadFromSlot={loadFromSlot}
         setShowRenameDialog={setShowRenameDialog}
         setRenameInput={setRenameInput}
@@ -1683,6 +1677,16 @@ export const RoutineBuilder = () => {
 
       {/* About Modal */}
       <AboutModal open={showAboutModal} onOpenChange={setShowAboutModal} />
+
+      {/* Config Modal */}
+      <RoutineConfigModal
+        isOpen={showConfigModal}
+        onOpenChange={setShowConfigModal}
+        config={config}
+        updateLength={updateLength}
+        updateBpm={updateBpm}
+        updateCategory={updateCategory}
+      />
     </div>
   );
 };

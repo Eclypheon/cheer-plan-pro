@@ -65,10 +65,6 @@ export interface KeyboardSettings {
   moveRight: string;
   moveUp: string;
   moveDown: string;
-  altMoveLeft: string;
-  altMoveRight: string;
-  altMoveUp: string;
-  altMoveDown: string;
 }
 
 export interface RoutineConfig {
