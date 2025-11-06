@@ -207,6 +207,9 @@ export const RoutineBuilder = () => {
 
   const { handleExportPDF, isGeneratingPdf } = usePdfExport({
     config,
+    placedSkills,
+    skills,
+    notes,
     getUniquePositionConfigurations,
     segmentNames,
     setPdfBlob,
