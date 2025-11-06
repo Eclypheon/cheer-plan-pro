@@ -47,10 +47,10 @@ const getSkillCategoryColors = (category: SkillCategory) => {
       };
     case "dismounts":
       return {
-        background: "bg-gradient-to-br from-red-50 to-orange-50 dark:from-red-900/40 dark:to-orange-900/40",
-        border: "border-red-300 dark:border-red-600",
-        text: "text-red-900 dark:text-red-100",
-        accent: "bg-red-600 text-white"
+        background: "bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-900/40 dark:to-purple-900/40",
+        border: "border-blue-300 dark:border-blue-600",
+        text: "text-blue-900 dark:text-blue-100",
+        accent: "bg-blue-600 text-white"
       };
     case "pyramids":
       return {
@@ -173,6 +173,34 @@ export const CountSheet = ({
   const [isResizingPanels, setIsResizingPanels] = React.useState(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
   const [editingNoteLine, setEditingNoteLine] = React.useState<number | null>(null);
+
+  // Check if we're currently dragging (passed from parent)
+  const isDraggingAnySkill = draggedSkill !== null || isResizing;
+
+  // Prevent default touch behavior when starting to drag placed skills
+  React.useEffect(() => {
+    const handleTouchStart = (e: TouchEvent) => {
+      // Check if the touch is on a placed skill element
+      const target = e.target as HTMLElement;
+      const skillElement = target.closest('[data-skill-id]');
+
+      if (skillElement) {
+        // Prevent default touch behavior to avoid scrolling when starting drag
+        e.preventDefault();
+      }
+    };
+
+    const scrollableContainer = document.getElementById('count-sheet-container');
+    if (scrollableContainer) {
+      scrollableContainer.addEventListener('touchstart', handleTouchStart, { passive: false });
+    }
+
+    return () => {
+      if (scrollableContainer) {
+        scrollableContainer.removeEventListener('touchstart', handleTouchStart);
+      }
+    };
+  }, []);
 
   // Handle panel resizing
   const handleMouseDown = React.useCallback((e: React.MouseEvent) => {
