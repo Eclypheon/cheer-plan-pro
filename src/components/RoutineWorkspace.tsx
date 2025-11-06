@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, DragMoveEvent, CollisionDetection, rectIntersection, closestCenter, DragOverEvent, useSensor, useSensors, PointerSensor } from "@dnd-kit/core";
-import { snapCenterToCursor } from "@dnd-kit/modifiers";
 import type { PlacedSkill, RoutineConfig, Skill, PositionIcon, CategoryStateData, SaveStateData } from "@/types/routine";
 import { useSkills } from "@/hooks/useSkills";
 import { useRoutineConfig } from "@/hooks/useRoutineConfig";
@@ -270,8 +269,7 @@ export const RoutineWorkspace = ({
     }),
   );
 
-  // Ensure drag overlay follows cursor consistently
-  const dragModifiers = [snapCenterToCursor];
+
 
   /**
    * Generate position icons for team categories (team-16 or team-24) in evenly distributed positions
@@ -1353,7 +1351,6 @@ export const RoutineWorkspace = ({
       onDragMove={handleDragMove}
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
-      modifiers={dragModifiers}
       autoScroll={false}
     >
       {/* Chevron button for toggling skills panel - positioned at top level */}
