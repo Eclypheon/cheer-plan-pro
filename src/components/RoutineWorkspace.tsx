@@ -1234,7 +1234,7 @@ export const RoutineWorkspace = ({
       {/* Chevron button for toggling skills panel - positioned at top level */}
       <button
         onClick={toggleSkillsPanel}
-        className="absolute left-0 top-[47%] -translate-y-1/2 -translate-x-1/2 z-[100] w-6 h-6 bg-card border border-border rounded-full shadow-md hover:bg-accent transition-colors flex items-center justify-center"
+        className="absolute left-0 top-[47%] -translate-y-1/2 -translate-x-1/2 z-40 w-6 h-6 bg-card border border-border rounded-full shadow-md hover:bg-accent transition-colors flex items-center justify-center"
         title={skillsPanelCollapsed ? "Show skills panel" : "Hide skills panel"}
         style={{ left: `${panelSizes[0]}%` }}
       >
@@ -1301,6 +1301,13 @@ export const RoutineWorkspace = ({
                     setSelectedSkillId(id);
                     // Deselect all position icons when selecting a placed skill
                     setPositionIcons(prev => prev.map(icon => ({ ...icon, selected: false })));
+                    // Also select the line that the first cell of the placed skill is on
+                    if (id) {
+                      const placedSkill = placedSkills.find(ps => ps.id === id);
+                      if (placedSkill) {
+                        setSelectedLine(placedSkill.lineIndex);
+                      }
+                    }
                   }}
                   onMoveSkill={(id, newLineIndex, newStartCount) => {
                     setPlacedSkills(
@@ -1436,6 +1443,13 @@ export const RoutineWorkspace = ({
                 setSelectedSkillId(id);
                 // Deselect all position icons when selecting a placed skill
                 setPositionIcons(prev => prev.map(icon => ({ ...icon, selected: false })));
+                // Also select the line that the first cell of the placed skill is on
+                if (id) {
+                  const placedSkill = placedSkills.find(ps => ps.id === id);
+                  if (placedSkill) {
+                    setSelectedLine(placedSkill.lineIndex);
+                  }
+                }
               }}
               onMoveSkill={(id, newLineIndex, newStartCount) => {
                 setPlacedSkills(

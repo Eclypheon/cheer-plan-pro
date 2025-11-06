@@ -1,10 +1,10 @@
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useRef, useCallback, useEffect } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import type { PositionIcon } from "@/types/routine";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
-import { Plus, Undo, Redo, ToggleLeft, ToggleRight, Square, Circle, Triangle, X, ZoomIn, ZoomOut } from "lucide-react";
+import { Plus, Undo, Redo, ToggleLeft, ToggleRight, Square, Circle, Triangle, X, ZoomIn, ZoomOut, Trash2 } from "lucide-react";
 import { PositionIcon as PositionIconComponent } from "./PositionIcon";
 import { PositionIconNameDialog } from "./PositionIconNameDialog";
 import { Input } from "@/components/ui/input";
@@ -90,7 +90,9 @@ export const PositionSheet = ({
   const [initialZoomLevel, setInitialZoomLevel] = useState(1.0);
   const [previewPosition, setPreviewPosition] = useState<{ x: number; y: number } | null>(null);
   const [previewSheetCoords, setPreviewSheetCoords] = useState<{ x: number; y: number } | null>(null);
+  const [isOverflowingHorizontally, setIsOverflowingHorizontally] = useState(true);
   const sheetRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Set up droppable area for the position sheet grid
   const { setNodeRef, isOver } = useDroppable({
@@ -135,6 +137,30 @@ export const PositionSheet = ({
   // Use prop zoom level if provided, otherwise use internal state
   const effectiveZoomLevel = propZoomLevel ?? zoomLevel;
 
+  // Check for horizontal overflow
+  useEffect(() => {
+    const checkOverflow = () => {
+      if (containerRef.current) {
+        const container = containerRef.current;
+        const contentWidth = 800 * effectiveZoomLevel + 24; // 800px content + 24px padding (12px * 2)
+        const containerWidth = container.clientWidth;
+        setIsOverflowingHorizontally(contentWidth > containerWidth);
+      }
+    };
+
+    checkOverflow();
+
+    // Set up ResizeObserver to watch for container size changes
+    const resizeObserver = new ResizeObserver(checkOverflow);
+    if (containerRef.current) {
+      resizeObserver.observe(containerRef.current);
+    }
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [effectiveZoomLevel, selectedLine]);
+
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     if (e.touches.length === 2) {
       e.preventDefault();
@@ -157,14 +183,21 @@ export const PositionSheet = ({
     }
 
     // Update preview position during icon dragging on mobile
-    if (isMobile && isDraggingIcon && e.touches.length === 1 && draggedIconId) {
+    if (isMobile && isDraggingIcon && e.touches.length === 1 && draggedIconId && dragOffset) {
       const touch = e.touches[0];
       const screenPos = { x: touch.clientX, y: touch.clientY };
-      const sheetCoords = getZoomedCoordinates(touch.clientX, touch.clientY);
+
+      // Calculate the current position of the dragged icon based on dragOffset
+      const draggedIcon = icons.find(icon => icon.id === draggedIconId);
+      if (draggedIcon) {
+        const currentX = draggedIcon.x + dragOffset.x / effectiveZoomLevel;
+        const currentY = draggedIcon.y + dragOffset.y / effectiveZoomLevel;
+        setPreviewSheetCoords({ x: currentX, y: currentY });
+      }
+
       setPreviewPosition(screenPos);
-      setPreviewSheetCoords(sheetCoords);
     }
-  }, [isPinching, initialPinchDistance, initialZoomLevel, getTouchDistance, onZoomChange, isMobile, isDraggingIcon, draggedIconId]);
+  }, [isPinching, initialPinchDistance, initialZoomLevel, getTouchDistance, onZoomChange, isMobile, isDraggingIcon, draggedIconId, dragOffset, icons, effectiveZoomLevel]);
 
   const handleTouchEnd = useCallback((e: React.TouchEvent) => {
     if (e.touches.length < 2) {
@@ -332,19 +365,19 @@ return (
       {/* Header */}
       <div className="p-1.5 border-b relative z-10">
         <div className="flex items-center justify-between gap-1.5">
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-0.5">
             <h3 className="text-sm font-semibold">Line {selectedLine !== null ? selectedLine + 1 : 'PDF'}</h3>
-            <Button size="sm" variant="ghost" className="h-6 px-1.5 text-xs" onClick={() => onAddIcon("square")}>
+            <Button size="sm" variant="ghost" className="h-6 px-0.25 text-xs" onClick={() => onAddIcon("square")}>
               <Square className="h-3 w-3 mr-0.5" />
-              Base
+              
             </Button>
-            <Button size="sm" variant="ghost" className="h-6 px-1.5 text-xs" onClick={() => onAddIcon("circle")}>
-              <Circle className="h-2.5 w-2.5 mr-0.5" />
-              Mid
+            <Button size="sm" variant="ghost" className="h-6 px-0.25 text-xs" onClick={() => onAddIcon("circle")}>
+              <Circle className="h-3 w-3 mr-0.5" />
+              
             </Button>
-            <Button size="sm" variant="ghost" className="h-6 px-1.5 text-xs" onClick={() => onAddIcon("x")}>
+            <Button size="sm" variant="ghost" className="h-6 px-0.25 text-xs" onClick={() => onAddIcon("x")}>
               <Triangle className="h-3 w-3 mr-0.5" />
-              Fly
+              
             </Button>
           </div>
           <div className="flex gap-1 items-center">
@@ -395,8 +428,7 @@ return (
                   }
                 }}
               >
-                <X className="h-3 w-3 mr-0.5" />
-                Delete ({selectedIconsCount})
+                <Trash2 className="h-3 w-3" />
               </Button>
             )}
           </div>
@@ -444,7 +476,14 @@ return (
         </div>
 
         {/* Position sheet */}
-        <div id="position-sheet-container" className="flex-1 p-1.5 flex flex-col items-center overflow-auto">
+        <div
+          id="position-sheet-container"
+          ref={containerRef}
+          className={cn(
+            "flex-1 p-1.5 flex flex-col overflow-auto",
+            isOverflowingHorizontally ? "items-start" : "items-center"
+          )}
+        >
           <div id="position-sheet-content-wrapper" className="flex flex-col items-center">
           {/* ----- START OF MODIFIED CODE ----- */}
           <div
