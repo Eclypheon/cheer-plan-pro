@@ -159,7 +159,7 @@ export const PositionSheet = ({
     return () => {
       resizeObserver.disconnect();
     };
-  }, [effectiveZoomLevel]);
+  }, [effectiveZoomLevel, selectedLine]);
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     if (e.touches.length === 2) {
