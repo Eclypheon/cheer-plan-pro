@@ -90,7 +90,7 @@ export const PositionSheet = ({
   const [initialZoomLevel, setInitialZoomLevel] = useState(1.0);
   const [previewPosition, setPreviewPosition] = useState<{ x: number; y: number } | null>(null);
   const [previewSheetCoords, setPreviewSheetCoords] = useState<{ x: number; y: number } | null>(null);
-  const [isOverflowingHorizontally, setIsOverflowingHorizontally] = useState(false);
+  const [isOverflowingHorizontally, setIsOverflowingHorizontally] = useState(true);
   const sheetRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
