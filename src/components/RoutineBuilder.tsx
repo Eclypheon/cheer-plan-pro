@@ -198,7 +198,9 @@ export const RoutineBuilder = () => {
       // Only add if we haven't seen this configuration before
       if (!seenConfigurations.has(configHash)) {
         seenConfigurations.add(configHash);
-        configurations.push({ icons: lineIcons, lineIndex }); // Store lineIndex
+        // Clear selected state on all icons for PDF generation
+        const iconsForPdf = lineIcons.map(icon => ({ ...icon, selected: false }));
+        configurations.push({ icons: iconsForPdf, lineIndex }); // Store lineIndex
       }
     }
 
@@ -214,6 +216,11 @@ export const RoutineBuilder = () => {
     segmentNames,
     setPdfBlob,
     setShowPdfPreview,
+    onClearSelections: () => {
+      setSelectedLine(null);
+      setSelectedSkillId(null);
+      setPositionIcons(prev => prev.map(icon => ({ ...icon, selected: false })));
+    },
   });
 
   // Handle category changes - auto-save/load category states

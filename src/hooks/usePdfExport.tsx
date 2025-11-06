@@ -25,6 +25,7 @@ interface UsePdfExportProps {
   segmentNames: Record<number, string>;
   setPdfBlob: (blob: Blob | null) => void;
   setShowPdfPreview: (show: boolean) => void;
+  onClearSelections?: () => void;
 }
 
 export const usePdfExport = ({
@@ -36,6 +37,7 @@ export const usePdfExport = ({
   segmentNames,
   setPdfBlob,
   setShowPdfPreview,
+  onClearSelections,
 }: UsePdfExportProps) => {
   const { theme } = useTheme();
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
@@ -43,6 +45,9 @@ export const usePdfExport = ({
   const handleExportPDF = async () => {
     if (isGeneratingPdf) return; // Prevent double-clicks
     setIsGeneratingPdf(true);
+
+    // Clear all selections temporarily for PDF generation
+    onClearSelections?.();
 
     try {
       // --- PDF Generation Logic ---
