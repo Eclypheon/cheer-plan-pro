@@ -365,19 +365,19 @@ return (
       {/* Header */}
       <div className="p-1.5 border-b relative z-10">
         <div className="flex items-center justify-between gap-1.5">
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-0.5">
             <h3 className="text-sm font-semibold">Line {selectedLine !== null ? selectedLine + 1 : 'PDF'}</h3>
-            <Button size="sm" variant="ghost" className="h-6 px-1.5 text-xs" onClick={() => onAddIcon("square")}>
+            <Button size="sm" variant="ghost" className="h-6 px-0.25 text-xs" onClick={() => onAddIcon("square")}>
               <Square className="h-3 w-3 mr-0.5" />
-              Base
+              
             </Button>
-            <Button size="sm" variant="ghost" className="h-6 px-1.5 text-xs" onClick={() => onAddIcon("circle")}>
-              <Circle className="h-2.5 w-2.5 mr-0.5" />
-              Mid
+            <Button size="sm" variant="ghost" className="h-6 px-0.25 text-xs" onClick={() => onAddIcon("circle")}>
+              <Circle className="h-3 w-3 mr-0.5" />
+              
             </Button>
-            <Button size="sm" variant="ghost" className="h-6 px-1.5 text-xs" onClick={() => onAddIcon("x")}>
+            <Button size="sm" variant="ghost" className="h-6 px-0.25 text-xs" onClick={() => onAddIcon("x")}>
               <Triangle className="h-3 w-3 mr-0.5" />
-              Fly
+              
             </Button>
           </div>
           <div className="flex gap-1 items-center">
