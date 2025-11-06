@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, DragMoveEvent, CollisionDetection, rectIntersection, closestCenter, DragOverEvent, useSensor, useSensors, PointerSensor } from "@dnd-kit/core";
-import type { PlacedSkill, RoutineConfig, Skill, PositionIcon, CategoryStateData, SaveStateData } from "@/types/routine";
+import type { PlacedSkill, RoutineConfig, Skill, PositionIcon, Arrow, CategoryStateData, SaveStateData } from "@/types/routine";
 import { useSkills } from "@/hooks/useSkills";
 import { useRoutineConfig } from "@/hooks/useRoutineConfig";
 import { usePdfExport } from "@/hooks/usePdfExport";
@@ -19,6 +19,8 @@ interface RoutineWorkspaceProps {
   setPlacedSkills: React.Dispatch<React.SetStateAction<PlacedSkill[]>>;
   positionIcons: PositionIcon[];
   setPositionIcons: React.Dispatch<React.SetStateAction<PositionIcon[]>>;
+  arrows: Arrow[];
+  setArrows: React.Dispatch<React.SetStateAction<Arrow[]>>;
   notes: Record<number, string>;
   setNotes: React.Dispatch<React.SetStateAction<Record<number, string>>>;
   segmentNames: Record<number, string>;
@@ -28,14 +30,22 @@ interface RoutineWorkspaceProps {
   lineHistories: {
     [saveStateSlot: number]: {
       [category: string]: {
-        [lineIndex: number]: { history: PositionIcon[][]; index: number };
+        [lineIndex: number]: { 
+          iconHistory: PositionIcon[][];
+          arrowHistory: Arrow[][];
+          index: number;
+        };
       };
     };
   };
   setLineHistories: React.Dispatch<React.SetStateAction<{
     [saveStateSlot: number]: {
       [category: string]: {
-        [lineIndex: number]: { history: PositionIcon[][]; index: number };
+        [lineIndex: number]: { 
+          iconHistory: PositionIcon[][];
+          arrowHistory: Arrow[][];
+          index: number;
+        };
       };
     };
   }>>;
@@ -68,7 +78,18 @@ interface RoutineWorkspaceProps {
   currentSaveState: SaveStateData | null;
   setCurrentSaveState: React.Dispatch<React.SetStateAction<SaveStateData | null>>;
   loadedSaveStateSlot: 1 | 2 | 3 | null;
-  keyboardSettings: any;
+  keyboardSettings: {
+    nextLine: string;
+    prevLine: string;
+    undo: string;
+    redo: string;
+    toggleAutoFollow: string;
+    deleteIcon: string;
+    moveLeft: string;
+    moveRight: string;
+    moveUp: string;
+    moveDown: string;
+  };
   skills: Skill[];
   updateSkillCounts: (id: string, counts: number) => void;
   addCustomSkill: (skill: Omit<Skill, "id">) => void;
@@ -89,6 +110,8 @@ export const RoutineWorkspace = ({
   setPlacedSkills,
   positionIcons,
   setPositionIcons,
+  arrows,
+  setArrows,
   notes,
   setNotes,
   segmentNames,
@@ -383,7 +406,7 @@ export const RoutineWorkspace = ({
     saveStateSlot: number,
     category: string,
     lineIndex: number,
-  ): { history: PositionIcon[][]; index: number } | undefined => {
+  ): { iconHistory: PositionIcon[][]; arrowHistory: Arrow[][]; index: number } | undefined => {
     return lineHistories[saveStateSlot]?.[category]?.[lineIndex];
   };
 
@@ -391,7 +414,7 @@ export const RoutineWorkspace = ({
     saveStateSlot: number,
     category: string,
     lineIndex: number,
-    history: { history: PositionIcon[][]; index: number },
+    history: { iconHistory: PositionIcon[][]; arrowHistory: Arrow[][]; index: number },
   ) => {
     setLineHistories((prev) => ({
       ...prev,
@@ -407,7 +430,7 @@ export const RoutineWorkspace = ({
 
   const getCurrentScopedHistory = (
     lineIndex: number,
-  ): { history: PositionIcon[][]; index: number } | undefined => {
+  ): { iconHistory: PositionIcon[][]; arrowHistory: Arrow[][]; index: number } | undefined => {
     if (!loadedSaveStateSlot) return undefined;
     return getScopedHistory(loadedSaveStateSlot, config.category, lineIndex);
   };
@@ -426,6 +449,14 @@ export const RoutineWorkspace = ({
   };
 
   /**
+   * Helper function to normalize arrows for history comparison
+   * Excludes UI-only properties like 'selected' that shouldn't be part of undo/redo
+   */
+  const normalizeArrowsForHistory = (arrows: Arrow[]): Arrow[] => {
+    return arrows.map(({ selected, ...arrow }) => arrow);
+  };
+
+  /**
    * Helper function to check if two icon states are equal, ignoring selection differences
    */
   const areStatesEqualIgnoringSelection = (state1: PositionIcon[], state2: PositionIcon[]): boolean => {
@@ -434,6 +465,19 @@ export const RoutineWorkspace = ({
     // Create normalized versions for comparison
     const normalized1 = normalizeIconsForHistory(state1);
     const normalized2 = normalizeIconsForHistory(state2);
+
+    return JSON.stringify(normalized1) === JSON.stringify(normalized2);
+  };
+
+  /**
+   * Helper function to check if two arrow states are equal, ignoring selection differences
+   */
+  const areArrowStatesEqualIgnoringSelection = (state1: Arrow[], state2: Arrow[]): boolean => {
+    if (state1.length !== state2.length) return false;
+
+    // Create normalized versions for comparison
+    const normalized1 = normalizeArrowsForHistory(state1);
+    const normalized2 = normalizeArrowsForHistory(state2);
 
     return JSON.stringify(normalized1) === JSON.stringify(normalized2);
   };
@@ -448,6 +492,7 @@ export const RoutineWorkspace = ({
     const data: CategoryStateData = {
       placedSkills: [...placedSkills],
       positionIcons: [...positionIcons],
+      arrows: [...arrows],
       notes: { ...notes },
       segmentNames: { ...segmentNames },
       timestamp: Date.now(),
@@ -461,7 +506,14 @@ export const RoutineWorkspace = ({
     if (!loadedSaveStateSlot) return null; // Shouldn't happen, but safety check
     const key = `category-${loadedSaveStateSlot}-${category}`;
     const saved = localStorage.getItem(key);
-    return saved ? JSON.parse(saved) : null;
+    const data = saved ? JSON.parse(saved) : null;
+    
+    // Handle backwards compatibility: if arrows don't exist in saved data, add empty array
+    if (data && !data.arrows) {
+      data.arrows = [];
+    }
+    
+    return data;
   };
 
   const saveToSlot = (slotNumber: 1 | 2 | 3) => {
@@ -469,6 +521,7 @@ export const RoutineWorkspace = ({
     const data: SaveStateData = {
       placedSkills: [...placedSkills],
       positionIcons: [...positionIcons],
+      arrows: [...arrows],
       config: { ...config },
       notes: { ...notes },
       segmentNames: { ...segmentNames },
@@ -491,6 +544,7 @@ export const RoutineWorkspace = ({
       const data: SaveStateData = JSON.parse(saved);
       setPlacedSkills(data.placedSkills);
       setPositionIcons(data.positionIcons);
+      setArrows(data.arrows || []);  // Handle backwards compatibility with older saves
       updateConfig(data.config);
       setNotes(data.notes || {});
       setSegmentNames(data.segmentNames || {});
@@ -502,8 +556,9 @@ export const RoutineWorkspace = ({
       const defaultPlacedSkills: PlacedSkill[] = [];
       const defaultNotes = {};
       const defaultSegmentNames = {};
+      const defaultArrows: Arrow[] = []; // Default to empty arrows array
 
-      let defaultPositionIcons: PositionIcon[] = [];
+      const defaultPositionIcons: PositionIcon[] = [];
       if (config.category === "team-16" || config.category === "team-24") {
         // Generate default team icons
         const totalLines = Math.ceil(((config.length * config.bpm) / 60 / 8));
@@ -519,6 +574,7 @@ export const RoutineWorkspace = ({
       const defaultData: SaveStateData = {
         placedSkills: defaultPlacedSkills,
         positionIcons: defaultPositionIcons,
+        arrows: defaultArrows,
         config: { ...config },
         notes: defaultNotes,
         segmentNames: defaultSegmentNames,
@@ -528,6 +584,7 @@ export const RoutineWorkspace = ({
       // Apply the default state
       setPlacedSkills(defaultPlacedSkills);
       setPositionIcons(defaultPositionIcons);
+      setArrows(defaultArrows);
       setNotes(defaultNotes);
       setSegmentNames(defaultSegmentNames);
       // Keep current config
@@ -637,42 +694,59 @@ export const RoutineWorkspace = ({
       const currentLineIcons = positionIcons.filter(
         (i) => i.lineIndex === selectedLine,
       );
+      const currentLineArrows = arrows.filter(
+        (a) => a.lineIndex === selectedLine,
+      );
       setScopedHistory(loadedSaveStateSlot, config.category, selectedLine, {
-        history: [currentLineIcons],
+        iconHistory: [currentLineIcons],
+        arrowHistory: [currentLineArrows],
         index: 0,
       });
     }
-  }, [selectedLine, positionIcons, loadedSaveStateSlot, config.category]);
+  }, [selectedLine, positionIcons, arrows, loadedSaveStateSlot, config.category]);
 
-  // Record history state whenever icons change for the current line
+  // Record history state whenever icons or arrows change for the current line
   useEffect(() => {
     if (selectedLine !== null && loadedSaveStateSlot) {
       const lineHistory = getCurrentScopedHistory(selectedLine);
       if (!lineHistory) return;
 
-      const currentState = positionIcons.filter(
+      const currentIconState = positionIcons.filter(
         (i) => i.lineIndex === selectedLine,
+      );
+      const currentArrowState = arrows.filter(
+        (a) => a.lineIndex === selectedLine,
       );
 
       // Check if the only changes are in 'selected' properties (UI state)
-      const lastState = lineHistory.history[lineHistory.index];
-      if (lastState && areStatesEqualIgnoringSelection(currentState, lastState)) {
-        // If states are identical except for selection, don't record
+      const lastIconState = lineHistory.iconHistory[lineHistory.index];
+      const lastArrowState = lineHistory.arrowHistory[lineHistory.index];
+      
+      const iconsEqual = lastIconState && areStatesEqualIgnoringSelection(currentIconState, lastIconState);
+      const arrowsEqual = lastArrowState && areArrowStatesEqualIgnoringSelection(currentArrowState, lastArrowState);
+      
+      if (iconsEqual && arrowsEqual) {
+        // If both states are identical except for selection, don't record
         return;
       }
 
       // If states are different, add a new history entry
-      const newHistory = [
-        ...lineHistory.history.slice(0, lineHistory.index + 1),
-        currentState,
+      const newIconHistory = [
+        ...lineHistory.iconHistory.slice(0, lineHistory.index + 1),
+        currentIconState,
+      ];
+      const newArrowHistory = [
+        ...lineHistory.arrowHistory.slice(0, lineHistory.index + 1),
+        currentArrowState,
       ];
 
       setScopedHistory(loadedSaveStateSlot, config.category, selectedLine, {
-        history: newHistory,
-        index: newHistory.length - 1,
+        iconHistory: newIconHistory,
+        arrowHistory: newArrowHistory,
+        index: newIconHistory.length - 1, // Both histories should have the same length
       });
     }
-  }, [positionIcons, selectedLine, loadedSaveStateSlot, config.category]);
+  }, [positionIcons, arrows, selectedLine, loadedSaveStateSlot, config.category]);
 
   const handleDragMove = (event: DragMoveEvent) => {
     console.log(
@@ -684,6 +758,10 @@ export const RoutineWorkspace = ({
     const { active, delta, over } = event; // Add 'over' here
 
     if (active.data?.current?.type === "position-icon") {
+      setDragOffset({ x: delta.x, y: delta.y });
+    }
+    
+    if (active.data?.current?.type === "arrow") {
       setDragOffset({ x: delta.x, y: delta.y });
     }
 
@@ -829,6 +907,31 @@ export const RoutineWorkspace = ({
       // Skill resize drag started - no special handling needed at start
       setIsResizing(true);
     }
+    
+    if (event.active.data?.current?.type === "arrow") {
+      setIsDraggingIcon(true); // Reuse this state for arrow dragging too
+      setDraggedIconId(event.active.data.current.id as string);
+      setDragOffset({ x: 0, y: 0 });
+
+      // Handle selection behavior when starting to drag an arrow
+      const draggedArrowId = event.active.data.current.id as string;
+      setArrows((prev) => {
+        const currentlySelected = prev.filter(arrow => arrow.selected && arrow.lineIndex === selectedLine);
+        const isDraggedArrowSelected = currentlySelected.some(arrow => arrow.id === draggedArrowId);
+
+        if (!isDraggedArrowSelected) {
+          // Dragging an arrow that's not selected: deselect all, select only this arrow
+          return prev.map((arrow) => ({
+            ...arrow,
+            selected: arrow.id === draggedArrowId,
+          }));
+        }
+        // If the dragged arrow is already selected, keep current selection
+        return prev;
+      });
+      // Deselect all position icons when dragging an arrow
+      setPositionIcons(prev => prev.map(icon => ({ ...icon, selected: false })));
+    }
   };
 
   const handleDragOver = (event: DragOverEvent) => {
@@ -900,7 +1003,12 @@ export const RoutineWorkspace = ({
         // Check original data for icon type
         // Handle position icon deletion
         const iconId = active.id as string;
-        handleRemovePositionIcon(iconId); // Assuming you have this function
+        handleRemovePositionIcon(iconId);
+      }
+      else if (active.data?.current?.type === "arrow") {
+        // Handle arrow deletion
+        const arrowId = active.id as string;
+        handleRemoveArrow(arrowId);
       }
       return; // Stop further processing after deleting
     }
@@ -945,6 +1053,54 @@ export const RoutineWorkspace = ({
       }
       // PositionSheet handles history, no need to add here.
       return; // Stop further processing for icons
+    }
+    
+    // --- Arrow Drag Logic ---
+    if (active.data?.current?.type === "arrow") {
+      const arrow = arrows.find((a) => a.id === active.id);
+      if (!arrow) return;
+
+      // Handle multi-arrow drag
+      const selectedArrows = arrows.filter(
+        (a) => a.selected && a.lineIndex === selectedLine
+      );
+      
+      if (
+        selectedArrows.length > 1 &&
+        selectedArrows.some((a) => a.id === active.id)
+      ) {
+        // Multi-arrow drag - update all selected arrows and propagate if autoFollow is on
+        selectedArrows.forEach((selectedArrow) => {
+          // Calculate new positions based on delta, scaling by zoom level
+          const scaledDeltaX = delta.x * (1 / currentZoomLevel);
+          const scaledDeltaY = delta.y * (1 / currentZoomLevel);
+          
+          const newStartX = Math.max(0, Math.min(800, selectedArrow.start.x + scaledDeltaX));
+          const newStartY = Math.max(0, Math.min(600, selectedArrow.start.y + scaledDeltaY));
+          const newEndX = Math.max(0, Math.min(800, selectedArrow.end.x + scaledDeltaX));
+          const newEndY = Math.max(0, Math.min(600, selectedArrow.end.y + scaledDeltaY));
+          
+          handleUpdateArrow(selectedArrow.id, {
+            start: { x: newStartX, y: newStartY },
+            end: { x: newEndX, y: newEndY }
+          }, autoFollow);
+        });
+      } else {
+        // Single arrow drag - scale delta by zoom level to account for visual scaling
+        const scaledDeltaX = delta.x * (1 / currentZoomLevel);
+        const scaledDeltaY = delta.y * (1 / currentZoomLevel);
+        
+        const newStartX = Math.max(0, Math.min(800, arrow.start.x + scaledDeltaX));
+        const newStartY = Math.max(0, Math.min(600, arrow.start.y + scaledDeltaY));
+        const newEndX = Math.max(0, Math.min(800, arrow.end.x + scaledDeltaX));
+        const newEndY = Math.max(0, Math.min(600, arrow.end.y + scaledDeltaY));
+        
+        handleUpdateArrow(arrow.id, {
+          start: { x: newStartX, y: newStartY },
+          end: { x: newEndX, y: newEndY }
+        }, autoFollow);
+      }
+      return; // Stop further processing for arrows
     }
 
     // --- Position Sheet Grid Drop Logic ---
@@ -1169,6 +1325,148 @@ export const RoutineWorkspace = ({
     setPositionIcons(positionIcons.filter((icon) => icon.id !== id));
   };
 
+  const handleAddArrow = (arrowData: Omit<Arrow, 'id'>) => {
+    const newArrow: Arrow = {
+      ...arrowData,
+      id: `arrow-${Date.now()}-${Math.random()}`,
+    };
+    
+    setArrows(prev => {
+      const updated = [...prev, newArrow];
+
+      // If auto-follow is enabled, propagate the arrow to subsequent lines
+      if (autoFollow && selectedLine !== null) {
+        const totalLines = Math.ceil(((config.length * config.bpm) / 60 / 8));
+
+        // For each subsequent line, copy the new arrow
+        for (let line = selectedLine + 1; line < totalLines; line++) {
+          const copiedArrow = {
+            ...newArrow,
+            id: `arrow-${Date.now()}-${Math.random()}-${line}`,
+            lineIndex: line,
+          };
+          updated.push(copiedArrow);
+        }
+      }
+
+      return updated;
+    });
+  };
+
+  const handleUpdateArrow = (id: string, updates: Partial<Arrow>, shouldPropagate: boolean = false) => {
+    const arrow = arrows.find(a => a.id === id);
+    if (!arrow) return;
+
+    setArrows(prev => {
+      const updated = prev.map(a =>
+        a.id === id ? { ...a, ...updates } : a
+      );
+
+      if (shouldPropagate && autoFollow) {
+        const currentLine = arrow.lineIndex;
+        const totalLines = Math.ceil(((config.length * config.bpm) / 60 / 8));
+
+        // Get all arrows at current line with their new positions
+        const currentLineArrows = updated.filter(
+          (a) => a.lineIndex === currentLine
+        );
+
+        // For each subsequent line, copy the entire arrow layout from current line
+        const result = [...updated];
+        for (let line = currentLine + 1; line < totalLines; line++) {
+          // Remove existing arrows at this line
+          const otherArrows = result.filter((a) => a.lineIndex !== line);
+
+          // Copy current line arrows to this line
+          const copiedArrows = currentLineArrows.map((a) => ({
+            ...a,
+            id: `arrow-${Date.now()}-${Math.random()}-${line}`,
+            lineIndex: line,
+          }));
+
+          result.length = 0;
+          result.push(...otherArrows, ...copiedArrows);
+        }
+
+        return result;
+      }
+
+      return updated;
+    });
+  };
+
+  const handleRemoveArrow = (id: string) => {
+    const arrowToRemove = arrows.find(arrow => arrow.id === id);
+    
+    setArrows(prev => {
+      const updated = prev.filter(arrow => arrow.id !== id);
+
+      // If auto-follow is enabled and we know which arrow was removed, 
+      // remove corresponding arrows from subsequent lines
+      if (autoFollow && arrowToRemove && selectedLine !== null) {
+        const totalLines = Math.ceil(((config.length * config.bpm) / 60 / 8));
+
+        // For each subsequent line, find and remove arrows that match the removed one's original position
+        for (let line = selectedLine + 1; line < totalLines; line++) {
+          const matchingArrows = updated.filter(arrow => 
+            arrow.lineIndex === line &&
+            arrow.start.x === arrowToRemove.start.x &&
+            arrow.start.y === arrowToRemove.start.y &&
+            arrow.end.x === arrowToRemove.end.x &&
+            arrow.end.y === arrowToRemove.end.y
+          );
+          
+          // Remove the matching arrows
+          matchingArrows.forEach(matchingArrow => {
+            const index = updated.findIndex(a => a.id === matchingArrow.id);
+            if (index !== -1) {
+              updated.splice(index, 1);
+            }
+          });
+        }
+      }
+
+      return updated;
+    });
+  };
+
+  const handleRemoveMultipleArrows = (ids: string[]) => {
+    const arrowsToRemove = arrows.filter(arrow => ids.includes(arrow.id));
+    
+    setArrows(prev => {
+      const updated = prev.filter(arrow => !ids.includes(arrow.id));
+
+      // If auto-follow is enabled and we know which arrows were removed, 
+      // remove corresponding arrows from subsequent lines
+      if (autoFollow && arrowsToRemove.length > 0 && selectedLine !== null) {
+        const totalLines = Math.ceil(((config.length * config.bpm) / 60 / 8));
+
+        // For each subsequent line, find and remove arrows that match the removed ones' original positions
+        for (let line = selectedLine + 1; line < totalLines; line++) {
+          for (const arrowToRemove of arrowsToRemove) {
+            const matchingArrows = updated.filter(arrow => 
+              arrow.lineIndex === line &&
+              arrow.start.x === arrowToRemove.start.x &&
+              arrow.start.y === arrowToRemove.start.y &&
+              arrow.end.x === arrowToRemove.end.x &&
+              arrow.end.y === arrowToRemove.end.y
+            );
+            
+            // Remove the matching arrows
+            matchingArrows.forEach(matchingArrow => {
+              const index = updated.findIndex(a => a.id === matchingArrow.id);
+              if (index !== -1) {
+                updated.splice(index, 1);
+              }
+            });
+          }
+        }
+      }
+
+      return updated;
+    });
+  };
+
   const handleRestoreLineState = (
     lineIndex: number,
     newLineIcons: PositionIcon[],
@@ -1189,39 +1487,59 @@ export const RoutineWorkspace = ({
     const lineHistory = getCurrentScopedHistory(lineIndex);
     if (!lineHistory || lineHistory.index <= 0) return;
 
-    // Get the previous state for this line
-    const prevState = lineHistory.history[lineHistory.index - 1];
-    if (!prevState) return;
+    // Get the previous states for this line
+    const prevIconState = lineHistory.iconHistory[lineHistory.index - 1];
+    const prevArrowState = lineHistory.arrowHistory[lineHistory.index - 1];
+    if (!prevIconState || !prevArrowState) return;
 
     // Store the current states of subsequent lines before undoing
     const totalLines = Math.ceil(((config.length * config.bpm) / 60 / 8));
-    const preUndoStates: { [lineIndex: number]: PositionIcon[] } = {};
+    const preUndoIconStates: { [lineIndex: number]: PositionIcon[] } = {};
+    const preUndoArrowStates: { [lineIndex: number]: Arrow[] } = {};
 
     if (autoFollow) {
       for (let line = lineIndex + 1; line < totalLines; line++) {
         const lineHistory = getCurrentScopedHistory(line);
         if (lineHistory && lineHistory.index > 0) {
           // Store the state that this line will be undone to
-          preUndoStates[line] = lineHistory.history[lineHistory.index - 1];
+          preUndoIconStates[line] = lineHistory.iconHistory[lineHistory.index - 1];
+          preUndoArrowStates[line] = lineHistory.arrowHistory[lineHistory.index - 1];
         }
       }
     }
 
-    // Restore the state for the main line
-    handleRestoreLineState(lineIndex, prevState);
+    // Restore the icon state for the main line
+    handleRestoreLineState(lineIndex, prevIconState);
+
+    // Restore the arrow state for the main line
+    setArrows(prev => {
+      // Remove all existing arrows for this line
+      const filteredArrows = prev.filter(arrow => arrow.lineIndex !== lineIndex);
+      // Add the restored arrow state
+      return [...filteredArrows, ...prevArrowState];
+    });
 
     // If auto-follow is enabled, undo subsequent lines to their pre-propagation states
     if (autoFollow) {
       for (let subsequentLine = lineIndex + 1; subsequentLine < totalLines; subsequentLine++) {
         const subsequentLineHistory = getCurrentScopedHistory(subsequentLine);
         if (subsequentLineHistory && subsequentLineHistory.index > 0) {
-          // Restore this line to its state from before the propagation
-          const prePropagationState = subsequentLineHistory.history[subsequentLineHistory.index - 1];
-          handleRestoreLineState(subsequentLine, prePropagationState);
+          // Restore icons for this line to its state from before the propagation
+          const prePropagationIconState = subsequentLineHistory.iconHistory[subsequentLineHistory.index - 1];
+          handleRestoreLineState(subsequentLine, prePropagationIconState);
+
+          // Restore arrows for this line to its state from before the propagation
+          setArrows(prev => {
+            // Remove all existing arrows for this line
+            const filteredArrows = prev.filter(arrow => arrow.lineIndex !== subsequentLine);
+            // Add the restored arrow state
+            return [...filteredArrows, ...subsequentLineHistory.arrowHistory[subsequentLineHistory.index - 1]];
+          });
 
           // Update the history index for this line
           setScopedHistory(loadedSaveStateSlot, config.category, subsequentLine, {
-            ...subsequentLineHistory,
+            iconHistory: subsequentLineHistory.iconHistory,
+            arrowHistory: subsequentLineHistory.arrowHistory,
             index: subsequentLineHistory.index - 1,
           });
         }
@@ -1230,7 +1548,8 @@ export const RoutineWorkspace = ({
 
     // Update history index for the main line
     setScopedHistory(loadedSaveStateSlot, config.category, lineIndex, {
-      ...lineHistory,
+      iconHistory: lineHistory.iconHistory,
+      arrowHistory: lineHistory.arrowHistory,
       index: lineHistory.index - 1,
     });
   };
@@ -1238,42 +1557,62 @@ export const RoutineWorkspace = ({
   const handleRedoLine = (lineIndex: number) => {
     if (!loadedSaveStateSlot) return;
     const lineHistory = getCurrentScopedHistory(lineIndex);
-    if (!lineHistory || lineHistory.index >= lineHistory.history.length - 1)
+    if (!lineHistory || lineHistory.index >= lineHistory.iconHistory.length - 1)
       return;
 
-    // Get the next state for this line
-    const nextState = lineHistory.history[lineHistory.index + 1];
-    if (!nextState) return;
+    // Get the next states for this line
+    const nextIconState = lineHistory.iconHistory[lineHistory.index + 1];
+    const nextArrowState = lineHistory.arrowHistory[lineHistory.index + 1];
+    if (!nextIconState || !nextArrowState) return;
 
     // Store the current states of subsequent lines before redoing
     const totalLines = Math.ceil(((config.length * config.bpm) / 60 / 8));
-    const preRedoStates: { [lineIndex: number]: PositionIcon[] } = {};
+    const preRedoIconStates: { [lineIndex: number]: PositionIcon[] } = {};
+    const preRedoArrowStates: { [lineIndex: number]: Arrow[] } = {};
 
     if (autoFollow) {
       for (let line = lineIndex + 1; line < totalLines; line++) {
         const lineHistory = getCurrentScopedHistory(line);
-        if (lineHistory && lineHistory.index < lineHistory.history.length - 1) {
+        if (lineHistory && lineHistory.index < lineHistory.iconHistory.length - 1) {
           // Store the state that this line will be redone to
-          preRedoStates[line] = lineHistory.history[lineHistory.index + 1];
+          preRedoIconStates[line] = lineHistory.iconHistory[lineHistory.index + 1];
+          preRedoArrowStates[line] = lineHistory.arrowHistory[lineHistory.index + 1];
         }
       }
     }
 
-    // Restore the state for the main line
-    handleRestoreLineState(lineIndex, nextState);
+    // Restore the icon state for the main line
+    handleRestoreLineState(lineIndex, nextIconState);
+
+    // Restore the arrow state for the main line
+    setArrows(prev => {
+      // Remove all existing arrows for this line
+      const filteredArrows = prev.filter(arrow => arrow.lineIndex !== lineIndex);
+      // Add the restored arrow state
+      return [...filteredArrows, ...nextArrowState];
+    });
 
     // If auto-follow is enabled, redo subsequent lines to their post-propagation states
     if (autoFollow) {
       for (let subsequentLine = lineIndex + 1; subsequentLine < totalLines; subsequentLine++) {
         const subsequentLineHistory = getCurrentScopedHistory(subsequentLine);
-        if (subsequentLineHistory && subsequentLineHistory.index < subsequentLineHistory.history.length - 1) {
-          // Restore this line to its state from after the propagation
-          const postPropagationState = subsequentLineHistory.history[subsequentLineHistory.index + 1];
-          handleRestoreLineState(subsequentLine, postPropagationState);
+        if (subsequentLineHistory && subsequentLineHistory.index < subsequentLineHistory.iconHistory.length - 1) {
+          // Restore icons for this line to its state from after the propagation
+          const postPropagationIconState = subsequentLineHistory.iconHistory[subsequentLineHistory.index + 1];
+          handleRestoreLineState(subsequentLine, postPropagationIconState);
+
+          // Restore arrows for this line to its state from after the propagation
+          setArrows(prev => {
+            // Remove all existing arrows for this line
+            const filteredArrows = prev.filter(arrow => arrow.lineIndex !== subsequentLine);
+            // Add the restored arrow state
+            return [...filteredArrows, ...subsequentLineHistory.arrowHistory[subsequentLineHistory.index + 1]];
+          });
 
           // Update the history index for this line
           setScopedHistory(loadedSaveStateSlot, config.category, subsequentLine, {
-            ...subsequentLineHistory,
+            iconHistory: subsequentLineHistory.iconHistory,
+            arrowHistory: subsequentLineHistory.arrowHistory,
             index: subsequentLineHistory.index + 1,
           });
         }
@@ -1282,7 +1621,8 @@ export const RoutineWorkspace = ({
 
     // Update history index for the main line
     setScopedHistory(loadedSaveStateSlot, config.category, lineIndex, {
-      ...lineHistory,
+      iconHistory: lineHistory.iconHistory,
+      arrowHistory: lineHistory.arrowHistory,
       index: lineHistory.index + 1,
     });
   };
@@ -1462,6 +1802,7 @@ export const RoutineWorkspace = ({
               <ResizablePanel defaultSize={50} minSize={30}>
                 <PositionSheet
                   icons={positionIcons}
+                  arrows={arrows}
                   selectedLine={selectedLine}
                   onUpdateIcon={handleUpdatePositionIcon}
                   onAddIcon={handleAddPositionIcon}
@@ -1478,6 +1819,47 @@ export const RoutineWorkspace = ({
                   isDraggingIcon={isDraggingIcon}
                   dragOffset={dragOffset}
                   draggedIconId={draggedIconId}
+                  // Arrow-related props
+                  onAddArrow={handleAddArrow}
+                  onUpdateArrow={handleUpdateArrow}
+                  onRemoveArrow={handleRemoveArrow}
+                  onRemoveMultipleArrows={handleRemoveMultipleArrows}
+                  onSelectArrow={(id) => {
+                    setArrows(prev => {
+                      const currentlySelected = prev.filter(arrow => arrow.selected);
+                      const isCurrentlySelected = currentlySelected.some(arrow => arrow.id === id);
+
+                      if (currentlySelected.length === 1 && !isCurrentlySelected) {
+                        // Single arrow selected, clicking another arrow: deselect current, select new
+                        return prev.map((arrow) => ({
+                          ...arrow,
+                          selected: arrow.id === id,
+                        }));
+                      } else if (currentlySelected.length > 1 && !isCurrentlySelected) {
+                        // Multiple arrows selected, clicking an arrow not in selection: deselect all, select new
+                        return prev.map((arrow) => ({
+                          ...arrow,
+                          selected: arrow.id === id,
+                        }));
+                      } else {
+                        // Toggle behavior for clicking selected arrow or when no arrows selected
+                        return prev.map((arrow) => ({
+                          ...arrow,
+                          selected: arrow.id === id ? !arrow.selected : false,
+                        }));
+                      }
+                    });
+                    // Deselect all position icons when selecting an arrow
+                    setPositionIcons(prev => prev.map(icon => ({ ...icon, selected: false })));
+                  }}
+                  onSelectMultipleArrows={(ids) => {
+                    setArrows(prev =>
+                      prev.map((arrow) => ({
+                        ...arrow,
+                        selected: ids.includes(arrow.id),
+                      })),
+                    );
+                  }}
                   onSelectIcon={(id) => {
                     setPositionIcons((prev) => {
                       const currentlySelected = prev.filter(icon => icon.selected);
@@ -1503,6 +1885,8 @@ export const RoutineWorkspace = ({
                         }));
                       }
                     });
+                    // Deselect all arrows when selecting an icon
+                    setArrows(prev => prev.map(arrow => ({ ...arrow, selected: false })));
                   }}
                   onSelectMultiple={(ids) => {
                     setPositionIcons((prev) =>
@@ -1511,6 +1895,10 @@ export const RoutineWorkspace = ({
                         selected: ids.includes(icon.id),
                       })),
                     );
+                    // Deselect all arrows when doing rectangle selection (only if icons are being selected)
+                    if (ids.length > 0) {
+                      setArrows(prev => prev.map(arrow => ({ ...arrow, selected: false })));
+                    }
                   }}
                   onNextLine={() => {
                     const totalLines = Math.ceil(

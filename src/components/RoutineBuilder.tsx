@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, DragMoveEvent, CollisionDetection, rectIntersection, DragOverEvent, useSensor, useSensors, PointerSensor } from "@dnd-kit/core";
 import { snapCenterToCursor } from "@dnd-kit/modifiers";
-import type { PlacedSkill, RoutineConfig, Skill, PositionIcon, CategoryStateData, SaveStateData } from "@/types/routine";
+import type { PlacedSkill, RoutineConfig, Skill, PositionIcon, Arrow, CategoryStateData, SaveStateData } from "@/types/routine";
 import { useSkills } from "@/hooks/useSkills";
 import { useRoutineConfig } from "@/hooks/useRoutineConfig";
 import { usePdfExport } from "@/hooks/usePdfExport";
@@ -35,13 +35,18 @@ export const RoutineBuilder = () => {
 
   const [placedSkills, setPlacedSkills] = useState<PlacedSkill[]>([]);
   const [positionIcons, setPositionIcons] = useState<PositionIcon[]>([]);
+  const [arrows, setArrows] = useState<Arrow[]>([]);
   const [notes, setNotes] = useState<Record<number, string>>({});
   const [segmentNames, setSegmentNames] = useState<Record<number, string>>({});
   const [selectedLine, setSelectedLine] = useState<number | null>(null);
   const [lineHistories, setLineHistories] = useState<{
     [saveStateSlot: number]: {
       [category: string]: {
-        [lineIndex: number]: { history: PositionIcon[][]; index: number };
+        [lineIndex: number]: {
+          iconHistory: PositionIcon[][];
+          arrowHistory: Arrow[][];
+          index: number;
+        };
       };
     };
   }>({});
@@ -167,15 +172,19 @@ export const RoutineBuilder = () => {
   // ----- MODIFY THIS FUNCTION -----
   const getUniquePositionConfigurations = (): {
     icons: PositionIcon[];
+    arrows: Arrow[];
     lineIndex: number;
   }[] => {
     const totalLines = Math.ceil(((config.length * config.bpm) / 60 / 8));
-    const configurations: { icons: PositionIcon[]; lineIndex: number }[] = [];
+    const configurations: { icons: PositionIcon[]; arrows: Arrow[]; lineIndex: number }[] = [];
     const seenConfigurations = new Set<string>();
 
     for (let lineIndex = 0; lineIndex < totalLines; lineIndex++) {
       const lineIcons = positionIcons.filter(
         (icon) => icon.lineIndex === lineIndex,
+      );
+      const lineArrows = arrows.filter(
+        (arrow) => arrow.lineIndex === lineIndex,
       );
 
       // Create a normalized representation of the configuration
@@ -193,14 +202,36 @@ export const RoutineBuilder = () => {
           return a.type.localeCompare(b.type);
         });
 
-      const configHash = JSON.stringify(normalizedIcons);
+      // Create a normalized representation of arrows
+      const normalizedArrows = lineArrows
+        .map((arrow) => ({
+          startX: arrow.start.x,
+          startY: arrow.start.y,
+          endX: arrow.end.x,
+          endY: arrow.end.y,
+        }))
+        .sort((a, b) => {
+          if (a.startY !== b.startY) return a.startY - b.startY;
+          if (a.startX !== b.startX) return a.startX - b.startX;
+          return 0;
+        });
+
+      const configHash = JSON.stringify({
+        icons: normalizedIcons,
+        arrows: normalizedArrows
+      });
 
       // Only add if we haven't seen this configuration before
       if (!seenConfigurations.has(configHash)) {
         seenConfigurations.add(configHash);
-        // Clear selected state on all icons for PDF generation
+        // Clear selected state on all icons and arrows for PDF generation
         const iconsForPdf = lineIcons.map(icon => ({ ...icon, selected: false }));
-        configurations.push({ icons: iconsForPdf, lineIndex }); // Store lineIndex
+        const arrowsForPdf = lineArrows.map(arrow => ({ ...arrow, selected: false }));
+        configurations.push({ 
+          icons: iconsForPdf, 
+          arrows: arrowsForPdf,
+          lineIndex 
+        }); // Store lineIndex
       }
     }
 
@@ -220,6 +251,7 @@ export const RoutineBuilder = () => {
       setSelectedLine(null);
       setSelectedSkillId(null);
       setPositionIcons(prev => prev.map(icon => ({ ...icon, selected: false })));
+      setArrows(prev => prev.map(arrow => ({ ...arrow, selected: false })));
     },
   });
 
@@ -260,11 +292,13 @@ export const RoutineBuilder = () => {
     if (savedCategoryData) {
       setPlacedSkills(savedCategoryData.placedSkills);
       setPositionIcons(savedCategoryData.positionIcons);
+      setArrows(savedCategoryData.arrows || []); // Handle backwards compatibility
       setNotes(savedCategoryData.notes || {});
       setSegmentNames(savedCategoryData.segmentNames || {});
     } else {
       // No saved state - create default state for category
       setPlacedSkills([]);
+      setArrows([]); // Start with empty arrows
       setNotes({});
       setSegmentNames({});
       if (config.category === "team-16" || config.category === "team-24") {
@@ -292,6 +326,7 @@ export const RoutineBuilder = () => {
       const data: SaveStateData = {
         placedSkills: [...placedSkills],
         positionIcons: [...positionIcons],
+        arrows: [...arrows],
         config: { ...config },
         notes: { ...notes },
         segmentNames: { ...segmentNames },
@@ -308,6 +343,7 @@ export const RoutineBuilder = () => {
   }, [
     placedSkills,
     positionIcons,
+    arrows,
     config,
     loadedSaveStateSlot,
     hasLoadedState,
@@ -513,7 +549,7 @@ export const RoutineBuilder = () => {
     saveStateSlot: number,
     category: string,
     lineIndex: number,
-  ): { history: PositionIcon[][]; index: number } | undefined => {
+  ): { iconHistory: PositionIcon[][]; arrowHistory: Arrow[][]; index: number } | undefined => {
     return lineHistories[saveStateSlot]?.[category]?.[lineIndex];
   };
 
@@ -521,7 +557,7 @@ export const RoutineBuilder = () => {
     saveStateSlot: number,
     category: string,
     lineIndex: number,
-    history: { history: PositionIcon[][]; index: number },
+    history: { iconHistory: PositionIcon[][]; arrowHistory: Arrow[][]; index: number },
   ) => {
     setLineHistories((prev) => ({
       ...prev,
@@ -537,7 +573,7 @@ export const RoutineBuilder = () => {
 
   const getCurrentScopedHistory = (
     lineIndex: number,
-  ): { history: PositionIcon[][]; index: number } | undefined => {
+  ): { iconHistory: PositionIcon[][]; arrowHistory: Arrow[][]; index: number } | undefined => {
     if (!loadedSaveStateSlot) return undefined;
     return getScopedHistory(loadedSaveStateSlot, config.category, lineIndex);
   };
@@ -578,6 +614,7 @@ export const RoutineBuilder = () => {
     const data: CategoryStateData = {
       placedSkills: [...placedSkills],
       positionIcons: [...positionIcons],
+      arrows: [...arrows],
       notes: { ...notes },
       segmentNames: { ...segmentNames },
       timestamp: Date.now(),
@@ -591,7 +628,14 @@ export const RoutineBuilder = () => {
     if (!loadedSaveStateSlot) return null; // Shouldn't happen, but safety check
     const key = `category-${loadedSaveStateSlot}-${category}`;
     const saved = localStorage.getItem(key);
-    return saved ? JSON.parse(saved) : null;
+    const data = saved ? JSON.parse(saved) : null;
+    
+    // Handle backwards compatibility: if arrows don't exist in saved data, add empty array
+    if (data && !data.arrows) {
+      data.arrows = [];
+    }
+    
+    return data;
   };
 
   const saveToSlot = (slotNumber: 1 | 2 | 3) => {
@@ -599,6 +643,7 @@ export const RoutineBuilder = () => {
     const data: SaveStateData = {
       placedSkills: [...placedSkills],
       positionIcons: [...positionIcons],
+      arrows: [...arrows],
       config: { ...config },
       notes: { ...notes },
       segmentNames: { ...segmentNames },
@@ -621,6 +666,7 @@ export const RoutineBuilder = () => {
       const data: SaveStateData = JSON.parse(saved);
       setPlacedSkills(data.placedSkills);
       setPositionIcons(data.positionIcons);
+      setArrows(data.arrows || []); // Handle backwards compatibility with older saves
       updateConfig(data.config);
       setNotes(data.notes || {});
       setSegmentNames(data.segmentNames || {});
@@ -632,8 +678,9 @@ export const RoutineBuilder = () => {
       const defaultPlacedSkills: PlacedSkill[] = [];
       const defaultNotes = {};
       const defaultSegmentNames = {};
+      const defaultArrows: Arrow[] = []; // Default to empty arrows array
 
-      let defaultPositionIcons: PositionIcon[] = [];
+      const defaultPositionIcons: PositionIcon[] = [];
       if (config.category === "team-16" || config.category === "team-24") {
         // Generate default team icons
         const totalLines = Math.ceil(((config.length * config.bpm) / 60 / 8));
@@ -649,6 +696,7 @@ export const RoutineBuilder = () => {
       const defaultData: SaveStateData = {
         placedSkills: defaultPlacedSkills,
         positionIcons: defaultPositionIcons,
+        arrows: defaultArrows,
         config: { ...config },
         notes: defaultNotes,
         segmentNames: defaultSegmentNames,
@@ -658,6 +706,7 @@ export const RoutineBuilder = () => {
       // Apply the default state
       setPlacedSkills(defaultPlacedSkills);
       setPositionIcons(defaultPositionIcons);
+      setArrows(defaultArrows);
       setNotes(defaultNotes);
       setSegmentNames(defaultSegmentNames);
       // Keep current config
@@ -766,42 +815,54 @@ export const RoutineBuilder = () => {
       const currentLineIcons = positionIcons.filter(
         (i) => i.lineIndex === selectedLine,
       );
+      const currentLineArrows = arrows.filter(
+        (a) => a.lineIndex === selectedLine,
+      );
       setScopedHistory(loadedSaveStateSlot, config.category, selectedLine, {
-        history: [currentLineIcons],
+        iconHistory: [currentLineIcons],
+        arrowHistory: [currentLineArrows],
         index: 0,
       });
     }
-  }, [selectedLine, positionIcons, loadedSaveStateSlot, config.category]);
+  }, [selectedLine, positionIcons, arrows, loadedSaveStateSlot, config.category]);
 
-  // Record history state whenever icons change for the current line
+  // Record history state whenever icons or arrows change for the current line
   useEffect(() => {
     if (selectedLine !== null && loadedSaveStateSlot) {
       const lineHistory = getCurrentScopedHistory(selectedLine);
       if (!lineHistory) return;
 
-      const currentState = positionIcons.filter(
+      const currentIconState = positionIcons.filter(
         (i) => i.lineIndex === selectedLine,
+      );
+      const currentArrowState = arrows.filter(
+        (a) => a.lineIndex === selectedLine,
       );
 
       // Check if the only changes are in 'selected' properties (UI state)
-      const lastState = lineHistory.history[lineHistory.index];
-      if (lastState && areStatesEqualIgnoringSelection(currentState, lastState)) {
+      const lastIconState = lineHistory.iconHistory[lineHistory.index];
+      if (lastIconState && areStatesEqualIgnoringSelection(currentIconState, lastIconState)) {
         // If states are identical except for selection, don't record
         return;
       }
 
       // If states are different, add a new history entry
-      const newHistory = [
-        ...lineHistory.history.slice(0, lineHistory.index + 1),
-        currentState,
+      const newIconHistory = [
+        ...lineHistory.iconHistory.slice(0, lineHistory.index + 1),
+        currentIconState,
+      ];
+      const newArrowHistory = [
+        ...lineHistory.arrowHistory.slice(0, lineHistory.index + 1),
+        currentArrowState,
       ];
 
       setScopedHistory(loadedSaveStateSlot, config.category, selectedLine, {
-        history: newHistory,
-        index: newHistory.length - 1,
+        iconHistory: newIconHistory,
+        arrowHistory: newArrowHistory,
+        index: newIconHistory.length - 1,
       });
     }
-  }, [positionIcons, selectedLine, loadedSaveStateSlot, config.category]);
+  }, [positionIcons, arrows, selectedLine, loadedSaveStateSlot, config.category]);
 
   const handleDragMove = (event: DragMoveEvent) => {
     console.log(
@@ -1295,16 +1356,26 @@ export const RoutineBuilder = () => {
     if (!lineHistory || lineHistory.index <= 0) return;
 
     // Get the previous state for this line
-    const prevState = lineHistory.history[lineHistory.index - 1];
-    if (!prevState) return;
+    const prevIconState = lineHistory.iconHistory[lineHistory.index - 1];
+    const prevArrowState = lineHistory.arrowHistory[lineHistory.index - 1];
+    if (!prevIconState || !prevArrowState) return;
 
-    // Restore the state
-    handleRestoreLineState(lineIndex, prevState);
+    // Restore the icon state
+    handleRestoreLineState(lineIndex, prevIconState);
+
+    // Restore the arrow state
+    setArrows(prev => {
+      // Remove all existing arrows for this line
+      const filteredArrows = prev.filter(arrow => arrow.lineIndex !== lineIndex);
+      // Add the restored arrow state
+      return [...filteredArrows, ...prevArrowState];
+    });
 
     // If auto-follow is enabled, propagate the undo to subsequent lines
     if (autoFollow) {
       const totalLines = Math.ceil(((config.length * config.bpm) / 60 / 8));
-      const currentLineIcons = prevState;
+      const currentLineIcons = prevIconState;
+      const currentLineArrows = prevArrowState;
 
       // Restore subsequent lines to match the undone state
       for (
@@ -1326,12 +1397,28 @@ export const RoutineBuilder = () => {
           );
           return [...otherIcons, ...copiedIcons];
         });
+
+        // Create copied arrows for this subsequent line
+        const copiedArrows = currentLineArrows.map((arrow) => ({
+          ...arrow,
+          id: `arrow-${Date.now()}-${Math.random()}-${subsequentLine}`,
+          lineIndex: subsequentLine,
+        }));
+
+        // Replace arrows for this line
+        setArrows((prev) => {
+          const otherArrows = prev.filter(
+            (arrow) => arrow.lineIndex !== subsequentLine,
+          );
+          return [...otherArrows, ...copiedArrows];
+        });
       }
     }
 
     // Update history index
     setScopedHistory(loadedSaveStateSlot, config.category, lineIndex, {
-      ...lineHistory,
+      iconHistory: lineHistory.iconHistory,
+      arrowHistory: lineHistory.arrowHistory,
       index: lineHistory.index - 1,
     });
   };
@@ -1339,20 +1426,30 @@ export const RoutineBuilder = () => {
   const handleRedoLine = (lineIndex: number) => {
     if (!loadedSaveStateSlot) return;
     const lineHistory = getCurrentScopedHistory(lineIndex);
-    if (!lineHistory || lineHistory.index >= lineHistory.history.length - 1)
+    if (!lineHistory || lineHistory.index >= lineHistory.iconHistory.length - 1)
       return;
 
     // Get the next state for this line
-    const nextState = lineHistory.history[lineHistory.index + 1];
-    if (!nextState) return;
+    const nextIconState = lineHistory.iconHistory[lineHistory.index + 1];
+    const nextArrowState = lineHistory.arrowHistory[lineHistory.index + 1];
+    if (!nextIconState || !nextArrowState) return;
 
-    // Restore the state
-    handleRestoreLineState(lineIndex, nextState);
+    // Restore the icon state
+    handleRestoreLineState(lineIndex, nextIconState);
+
+    // Restore the arrow state
+    setArrows(prev => {
+      // Remove all existing arrows for this line
+      const filteredArrows = prev.filter(arrow => arrow.lineIndex !== lineIndex);
+      // Add the restored arrow state
+      return [...filteredArrows, ...nextArrowState];
+    });
 
     // If auto-follow is enabled, propagate the redo to subsequent lines
     if (autoFollow) {
       const totalLines = Math.ceil(((config.length * config.bpm) / 60 / 8));
-      const currentLineIcons = nextState;
+      const currentLineIcons = nextIconState;
+      const currentLineArrows = nextArrowState;
 
       // Restore subsequent lines to match the redone state
       for (
@@ -1374,12 +1471,28 @@ export const RoutineBuilder = () => {
           );
           return [...otherIcons, ...copiedIcons];
         });
+
+        // Create copied arrows for this subsequent line
+        const copiedArrows = currentLineArrows.map((arrow) => ({
+          ...arrow,
+          id: `arrow-${Date.now()}-${Math.random()}-${subsequentLine}`,
+          lineIndex: subsequentLine,
+        }));
+
+        // Replace arrows for this line
+        setArrows((prev) => {
+          const otherArrows = prev.filter(
+            (arrow) => arrow.lineIndex !== subsequentLine,
+          );
+          return [...otherArrows, ...copiedArrows];
+        });
       }
     }
 
     // Update history index
     setScopedHistory(loadedSaveStateSlot, config.category, lineIndex, {
-      ...lineHistory,
+      iconHistory: lineHistory.iconHistory,
+      arrowHistory: lineHistory.arrowHistory,
       index: lineHistory.index + 1,
     });
   };
@@ -1510,6 +1623,7 @@ export const RoutineBuilder = () => {
       slotName,
       placedSkills,
       positionIcons,
+      arrows,
       config,
       notes,
       segmentNames
@@ -1555,6 +1669,7 @@ export const RoutineBuilder = () => {
           const categoryStateData = {
             placedSkills: categoryData.placedSkills || [],
             positionIcons: categoryData.positionIcons || [],
+            arrows: categoryData.arrows || [],
             notes: categoryData.notes || {},
             segmentNames: categoryData.segmentNames || {},
             timestamp: Date.now(),
@@ -1567,12 +1682,14 @@ export const RoutineBuilder = () => {
         if (currentCategoryData) {
           setPlacedSkills(currentCategoryData.placedSkills || []);
           setPositionIcons(currentCategoryData.positionIcons || []);
+          setArrows(currentCategoryData.arrows || []);
           setNotes(currentCategoryData.notes || {});
           setSegmentNames(currentCategoryData.segmentNames || {});
         } else {
           // If current category doesn't exist in imported data, clear it
           setPlacedSkills([]);
           setPositionIcons([]);
+          setArrows([]);
           setNotes({});
           setSegmentNames({});
         }
@@ -1641,6 +1758,8 @@ export const RoutineBuilder = () => {
         setPlacedSkills={setPlacedSkills}
         positionIcons={positionIcons}
         setPositionIcons={setPositionIcons}
+        arrows={arrows}
+        setArrows={setArrows}
         notes={notes}
         setNotes={setNotes}
         segmentNames={segmentNames}

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useTheme } from "next-themes";
-import type { RoutineConfig, PositionIcon, PlacedSkill, Skill } from "@/types/routine";
+import type { RoutineConfig, PositionIcon, Arrow, PlacedSkill, Skill } from "@/types/routine";
 import { PdfRenderer } from "@/components/PdfRenderer";
 
 // Define global functions for TypeScript
@@ -30,6 +30,7 @@ export const usePdfExport = ({
   notes: Record<number, string>;
   getUniquePositionConfigurations: () => {
     icons: PositionIcon[];
+    arrows: Arrow[];
     lineIndex: number;
   }[];
   segmentNames: Record<number, string>;
@@ -186,7 +187,10 @@ export const usePdfExport = ({
         const root = createRoot(renderDiv);
         root.render(
           <PdfRenderer
-            configurations={uniqueConfigurations}
+            configurations={uniqueConfigurations.map(config => ({
+              ...config,
+              arrows: config.arrows || [] // Handle backwards compatibility
+            }))}
             segmentNames={segmentNames}
             zoomLevel={1.0} // Render at 100% zoom
           />,
