@@ -90,7 +90,18 @@ export const usePdfExport = ({
       const countSheetElement = document.getElementById(
         "count-sheet-content-wrapper",
       );
+      const countSheetContainer = document.getElementById("count-sheet-container");
+
       if (countSheetElement) {
+        // Save current scroll position and scroll to top for proper header capture
+        const originalScrollTop = countSheetContainer ? countSheetContainer.scrollTop : 0;
+        if (countSheetContainer) {
+          countSheetContainer.scrollTop = 0;
+        }
+
+        // Wait for DOM to update after scrolling
+        await new Promise(resolve => setTimeout(resolve, 100));
+
         const canvas = await html2canvas(countSheetElement, {
           scale: 2,
           useCORS: true,
@@ -99,6 +110,11 @@ export const usePdfExport = ({
           height: countSheetElement.scrollHeight,
           width: countSheetElement.scrollWidth,
         });
+
+        // Restore original scroll position
+        if (countSheetContainer) {
+          countSheetContainer.scrollTop = originalScrollTop;
+        }
 
         const imgData = canvas.toDataURL("image/png");
         const scaleX = availableWidth / canvas.width;
