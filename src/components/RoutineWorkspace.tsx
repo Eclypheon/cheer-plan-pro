@@ -185,6 +185,9 @@ export const RoutineWorkspace = ({
     }),
   );
 
+  // Ensure drag overlay follows cursor consistently
+  const dragModifiers = [snapCenterToCursor];
+
   /**
    * Generate position icons for team categories (team-16 or team-24) in evenly distributed positions
    */
@@ -1264,6 +1267,7 @@ export const RoutineWorkspace = ({
       onDragMove={handleDragMove}
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
+      modifiers={dragModifiers}
       autoScroll={false}
     >
       {/* Chevron button for toggling skills panel - positioned at top level */}
