@@ -901,6 +901,12 @@ export const RoutineWorkspace = ({
                 : ps,
             ),
           );
+          // If this was the currently selected skill and it moved to a different line, select that line
+          if (selectedSkillId === originalPlacedSkillId) {
+            setSelectedLine(lineIndex);
+            // Deselect all position icons when moving a selected skill
+            setPositionIcons(prev => prev.map(icon => ({ ...icon, selected: false })));
+          }
         } else {
           // Check if we are dropping a NEW skill from the panel
           const skillFromPanel = skills.find((s) => s.id === active.id);

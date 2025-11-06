@@ -122,6 +122,47 @@ export const useKeyboardShortcuts = ({
         e.preventDefault();
       }
 
+      // Previous/next skill selection shortcuts
+      if (e.key === "a" && selectedSkillId) {
+        // Sort skills by their absolute position in the routine
+        const sortedSkills = [...placedSkills].sort((a, b) => {
+          const posA = a.lineIndex * 8 + a.startCount - 1;
+          const posB = b.lineIndex * 8 + b.startCount - 1;
+          return posA - posB;
+        });
+
+        const currentIndex = sortedSkills.findIndex(ps => ps.id === selectedSkillId);
+        if (currentIndex !== -1) {
+          const prevIndex = currentIndex > 0 ? currentIndex - 1 : sortedSkills.length - 1;
+          const prevSkill = sortedSkills[prevIndex];
+          setSelectedSkillId(prevSkill.id);
+          setSelectedLine(prevSkill.lineIndex);
+          // Deselect all position icons when selecting a placed skill
+          setPositionIcons(prev => prev.map(icon => ({ ...icon, selected: false })));
+          e.preventDefault();
+        }
+      }
+
+      if (e.key === "d" && selectedSkillId) {
+        // Sort skills by their absolute position in the routine
+        const sortedSkills = [...placedSkills].sort((a, b) => {
+          const posA = a.lineIndex * 8 + a.startCount - 1;
+          const posB = b.lineIndex * 8 + b.startCount - 1;
+          return posA - posB;
+        });
+
+        const currentIndex = sortedSkills.findIndex(ps => ps.id === selectedSkillId);
+        if (currentIndex !== -1) {
+          const nextIndex = currentIndex < sortedSkills.length - 1 ? currentIndex + 1 : 0;
+          const nextSkill = sortedSkills[nextIndex];
+          setSelectedSkillId(nextSkill.id);
+          setSelectedLine(nextSkill.lineIndex);
+          // Deselect all position icons when selecting a placed skill
+          setPositionIcons(prev => prev.map(icon => ({ ...icon, selected: false })));
+          e.preventDefault();
+        }
+      }
+
       // Count sheet shortcuts
       if (selectedSkillId) {
         const selectedSkill = placedSkills.find(

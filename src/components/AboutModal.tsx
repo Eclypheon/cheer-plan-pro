@@ -60,6 +60,14 @@ const AboutModal = ({ open, onOpenChange }: AboutModalProps) => {
                 <h2 className="text-2xl font-semibold mb-3">Skill Movement</h2>
                 <div className="space-y-3 text-muted-foreground">
                   <div className="flex items-center gap-3">
+                    <kbd className="px-2 py-1 bg-muted rounded text-sm">A</kbd>
+                    <span>Select previous skill</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <kbd className="px-2 py-1 bg-muted rounded text-sm">D</kbd>
+                    <span>Select next skill</span>
+                  </div>
+                  <div className="flex items-center gap-3">
                     <kbd className="px-2 py-1 bg-muted rounded text-sm">↑↓←→</kbd>
                     <span>Move selected skill</span>
                   </div>
