@@ -13,7 +13,17 @@ declare global {
   }
 }
 
-interface UsePdfExportProps {
+export const usePdfExport = ({
+  config,
+  placedSkills,
+  skills,
+  notes,
+  getUniquePositionConfigurations,
+  segmentNames,
+  setPdfBlob,
+  setShowPdfPreview,
+  onClearSelections,
+}: {
   config: RoutineConfig;
   placedSkills: PlacedSkill[];
   skills: Skill[];
@@ -26,19 +36,7 @@ interface UsePdfExportProps {
   setPdfBlob: (blob: Blob | null) => void;
   setShowPdfPreview: (show: boolean) => void;
   onClearSelections?: () => void;
-}
-
-export const usePdfExport = ({
-  config,
-  placedSkills,
-  skills,
-  notes,
-  getUniquePositionConfigurations,
-  segmentNames,
-  setPdfBlob,
-  setShowPdfPreview,
-  onClearSelections,
-}: UsePdfExportProps) => {
+}) => {
   const { theme } = useTheme();
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
