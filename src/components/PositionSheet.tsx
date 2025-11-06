@@ -157,14 +157,21 @@ export const PositionSheet = ({
     }
 
     // Update preview position during icon dragging on mobile
-    if (isMobile && isDraggingIcon && e.touches.length === 1 && draggedIconId) {
+    if (isMobile && isDraggingIcon && e.touches.length === 1 && draggedIconId && dragOffset) {
       const touch = e.touches[0];
       const screenPos = { x: touch.clientX, y: touch.clientY };
-      const sheetCoords = getZoomedCoordinates(touch.clientX, touch.clientY);
+
+      // Calculate the current position of the dragged icon based on dragOffset
+      const draggedIcon = icons.find(icon => icon.id === draggedIconId);
+      if (draggedIcon) {
+        const currentX = draggedIcon.x + dragOffset.x / effectiveZoomLevel;
+        const currentY = draggedIcon.y + dragOffset.y / effectiveZoomLevel;
+        setPreviewSheetCoords({ x: currentX, y: currentY });
+      }
+
       setPreviewPosition(screenPos);
-      setPreviewSheetCoords(sheetCoords);
     }
-  }, [isPinching, initialPinchDistance, initialZoomLevel, getTouchDistance, onZoomChange, isMobile, isDraggingIcon, draggedIconId]);
+  }, [isPinching, initialPinchDistance, initialZoomLevel, getTouchDistance, onZoomChange, isMobile, isDraggingIcon, draggedIconId, dragOffset, icons, effectiveZoomLevel]);
 
   const handleTouchEnd = useCallback((e: React.TouchEvent) => {
     if (e.touches.length < 2) {
