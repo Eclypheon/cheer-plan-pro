@@ -74,8 +74,15 @@ export const usePdfExport = ({
       };
       const bgRgb = hexToRgb(backgroundColor);
 
-      // Use portrait A4 (210mm x 297mm)
-      const pdf = new jsPDF("p", "mm", "a4");
+      // Use portrait A4 (210mm x 297mm) with compression enabled
+      const pdf = new jsPDF({
+        orientation: "p",
+        unit: "mm",
+        format: "a4",
+        compress: true,           // Enable PDF compression
+        putOnlyUsedFonts: true,   // Only embed used fonts
+        floatPrecision: 3         // Balance quality vs file size
+      });
       const pageWidth = 210;
       const pageHeight = 297;
       const margin = 2; // Minimal margin
@@ -103,7 +110,7 @@ export const usePdfExport = ({
         await new Promise(resolve => setTimeout(resolve, 100));
 
         const canvas = await html2canvas(countSheetElement, {
-          scale: 2,
+          scale: 1,
           useCORS: true,
           allowTaint: true,
           backgroundColor,
@@ -216,6 +223,7 @@ export const usePdfExport = ({
       console.error("Error generating PDF:", error);
       window.hidePdfProgress(); // Hide progress on error
     } finally {
+
       // Hide progress bar *after* React modal is ready
       setTimeout(() => {
           setIsGeneratingPdf(false);
