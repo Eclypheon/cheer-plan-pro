@@ -116,7 +116,7 @@ const AboutModal = ({ open, onOpenChange }: AboutModalProps) => {
                 <h2 className="text-2xl font-semibold mb-3">Tips</h2>
                 <ul className="list-disc list-inside space-y-2 text-muted-foreground">
                   <p>- Propagate Changes transmit changes made to all following lines</p>
-                  <p>- Export PDF only exports unique positions</p>
+                  <p>- Export PDF only exports unique position sheets</p>
                   <p>- Edit counts directly on count sheet by dragging the handles of placed skills</p>
                   <p>- Select placed skill or icon and press <kbd className="px-1 py-0.5 bg-muted rounded text-sm">Delete</kbd> to delete them.</p>
                   <p>- Select placed skill and use arrow keys to move them</p>
