@@ -1563,6 +1563,7 @@ export const RoutineBuilder = () => {
     setLineHistories({}); // Clear all history states
     setNotes({});
     setSegmentNames({});
+    setArrows([]); // Clear all arrows
 
     // For team categories, reset icons to default positions
     if (config.category === "team-16" || config.category === "team-24") {

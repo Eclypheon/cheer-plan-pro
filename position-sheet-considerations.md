@@ -46,6 +46,7 @@ The Position Sheet is a complex component that allows users to visualize cheerle
 - **Toggle Selection**: Clicking a selected item toggles its selection state
 - **Cross-Type Deselection**: Selecting an icon automatically deselects all arrows and vice versa
 - **Keyboard Deselection**: Delete/Backspace keys delete all selected items
+- **Deselect Logic**: Clicking on empty space in the sheet deselects all selected icons and arrows
 
 ### 3. Zoom and Viewport Management
 - **Zoom Controls**: Slider, zoom in/out buttons, and pinch gestures (mobile)
@@ -99,6 +100,7 @@ The Position Sheet is a complex component that allows users to visualize cheerle
 - **Selected Line**: Most operations are line-specific and depend on the selected line
 - **Drag State**: Various drag states (isDraggingIcon, dragOffset, draggedIconId) affect rendering
 - **Zoom State**: Zoom level affects positioning calculations and rendering
+- **Selection State**: Icons and arrows maintain individual selection states that need to be managed during deselect operations
 
 ## Testing Considerations
 
@@ -126,6 +128,8 @@ The Position Sheet is a complex component that allows users to visualize cheerle
 - Test with no selected line (for team categories)
 - Test propagation behavior when routine length changes
 - Test mobile interaction without selection
+- Test deselect functionality by clicking on empty areas of the sheet
+- Test reset functionality to ensure all position sheet elements are properly reset
 
 ## Performance Considerations
 
@@ -181,6 +185,15 @@ The Position Sheet is a complex component that allows users to visualize cheerle
 - Update multi-selection handling
 - Consider interaction with cross-type deselection
 - Update keyboard event handling for selection
+- Preserve deselect functionality when clicking on empty space in the sheet
+
+### 5. Reset Functionality
+- The reset button in the RoutineHeader should reset all position sheet elements to their default state
+- For team categories (team-16/team-24), reset generates default formation icons
+- For other categories, reset clears all icons from the position sheet
+- Reset should clear all arrows from all lines
+- Reset should clear all segment names
+- Reset should clear any selection states
 
 ## Best Practices for Position Sheet Modifications
 
@@ -191,4 +204,5 @@ The Position Sheet is a complex component that allows users to visualize cheerle
 5. **Preserve History Functionality**: Ensure new features integrate with undo/redo
 6. **Test Propagation Logic**: Verify how new features work with autoFollow enabled
 7. **Validate PDF Export**: Confirm new features render correctly in PDFs
-8. **Update Documentation**: Document any new functionality for other developers
+8. **Support Reset Functionality**: Ensure new features are properly reset when the reset button is pressed
+9. **Update Documentation**: Document any new functionality for other developers
