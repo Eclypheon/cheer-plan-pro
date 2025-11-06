@@ -1301,6 +1301,13 @@ export const RoutineWorkspace = ({
                     setSelectedSkillId(id);
                     // Deselect all position icons when selecting a placed skill
                     setPositionIcons(prev => prev.map(icon => ({ ...icon, selected: false })));
+                    // Also select the line that the first cell of the placed skill is on
+                    if (id) {
+                      const placedSkill = placedSkills.find(ps => ps.id === id);
+                      if (placedSkill) {
+                        setSelectedLine(placedSkill.lineIndex);
+                      }
+                    }
                   }}
                   onMoveSkill={(id, newLineIndex, newStartCount) => {
                     setPlacedSkills(
@@ -1436,6 +1443,13 @@ export const RoutineWorkspace = ({
                 setSelectedSkillId(id);
                 // Deselect all position icons when selecting a placed skill
                 setPositionIcons(prev => prev.map(icon => ({ ...icon, selected: false })));
+                // Also select the line that the first cell of the placed skill is on
+                if (id) {
+                  const placedSkill = placedSkills.find(ps => ps.id === id);
+                  if (placedSkill) {
+                    setSelectedLine(placedSkill.lineIndex);
+                  }
+                }
               }}
               onMoveSkill={(id, newLineIndex, newStartCount) => {
                 setPlacedSkills(

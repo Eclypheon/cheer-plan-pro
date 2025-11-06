@@ -321,18 +321,20 @@ export const CountSheet = ({
     // Check if this cell is part of a skill span but not the first cell
     const isPartOfSkillSpan = cellSkills.length > 0 && isFirstCountOfSkill.length === 0;
 
-    const isDropTarget = 
+    const isDropTarget =
       skillSpan > 0 && // Is a skill being dragged?
       lineIndex === hoverLineIndex && // Is this cell on the correct line?
       count >= hoverStartCount && // Is this cell at or after the start?
       count < (hoverStartCount + skillSpan); // Is this cell within the skill's count?
+
+    const isLineSelected = selectedLine === lineIndex;
 
     return (
       <td
         ref={setNodeRef}
         data-cell={`${lineIndex}-${count}`}
         className={`border border-border min-w-[80px] h-10 p-0.5 relative text-xs ${
-          isDropTarget ? "bg-accent" : isPartOfSkillSpan ? "bg-card" : "bg-card hover:bg-accent/50"
+          isDropTarget ? "bg-accent" : isPartOfSkillSpan ? "bg-card" : isLineSelected ? "bg-accent/20 hover:bg-accent/40" : "bg-card hover:bg-accent/50"
         }`}
       >
         {isFirstCountOfSkill.map((sp, skillIndex) => {
