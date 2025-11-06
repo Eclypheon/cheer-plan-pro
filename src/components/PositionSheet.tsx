@@ -4,7 +4,7 @@ import type { PositionIcon } from "@/types/routine";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
-import { Plus, Undo, Redo, ToggleLeft, ToggleRight, Square, Circle, Triangle, X, ZoomIn, ZoomOut } from "lucide-react";
+import { Plus, Undo, Redo, ToggleLeft, ToggleRight, Square, Circle, Triangle, X, ZoomIn, ZoomOut, Trash2 } from "lucide-react";
 import { PositionIcon as PositionIconComponent } from "./PositionIcon";
 import { PositionIconNameDialog } from "./PositionIconNameDialog";
 import { Input } from "@/components/ui/input";
@@ -428,8 +428,7 @@ return (
                   }
                 }}
               >
-                <X className="h-3 w-3 mr-0.5" />
-                Delete ({selectedIconsCount})
+                <Trash2 className="h-3 w-3" />
               </Button>
             )}
           </div>
