@@ -119,12 +119,12 @@ const SkillsLibraryEditor = () => {
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={handleExportCSV}>
               <Download className="h-4 w-4 mr-2" />
-              Export Skills
+              Skills
             </Button>
             <Button variant="outline" size="sm" asChild>
               <label className="cursor-pointer">
                 <Upload className="h-4 w-4 mr-2" />
-                Import Skills
+                Skills
                 <input
                   type="file"
                   accept=".csv"

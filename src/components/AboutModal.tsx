@@ -12,8 +12,8 @@ interface AboutModalProps {
 const AboutModal = ({ open, onOpenChange }: AboutModalProps) => {
   const [currentPage, setCurrentPage] = useState(1);
 
-  const nextPage = () => setCurrentPage(2);
-  const prevPage = () => setCurrentPage(1);
+  const nextPage = () => setCurrentPage(Math.min(currentPage + 1, 3));
+  const prevPage = () => setCurrentPage(Math.max(currentPage - 1, 1));
 
   const handleClose = () => {
     onOpenChange(false);
@@ -26,7 +26,8 @@ const AboutModal = ({ open, onOpenChange }: AboutModalProps) => {
         <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center justify-between">
             <span>
-              {currentPage === 1 ? "How to Use the App" : "About Cheerleading Routine Builder"}
+              {currentPage === 1 ? "Keyboard Shortcuts" :
+               currentPage === 2 ? "How to Use the App" : "About Cheer Routine Builder"}
             </span>
             <div className="flex items-center gap-2">
               <Button
@@ -38,13 +39,13 @@ const AboutModal = ({ open, onOpenChange }: AboutModalProps) => {
                 <ChevronLeft className="h-4 w-4" />
               </Button>
               <span className="text-sm text-muted-foreground">
-                {currentPage} / 2
+                {currentPage} / 3
               </span>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={nextPage}
-                disabled={currentPage === 2}
+                disabled={currentPage === 3}
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>
@@ -55,12 +56,67 @@ const AboutModal = ({ open, onOpenChange }: AboutModalProps) => {
         <div className="flex-1 overflow-auto">
           {currentPage === 1 ? (
             <Card className="p-6 space-y-4">
+              <section>
+                <h2 className="text-2xl font-semibold mb-3">Skill Movement</h2>
+                <div className="space-y-3 text-muted-foreground">
+                  <div className="flex items-center gap-3">
+                    <kbd className="px-2 py-1 bg-muted rounded text-sm">A</kbd>
+                    <span>Select previous skill</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <kbd className="px-2 py-1 bg-muted rounded text-sm">D</kbd>
+                    <span>Select next skill</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <kbd className="px-2 py-1 bg-muted rounded text-sm">↑↓←→</kbd>
+                    <span>Move selected skill</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <kbd className="px-2 py-1 bg-muted rounded text-sm">Shift</kbd> + <kbd className="px-2 py-1 bg-muted rounded text-sm">↑↓←→</kbd>
+                    <span>Move selected skill and all skills after it</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <kbd className="px-2 py-1 bg-muted rounded text-sm">Shift</kbd> + <kbd className="px-2 py-1 bg-muted rounded text-sm">Alt</kbd> + <kbd className="px-2 py-1 bg-muted rounded text-sm">↑↓←→</kbd>
+                    <span>Move selected skill and all skills before it</span>
+                  </div>
+                </div>
+              </section>
 
-                <section>
+              <section>
+                <h2 className="text-2xl font-semibold mb-3">Editing</h2>
+                <div className="space-y-3 text-muted-foreground">
+                  <div className="flex items-center gap-3">
+                    <kbd className="px-2 py-1 bg-muted rounded text-sm">Delete</kbd>
+                    <span>Delete selected skill or position icon</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <kbd className="px-2 py-1 bg-muted rounded text-sm">Z</kbd>
+                    <span>Undo last action</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <kbd className="px-2 py-1 bg-muted rounded text-sm">Y</kbd>
+                    <span>Redo last undone action</span>
+                  </div>
+                </div>
+              </section>
+
+              <section>
+                <h2 className="text-2xl font-semibold mb-3">Navigation</h2>
+                <div className="space-y-3 text-muted-foreground">
+                  <div className="flex items-center gap-3">
+                    <kbd className="px-2 py-1 bg-muted rounded text-sm">F</kbd>
+                    <span>Toggle Propogate Changes</span>
+                  </div>
+                </div>
+              </section>
+            </Card>
+          ) : currentPage === 2 ? (
+            <Card className="p-6 space-y-4">
+              <section>
                 <h2 className="text-2xl font-semibold mb-3">Tips</h2>
                 <ul className="list-disc list-inside space-y-2 text-muted-foreground">
-                  <p>- Propagate Changes toggle transmit changes made to all following lines</p>
-                  <p>- Export PDF only exports unique positions</p>
+                  <p>- Propagate Changes transmit changes made to all following lines</p>
+                  <p>- Export PDF only exports unique position sheets</p>
                   <p>- Edit counts directly on count sheet by dragging the handles of placed skills</p>
                   <p>- Select placed skill or icon and press <kbd className="px-1 py-0.5 bg-muted rounded text-sm">Delete</kbd> to delete them.</p>
                   <p>- Select placed skill and use arrow keys to move them</p>
@@ -98,7 +154,6 @@ const AboutModal = ({ open, onOpenChange }: AboutModalProps) => {
                   </div>
                 </div>
               </section>
-
             </Card>
           ) : (
             <Card className="p-6 space-y-4">

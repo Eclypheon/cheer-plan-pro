@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useTheme } from "next-themes";
-import type { RoutineConfig, PositionIcon } from "@/types/routine";
+import type { RoutineConfig, PositionIcon, PlacedSkill, Skill } from "@/types/routine";
 import { PdfRenderer } from "@/components/PdfRenderer";
 
 // Define global functions for TypeScript
@@ -13,8 +13,21 @@ declare global {
   }
 }
 
-interface UsePdfExportProps {
+export const usePdfExport = ({
+  config,
+  placedSkills,
+  skills,
+  notes,
+  getUniquePositionConfigurations,
+  segmentNames,
+  setPdfBlob,
+  setShowPdfPreview,
+  onClearSelections,
+}: {
   config: RoutineConfig;
+  placedSkills: PlacedSkill[];
+  skills: Skill[];
+  notes: Record<number, string>;
   getUniquePositionConfigurations: () => {
     icons: PositionIcon[];
     lineIndex: number;
@@ -22,21 +35,17 @@ interface UsePdfExportProps {
   segmentNames: Record<number, string>;
   setPdfBlob: (blob: Blob | null) => void;
   setShowPdfPreview: (show: boolean) => void;
-}
-
-export const usePdfExport = ({
-  config,
-  getUniquePositionConfigurations,
-  segmentNames,
-  setPdfBlob,
-  setShowPdfPreview,
-}: UsePdfExportProps) => {
+  onClearSelections?: () => void;
+}) => {
   const { theme } = useTheme();
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
   const handleExportPDF = async () => {
     if (isGeneratingPdf) return; // Prevent double-clicks
     setIsGeneratingPdf(true);
+
+    // Clear all selections temporarily for PDF generation
+    onClearSelections?.();
 
     try {
       // --- PDF Generation Logic ---
@@ -74,8 +83,15 @@ export const usePdfExport = ({
       };
       const bgRgb = hexToRgb(backgroundColor);
 
-      // Use portrait A4 (210mm x 297mm)
-      const pdf = new jsPDF("p", "mm", "a4");
+      // Use portrait A4 (210mm x 297mm) with compression enabled
+      const pdf = new jsPDF({
+        orientation: "p",
+        unit: "mm",
+        format: "a4",
+        compress: true,           // Enable PDF compression
+        putOnlyUsedFonts: true,   // Only embed used fonts
+        floatPrecision: 3         // Balance quality vs file size
+      });
       const pageWidth = 210;
       const pageHeight = 297;
       const margin = 2; // Minimal margin
@@ -87,34 +103,57 @@ export const usePdfExport = ({
       window.updatePdfProgress(currentStep, `Capturing Count Sheet...`);
       await new Promise(resolve => setTimeout(resolve, 50)); // Allow UI to update
 
-      const countSheetElement = document.getElementById(
-        "count-sheet-content-wrapper",
+      // Create a hidden div to render CountSheet into (similar to PositionSheet approach)
+      const countSheetRenderDiv = document.createElement("div");
+      countSheetRenderDiv.id = "pdf-countsheet-render-target";
+      countSheetRenderDiv.style.position = "absolute";
+      countSheetRenderDiv.style.left = "99px";
+      countSheetRenderDiv.style.top = "-80px";
+      document.body.appendChild(countSheetRenderDiv);
+
+      // Import CountSheet component
+      const { CountSheet } = await import("@/components/CountSheet");
+
+      // Use createRoot to render CountSheet in hidden container
+      const countSheetRoot = createRoot(countSheetRenderDiv);
+      countSheetRoot.render(
+        <CountSheet
+          routineLength={config.length}
+          bpm={config.bpm}
+          placedSkills={placedSkills}
+          skills={skills}
+          onRemoveSkill={() => {}} // Stub functions
+          onLineClick={() => {}}
+          selectedLine={null}
+          selectedSkillId={null}
+          onSelectSkill={() => {}}
+          onMoveSkill={() => {}}
+          onUpdateSkillCounts={() => {}}
+          draggedSkill={null}
+          overCellId={null}
+          notes={notes}
+          onUpdateNote={() => {}}
+          isPdfRender={true} // Enable PDF rendering mode
+          onToggleSkillsPanel={() => {}}
+          skillsPanelCollapsed={false}
+        />,
       );
-      const countSheetContainer = document.getElementById("count-sheet-container");
 
-      if (countSheetElement) {
-        // Save current scroll position and scroll to top for proper header capture
-        const originalScrollTop = countSheetContainer ? countSheetContainer.scrollTop : 0;
-        if (countSheetContainer) {
-          countSheetContainer.scrollTop = 0;
-        }
+      // Wait for React to render
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
-        // Wait for DOM to update after scrolling
-        await new Promise(resolve => setTimeout(resolve, 100));
+      // Find the rendered content
+      const countSheetContent = countSheetRenderDiv.querySelector("#count-sheet-content-wrapper") as HTMLElement;
 
-        const canvas = await html2canvas(countSheetElement, {
-          scale: 2,
+      if (countSheetContent) {
+        const canvas = await html2canvas(countSheetContent, {
+          scale: 1,
           useCORS: true,
           allowTaint: true,
           backgroundColor,
-          height: countSheetElement.scrollHeight,
-          width: countSheetElement.scrollWidth,
+          height: countSheetContent.scrollHeight,
+          width: countSheetContent.scrollWidth,
         });
-
-        // Restore original scroll position
-        if (countSheetContainer) {
-          countSheetContainer.scrollTop = originalScrollTop;
-        }
 
         const imgData = canvas.toDataURL("image/png");
         const scaleX = availableWidth / canvas.width;
@@ -128,6 +167,12 @@ export const usePdfExport = ({
         const x = (pageWidth - imgWidth) / 2;
         const y = (pageHeight - imgHeight) / 2;
         pdf.addImage(imgData, "PNG", x, y, imgWidth, imgHeight);
+      }
+
+      // Cleanup
+      countSheetRoot.unmount();
+      if (document.body.contains(countSheetRenderDiv)) {
+        document.body.removeChild(countSheetRenderDiv);
       }
 
       // --- Step 2: Capture Position Sheets ---
@@ -216,6 +261,7 @@ export const usePdfExport = ({
       console.error("Error generating PDF:", error);
       window.hidePdfProgress(); // Hide progress on error
     } finally {
+
       // Hide progress bar *after* React modal is ready
       setTimeout(() => {
           setIsGeneratingPdf(false);

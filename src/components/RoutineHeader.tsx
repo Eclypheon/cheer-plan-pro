@@ -21,6 +21,7 @@ interface RoutineHeaderProps {
   handleExportPDF: () => void;
   isGeneratingPdf: boolean;
   setShowAboutModal: (show: boolean) => void;
+  setShowConfigModal: (show: boolean) => void;
   loadFromSlot: (slot: 1 | 2 | 3) => void;
   setShowRenameDialog: (show: boolean) => void;
   setRenameInput: (input: string) => void;
@@ -45,6 +46,7 @@ export const RoutineHeader = ({
   handleExportPDF,
   isGeneratingPdf,
   setShowAboutModal,
+  setShowConfigModal,
   loadFromSlot,
   setShowRenameDialog,
   setRenameInput,
@@ -66,6 +68,14 @@ export const RoutineHeader = ({
             <Button
               variant="outline"
               size="sm"
+              onClick={() => setShowConfigModal(true)}
+              title="Routine Configuration"
+            >
+              <SettingsIcon className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => setShowAboutModal(true)}
             >
               <Info className="h-4 w-4" />
@@ -73,15 +83,10 @@ export const RoutineHeader = ({
             <Button variant="destructive" size="sm" onClick={handleReset}>
               <RotateCcw className="h-4 w-4" />
             </Button>
-            <Link to="/settings">
-              <Button variant="outline" size="sm">
-                <SettingsIcon className="h-4 w-4" />
-              </Button>
-            </Link>
             <Link to="/skills-editor">
               <Button variant="outline" size="sm">
                 <Library className="h-4 w-4 mr-1" />
-                Skills Editor
+                Skills
               </Button>
             </Link>
             <Button
@@ -91,69 +96,13 @@ export const RoutineHeader = ({
               disabled={isGeneratingPdf}
             >
               <Download className="h-4 w-4 mr-1" />
-              {isGeneratingPdf ? "Generating..." : "Export PDF"}
+              {isGeneratingPdf ? "Generating..." : "PDF"}
             </Button>
             <ThemeToggle />
           </div>
         </div>
 
         <div className="flex flex-wrap gap-3 items-center">
-        <div className="flex items-center gap-1">
-          <Label className="text-xs">Length:</Label>
-          <Select
-            value={config.length.toString()}
-            onValueChange={(v) => updateLength(parseInt(v))}
-          >
-            <SelectTrigger className="w-20 h-8">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="60">1:00</SelectItem>
-              <SelectItem value="90">1:30</SelectItem>
-              <SelectItem value="120">2:00</SelectItem>
-              <SelectItem value="135">2:15</SelectItem>
-              <SelectItem value="150">2:30</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="flex items-center gap-1">
-          <Label className="text-xs">BPM:</Label>
-          <Input
-            type="number"
-            min="120"
-            max="160"
-            value={config.bpm}
-            onChange={(e) => {
-              const bpm = parseInt(e.target.value);
-              if (!isNaN(bpm) && bpm >= 120 && bpm <= 160) {
-                updateBpm(bpm);
-              }
-            }}
-            className="w-[80px] h-8"
-          />
-        </div>
-
-        <div className="flex items-center gap-1">
-          <Label className="text-xs">Cat:</Label>
-          <Select
-            value={config.category}
-            onValueChange={(v) =>
-              updateCategory(v as any)
-            }
-          >
-            <SelectTrigger className="w-36 h-8">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="partner-stunts">Partner Stunts</SelectItem>
-              <SelectItem value="group-stunts">Group Stunts</SelectItem>
-              <SelectItem value="team-16">Team (16)</SelectItem>
-              <SelectItem value="team-24">Team (24)</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
         <div className="flex items-center gap-1">
           <Label className="text-xs">Saves:</Label>
           <Select
@@ -227,7 +176,7 @@ export const RoutineHeader = ({
       </div>
 
       {/* Toggle button positioned at bottom border */}
-      <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2 z-10">
+      <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2 z-[5]">
         <Button
           variant="outline"
           size="sm"

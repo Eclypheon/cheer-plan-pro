@@ -69,7 +69,7 @@ export const SkillsPanel = ({ skills, onAddCustomSkill, onDeleteSkill, onUpdateS
   };
 
   return (
-    <div className="h-full flex flex-col border-r bg-card relative z-10">
+    <div className="h-full flex flex-col border-r bg-card relative z-[5]">
       <div className="p-2 border-b space-y-2">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold">Skills Library</h2>

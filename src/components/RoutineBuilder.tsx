@@ -13,6 +13,7 @@ import { RoutineHeader } from "./RoutineHeader";
 import { RoutineWorkspace } from "./RoutineWorkspace";
 import { PdfPreviewDialog } from "./PdfPreviewDialog";
 import { SaveRenameDialog } from "./SaveRenameDialog";
+import { RoutineConfigModal } from "./RoutineConfigModal";
 import { useTheme } from "next-themes";
 
 // Define global functions for TypeScript
@@ -84,29 +85,21 @@ export const RoutineBuilder = () => {
   const [showRenameDialog, setShowRenameDialog] = useState(false);
   const [renameInput, setRenameInput] = useState("");
   const [showAboutModal, setShowAboutModal] = useState(false);
+  const [showConfigModal, setShowConfigModal] = useState(false);
 
   // Load keyboard settings
-  const [keyboardSettings] = useState(() => {
-    const saved = localStorage.getItem("keyboardSettings");
-    return saved
-      ? JSON.parse(saved)
-      : {
-          nextLine: "ArrowDown",
-          prevLine: "ArrowUp",
-          undo: "z",
-          redo: "y",
-          toggleAutoFollow: "f",
-          deleteIcon: "Delete",
-          moveLeft: "ArrowLeft",
-          moveRight: "ArrowRight",
-          moveUp: "ArrowUp",
-          moveDown: "ArrowDown",
-          altMoveLeft: "a",
-          altMoveRight: "d",
-          altMoveUp: "w",
-          altMoveDown: "s",
-        };
-  });
+  const keyboardSettings = {
+    nextLine: "ArrowDown",
+    prevLine: "ArrowUp",
+    undo: "z",
+    redo: "y",
+    toggleAutoFollow: "f",
+    deleteIcon: "Delete",
+    moveLeft: "ArrowLeft",
+    moveRight: "ArrowRight",
+    moveUp: "ArrowUp",
+    moveDown: "ArrowDown",
+  };
 
   // Load saved state on component mount - auto-load State 1 if available
   useEffect(() => {
@@ -205,7 +198,9 @@ export const RoutineBuilder = () => {
       // Only add if we haven't seen this configuration before
       if (!seenConfigurations.has(configHash)) {
         seenConfigurations.add(configHash);
-        configurations.push({ icons: lineIcons, lineIndex }); // Store lineIndex
+        // Clear selected state on all icons for PDF generation
+        const iconsForPdf = lineIcons.map(icon => ({ ...icon, selected: false }));
+        configurations.push({ icons: iconsForPdf, lineIndex }); // Store lineIndex
       }
     }
 
@@ -214,10 +209,18 @@ export const RoutineBuilder = () => {
 
   const { handleExportPDF, isGeneratingPdf } = usePdfExport({
     config,
+    placedSkills,
+    skills,
+    notes,
     getUniquePositionConfigurations,
     segmentNames,
     setPdfBlob,
     setShowPdfPreview,
+    onClearSelections: () => {
+      setSelectedLine(null);
+      setSelectedSkillId(null);
+      setPositionIcons(prev => prev.map(icon => ({ ...icon, selected: false })));
+    },
   });
 
   // Handle category changes - auto-save/load category states
@@ -545,6 +548,27 @@ export const RoutineBuilder = () => {
     : {};
 
   /**
+   * Helper function to normalize position icons for history comparison
+   * Excludes UI-only properties like 'selected' that shouldn't be part of undo/redo
+   */
+  const normalizeIconsForHistory = (icons: PositionIcon[]): PositionIcon[] => {
+    return icons.map(({ selected, ...icon }) => icon);
+  };
+
+  /**
+   * Helper function to check if two icon states are equal, ignoring selection differences
+   */
+  const areStatesEqualIgnoringSelection = (state1: PositionIcon[], state2: PositionIcon[]): boolean => {
+    if (state1.length !== state2.length) return false;
+
+    // Create normalized versions for comparison
+    const normalized1 = normalizeIconsForHistory(state1);
+    const normalized2 = normalizeIconsForHistory(state2);
+
+    return JSON.stringify(normalized1) === JSON.stringify(normalized2);
+  };
+
+  /**
    * Helper functions for category-based state management
    * Category states are now scoped per save state to avoid conflicts
    */
@@ -759,10 +783,10 @@ export const RoutineBuilder = () => {
         (i) => i.lineIndex === selectedLine,
       );
 
-      // Don't record if state hasn't changed from current history position
+      // Check if the only changes are in 'selected' properties (UI state)
       const lastState = lineHistory.history[lineHistory.index];
-      if (lastState && JSON.stringify(lastState) === JSON.stringify(currentState)) {
-        // If states are identical, check if we got here because of undo - don't record in that case
+      if (lastState && areStatesEqualIgnoringSelection(currentState, lastState)) {
+        // If states are identical except for selection, don't record
         return;
       }
 
@@ -1598,6 +1622,7 @@ export const RoutineBuilder = () => {
         handleExportPDF={handleExportPDF}
         isGeneratingPdf={isGeneratingPdf}
         setShowAboutModal={setShowAboutModal}
+        setShowConfigModal={setShowConfigModal}
         loadFromSlot={loadFromSlot}
         setShowRenameDialog={setShowRenameDialog}
         setRenameInput={setRenameInput}
@@ -1683,6 +1708,16 @@ export const RoutineBuilder = () => {
 
       {/* About Modal */}
       <AboutModal open={showAboutModal} onOpenChange={setShowAboutModal} />
+
+      {/* Config Modal */}
+      <RoutineConfigModal
+        isOpen={showConfigModal}
+        onOpenChange={setShowConfigModal}
+        config={config}
+        updateLength={updateLength}
+        updateBpm={updateBpm}
+        updateCategory={updateCategory}
+      />
     </div>
   );
 };
