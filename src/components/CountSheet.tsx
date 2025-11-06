@@ -47,10 +47,10 @@ const getSkillCategoryColors = (category: SkillCategory) => {
       };
     case "dismounts":
       return {
-        background: "bg-gradient-to-br from-red-50 to-orange-50 dark:from-red-900/40 dark:to-orange-900/40",
-        border: "border-red-300 dark:border-red-600",
-        text: "text-red-900 dark:text-red-100",
-        accent: "bg-red-600 text-white"
+        background: "bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-900/40 dark:to-purple-900/40",
+        border: "border-blue-300 dark:border-blue-600",
+        text: "text-blue-900 dark:text-blue-100",
+        accent: "bg-blue-600 text-white"
       };
     case "pyramids":
       return {
