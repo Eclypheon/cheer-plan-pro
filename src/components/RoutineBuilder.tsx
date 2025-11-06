@@ -548,6 +548,27 @@ export const RoutineBuilder = () => {
     : {};
 
   /**
+   * Helper function to normalize position icons for history comparison
+   * Excludes UI-only properties like 'selected' that shouldn't be part of undo/redo
+   */
+  const normalizeIconsForHistory = (icons: PositionIcon[]): PositionIcon[] => {
+    return icons.map(({ selected, ...icon }) => icon);
+  };
+
+  /**
+   * Helper function to check if two icon states are equal, ignoring selection differences
+   */
+  const areStatesEqualIgnoringSelection = (state1: PositionIcon[], state2: PositionIcon[]): boolean => {
+    if (state1.length !== state2.length) return false;
+
+    // Create normalized versions for comparison
+    const normalized1 = normalizeIconsForHistory(state1);
+    const normalized2 = normalizeIconsForHistory(state2);
+
+    return JSON.stringify(normalized1) === JSON.stringify(normalized2);
+  };
+
+  /**
    * Helper functions for category-based state management
    * Category states are now scoped per save state to avoid conflicts
    */
@@ -762,10 +783,10 @@ export const RoutineBuilder = () => {
         (i) => i.lineIndex === selectedLine,
       );
 
-      // Don't record if state hasn't changed from current history position
+      // Check if the only changes are in 'selected' properties (UI state)
       const lastState = lineHistory.history[lineHistory.index];
-      if (lastState && JSON.stringify(lastState) === JSON.stringify(currentState)) {
-        // If states are identical, check if we got here because of undo - don't record in that case
+      if (lastState && areStatesEqualIgnoringSelection(currentState, lastState)) {
+        // If states are identical except for selection, don't record
         return;
       }
 

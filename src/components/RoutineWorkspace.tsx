@@ -332,6 +332,27 @@ export const RoutineWorkspace = ({
     : {};
 
   /**
+   * Helper function to normalize position icons for history comparison
+   * Excludes UI-only properties like 'selected' that shouldn't be part of undo/redo
+   */
+  const normalizeIconsForHistory = (icons: PositionIcon[]): PositionIcon[] => {
+    return icons.map(({ selected, ...icon }) => icon);
+  };
+
+  /**
+   * Helper function to check if two icon states are equal, ignoring selection differences
+   */
+  const areStatesEqualIgnoringSelection = (state1: PositionIcon[], state2: PositionIcon[]): boolean => {
+    if (state1.length !== state2.length) return false;
+
+    // Create normalized versions for comparison
+    const normalized1 = normalizeIconsForHistory(state1);
+    const normalized2 = normalizeIconsForHistory(state2);
+
+    return JSON.stringify(normalized1) === JSON.stringify(normalized2);
+  };
+
+  /**
    * Helper functions for category-based state management
    * Category states are now scoped per save state to avoid conflicts
    */
@@ -547,10 +568,10 @@ export const RoutineWorkspace = ({
         (i) => i.lineIndex === selectedLine,
       );
 
-      // Don't record if state hasn't changed from current history position
+      // Check if the only changes are in 'selected' properties (UI state)
       const lastState = lineHistory.history[lineHistory.index];
-      if (lastState && JSON.stringify(lastState) === JSON.stringify(currentState)) {
-        // If states are identical, check if we got here because of undo - don't record in that case
+      if (lastState && areStatesEqualIgnoringSelection(currentState, lastState)) {
+        // If states are identical except for selection, don't record
         return;
       }
 
@@ -1085,38 +1106,42 @@ export const RoutineWorkspace = ({
     const prevState = lineHistory.history[lineHistory.index - 1];
     if (!prevState) return;
 
-    // Restore the state
-    handleRestoreLineState(lineIndex, prevState);
+    // Store the current states of subsequent lines before undoing
+    const totalLines = Math.ceil(((config.length * config.bpm) / 60 / 8));
+    const preUndoStates: { [lineIndex: number]: PositionIcon[] } = {};
 
-    // If auto-follow is enabled, propagate the undo to subsequent lines
     if (autoFollow) {
-      const totalLines = Math.ceil(((config.length * config.bpm) / 60 / 8));
-      const currentLineIcons = prevState;
-
-      // Restore subsequent lines to match the undone state
-      for (
-        let subsequentLine = lineIndex + 1;
-        subsequentLine < totalLines;
-        subsequentLine++
-      ) {
-        // Create copied icons for this subsequent line
-        const copiedIcons = currentLineIcons.map((icon) => ({
-          ...icon,
-          id: `icon-${Date.now()}-${Math.random()}-${subsequentLine}`,
-          lineIndex: subsequentLine,
-        }));
-
-        // Replace icons for this line
-        setPositionIcons((prev) => {
-          const otherIcons = prev.filter(
-            (icon) => icon.lineIndex !== subsequentLine,
-          );
-          return [...otherIcons, ...copiedIcons];
-        });
+      for (let line = lineIndex + 1; line < totalLines; line++) {
+        const lineHistory = getCurrentScopedHistory(line);
+        if (lineHistory && lineHistory.index > 0) {
+          // Store the state that this line will be undone to
+          preUndoStates[line] = lineHistory.history[lineHistory.index - 1];
+        }
       }
     }
 
-    // Update history index
+    // Restore the state for the main line
+    handleRestoreLineState(lineIndex, prevState);
+
+    // If auto-follow is enabled, undo subsequent lines to their pre-propagation states
+    if (autoFollow) {
+      for (let subsequentLine = lineIndex + 1; subsequentLine < totalLines; subsequentLine++) {
+        const subsequentLineHistory = getCurrentScopedHistory(subsequentLine);
+        if (subsequentLineHistory && subsequentLineHistory.index > 0) {
+          // Restore this line to its state from before the propagation
+          const prePropagationState = subsequentLineHistory.history[subsequentLineHistory.index - 1];
+          handleRestoreLineState(subsequentLine, prePropagationState);
+
+          // Update the history index for this line
+          setScopedHistory(loadedSaveStateSlot, config.category, subsequentLine, {
+            ...subsequentLineHistory,
+            index: subsequentLineHistory.index - 1,
+          });
+        }
+      }
+    }
+
+    // Update history index for the main line
     setScopedHistory(loadedSaveStateSlot, config.category, lineIndex, {
       ...lineHistory,
       index: lineHistory.index - 1,
@@ -1133,38 +1158,42 @@ export const RoutineWorkspace = ({
     const nextState = lineHistory.history[lineHistory.index + 1];
     if (!nextState) return;
 
-    // Restore the state
-    handleRestoreLineState(lineIndex, nextState);
+    // Store the current states of subsequent lines before redoing
+    const totalLines = Math.ceil(((config.length * config.bpm) / 60 / 8));
+    const preRedoStates: { [lineIndex: number]: PositionIcon[] } = {};
 
-    // If auto-follow is enabled, propagate the redo to subsequent lines
     if (autoFollow) {
-      const totalLines = Math.ceil(((config.length * config.bpm) / 60 / 8));
-      const currentLineIcons = nextState;
-
-      // Restore subsequent lines to match the redone state
-      for (
-        let subsequentLine = lineIndex + 1;
-        subsequentLine < totalLines;
-        subsequentLine++
-      ) {
-        // Create copied icons for this subsequent line
-        const copiedIcons = currentLineIcons.map((icon) => ({
-          ...icon,
-          id: `icon-${Date.now()}-${Math.random()}-${subsequentLine}`,
-          lineIndex: subsequentLine,
-        }));
-
-        // Replace icons for this line
-        setPositionIcons((prev) => {
-          const otherIcons = prev.filter(
-            (icon) => icon.lineIndex !== subsequentLine,
-          );
-          return [...otherIcons, ...copiedIcons];
-        });
+      for (let line = lineIndex + 1; line < totalLines; line++) {
+        const lineHistory = getCurrentScopedHistory(line);
+        if (lineHistory && lineHistory.index < lineHistory.history.length - 1) {
+          // Store the state that this line will be redone to
+          preRedoStates[line] = lineHistory.history[lineHistory.index + 1];
+        }
       }
     }
 
-    // Update history index
+    // Restore the state for the main line
+    handleRestoreLineState(lineIndex, nextState);
+
+    // If auto-follow is enabled, redo subsequent lines to their post-propagation states
+    if (autoFollow) {
+      for (let subsequentLine = lineIndex + 1; subsequentLine < totalLines; subsequentLine++) {
+        const subsequentLineHistory = getCurrentScopedHistory(subsequentLine);
+        if (subsequentLineHistory && subsequentLineHistory.index < subsequentLineHistory.history.length - 1) {
+          // Restore this line to its state from after the propagation
+          const postPropagationState = subsequentLineHistory.history[subsequentLineHistory.index + 1];
+          handleRestoreLineState(subsequentLine, postPropagationState);
+
+          // Update the history index for this line
+          setScopedHistory(loadedSaveStateSlot, config.category, subsequentLine, {
+            ...subsequentLineHistory,
+            index: subsequentLineHistory.index + 1,
+          });
+        }
+      }
+    }
+
+    // Update history index for the main line
     setScopedHistory(loadedSaveStateSlot, config.category, lineIndex, {
       ...lineHistory,
       index: lineHistory.index + 1,
