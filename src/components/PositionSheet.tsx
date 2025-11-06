@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useRef, useCallback, useEffect } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import type { PositionIcon } from "@/types/routine";
 import { Card } from "@/components/ui/card";
@@ -90,7 +90,9 @@ export const PositionSheet = ({
   const [initialZoomLevel, setInitialZoomLevel] = useState(1.0);
   const [previewPosition, setPreviewPosition] = useState<{ x: number; y: number } | null>(null);
   const [previewSheetCoords, setPreviewSheetCoords] = useState<{ x: number; y: number } | null>(null);
+  const [isOverflowingHorizontally, setIsOverflowingHorizontally] = useState(false);
   const sheetRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Set up droppable area for the position sheet grid
   const { setNodeRef, isOver } = useDroppable({
@@ -134,6 +136,30 @@ export const PositionSheet = ({
 
   // Use prop zoom level if provided, otherwise use internal state
   const effectiveZoomLevel = propZoomLevel ?? zoomLevel;
+
+  // Check for horizontal overflow
+  useEffect(() => {
+    const checkOverflow = () => {
+      if (containerRef.current) {
+        const container = containerRef.current;
+        const contentWidth = 800 * effectiveZoomLevel + 24; // 800px content + 24px padding (12px * 2)
+        const containerWidth = container.clientWidth;
+        setIsOverflowingHorizontally(contentWidth > containerWidth);
+      }
+    };
+
+    checkOverflow();
+
+    // Set up ResizeObserver to watch for container size changes
+    const resizeObserver = new ResizeObserver(checkOverflow);
+    if (containerRef.current) {
+      resizeObserver.observe(containerRef.current);
+    }
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [effectiveZoomLevel]);
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     if (e.touches.length === 2) {
@@ -451,7 +477,14 @@ return (
         </div>
 
         {/* Position sheet */}
-        <div id="position-sheet-container" className="flex-1 p-1.5 flex flex-col items-center overflow-auto">
+        <div
+          id="position-sheet-container"
+          ref={containerRef}
+          className={cn(
+            "flex-1 p-1.5 flex flex-col overflow-auto",
+            isOverflowingHorizontally ? "items-start" : "items-center"
+          )}
+        >
           <div id="position-sheet-content-wrapper" className="flex flex-col items-center">
           {/* ----- START OF MODIFIED CODE ----- */}
           <div
