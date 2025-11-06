@@ -140,6 +140,91 @@ export const RoutineWorkspace = ({
 }: RoutineWorkspaceProps) => {
   const isMobile = useIsMobile();
 
+  // Touch event prevention during drag operations
+  const touchEventListenersRef = useRef<{
+    touchmove?: (e: TouchEvent) => void;
+    touchstart?: (e: TouchEvent) => void;
+    gesturestart?: (e: Event) => void;
+    gesturechange?: (e: Event) => void;
+    gestureend?: (e: Event) => void;
+    contextmenu?: (e: Event) => void;
+  }>({});
+
+  // Add touch event prevention for mobile devices
+  useEffect(() => {
+    if (!isMobile) return;
+
+    const preventTouchMove = (e: TouchEvent) => {
+      // Only prevent if we're currently dragging
+      if (draggedSkill || isDraggingPlacedSkill || isDraggingIcon || isResizing) {
+        e.preventDefault();
+      }
+    };
+
+    const preventTouchStart = (e: TouchEvent) => {
+      // Prevent multi-touch gestures when dragging
+      if ((draggedSkill || isDraggingPlacedSkill || isDraggingIcon || isResizing) && e.touches.length > 1) {
+        e.preventDefault();
+      }
+    };
+
+    const preventGesture = (e: Event) => {
+      // Prevent gestures when dragging
+      if (draggedSkill || isDraggingPlacedSkill || isDraggingIcon || isResizing) {
+        e.preventDefault();
+      }
+    };
+
+    const preventContextMenu = (e: Event) => {
+      // Prevent context menu when dragging
+      if (draggedSkill || isDraggingPlacedSkill || isDraggingIcon || isResizing) {
+        e.preventDefault();
+      }
+    };
+
+    // Store listener references
+    touchEventListenersRef.current = {
+      touchmove: preventTouchMove,
+      touchstart: preventTouchStart,
+      gesturestart: preventGesture,
+      gesturechange: preventGesture,
+      gestureend: preventGesture,
+      contextmenu: preventContextMenu,
+    };
+
+    // Add listeners that are always active on mobile
+    document.addEventListener('touchmove', preventTouchMove, { passive: false });
+    document.addEventListener('touchstart', preventTouchStart, { passive: false });
+    document.addEventListener('gesturestart', preventGesture, { passive: false });
+    document.addEventListener('gesturechange', preventGesture, { passive: false });
+    document.addEventListener('gestureend', preventGesture, { passive: false });
+    document.addEventListener('contextmenu', preventContextMenu, { passive: false });
+
+    // Cleanup function
+    return () => {
+      const listeners = touchEventListenersRef.current;
+      if (listeners.touchmove) {
+        document.removeEventListener('touchmove', listeners.touchmove);
+      }
+      if (listeners.touchstart) {
+        document.removeEventListener('touchstart', listeners.touchstart);
+      }
+      if (listeners.gesturestart) {
+        document.removeEventListener('gesturestart', listeners.gesturestart);
+      }
+      if (listeners.gesturechange) {
+        document.removeEventListener('gesturechange', listeners.gesturechange);
+      }
+      if (listeners.gestureend) {
+        document.removeEventListener('gestureend', listeners.gestureend);
+      }
+      if (listeners.contextmenu) {
+        document.removeEventListener('contextmenu', listeners.contextmenu);
+      }
+      touchEventListenersRef.current = {};
+    };
+  }, [isMobile, draggedSkill, isDraggingPlacedSkill, isDraggingIcon, isResizing]);
+
   // State for panel sizes and toggle
   const [panelSizes, setPanelSizes] = useState([30, 70]); // [skillsPanel, mainPanel]
   const [skillsPanelCollapsed, setSkillsPanelCollapsed] = useState(false);
@@ -697,6 +782,7 @@ export const RoutineWorkspace = ({
         (skills.find((s) => s.id === event.active.id) ? "new skill" : "unknown")
       }', ID='${event.active.id}'`,
     );
+
     const skill = skills.find((s) => s.id === event.active.id);
     if (skill) {
       setDraggedSkill(skill);

@@ -174,6 +174,34 @@ export const CountSheet = ({
   const containerRef = React.useRef<HTMLDivElement>(null);
   const [editingNoteLine, setEditingNoteLine] = React.useState<number | null>(null);
 
+  // Check if we're currently dragging (passed from parent)
+  const isDraggingAnySkill = draggedSkill !== null || isResizing;
+
+  // Prevent default touch behavior when starting to drag placed skills
+  React.useEffect(() => {
+    const handleTouchStart = (e: TouchEvent) => {
+      // Check if the touch is on a placed skill element
+      const target = e.target as HTMLElement;
+      const skillElement = target.closest('[data-skill-id]');
+
+      if (skillElement) {
+        // Prevent default touch behavior to avoid scrolling when starting drag
+        e.preventDefault();
+      }
+    };
+
+    const scrollableContainer = document.getElementById('count-sheet-container');
+    if (scrollableContainer) {
+      scrollableContainer.addEventListener('touchstart', handleTouchStart, { passive: false });
+    }
+
+    return () => {
+      if (scrollableContainer) {
+        scrollableContainer.removeEventListener('touchstart', handleTouchStart);
+      }
+    };
+  }, []);
+
   // Handle panel resizing
   const handleMouseDown = React.useCallback((e: React.MouseEvent) => {
     setIsResizingPanels(true);
