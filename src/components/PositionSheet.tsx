@@ -1029,6 +1029,60 @@ return (
               />
             ))}
 
+            {/* Mini arrows */}
+            <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 6, width:'640%', height: '500%' }}>
+              {lineArrows.map((arrow) => {
+                // Calculate angle for arrowhead
+                const angle = Math.atan2(arrow.end.y - arrow.start.y, arrow.end.x - arrow.start.x);
+                const arrowheadLength = 4; // Smaller for preview
+
+                // Calculate arrowhead points
+                const angle1 = angle + Math.PI - (25 * Math.PI) / 180;
+                const angle2 = angle + Math.PI + (25 * Math.PI) / 180;
+
+                const arrowhead1X = arrow.end.x + arrowheadLength * Math.cos(angle1);
+                const arrowhead1Y = arrow.end.y + arrowheadLength * Math.sin(angle1);
+                const arrowhead2X = arrow.end.x + arrowheadLength * Math.cos(angle2);
+                const arrowhead2Y = arrow.end.y + arrowheadLength * Math.sin(angle2);
+
+                return (
+                  <g key={`preview-arrow-${arrow.id}`}>
+                    {/* Arrow line */}
+                    <line
+                      x1={arrow.start.x}
+                      y1={arrow.start.y}
+                      x2={arrow.end.x}
+                      y2={arrow.end.y}
+                      stroke={arrow.selected ? "blue" : "currentColor"}
+                      strokeWidth={arrow.selected ? "2" : "1.5"}
+                      strokeOpacity="0.8"
+                    />
+                    {/* Arrowhead lines */}
+                    <line
+                      x1={arrow.end.x}
+                      y1={arrow.end.y}
+                      x2={arrowhead1X}
+                      y2={arrowhead1Y}
+                      stroke={arrow.selected ? "blue" : "currentColor"}
+                      strokeWidth={arrow.selected ? "2" : "1.5"}
+                      strokeOpacity="0.8"
+                      strokeLinecap="round"
+                    />
+                    <line
+                      x1={arrow.end.x}
+                      y1={arrow.end.y}
+                      x2={arrowhead2X}
+                      y2={arrowhead2Y}
+                      stroke={arrow.selected ? "blue" : "currentColor"}
+                      strokeWidth={arrow.selected ? "2" : "1.5"}
+                      strokeOpacity="0.8"
+                      strokeLinecap="round"
+                    />
+                  </g>
+                );
+              })}
+            </svg>
+
             {/* Mini position icons - exclude dragged icon from static rendering */}
             {lineIcons.filter(icon => icon.id !== draggedIconId).map((icon) => (
               <div
