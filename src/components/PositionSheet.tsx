@@ -1,10 +1,11 @@
 import React, { useState, useRef, useCallback, useEffect } from "react";
-import { useDroppable } from "@dnd-kit/core";
-import type { PositionIcon } from "@/types/routine";
+import { useDroppable, Active } from "@dnd-kit/core";
+import type { PositionIcon, Arrow } from "@/types/routine";
+import { ArrowComponent } from "./Arrow";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
-import { Plus, Undo, Redo, ToggleLeft, ToggleRight, Square, Circle, Triangle, X, ZoomIn, ZoomOut, Trash2 } from "lucide-react";
+import { Plus, Undo, Redo, ToggleLeft, ToggleRight, Square, Circle, Triangle, X, ZoomIn, ZoomOut, Trash2, ArrowRight } from "lucide-react";
 import { PositionIcon as PositionIconComponent } from "./PositionIcon";
 import { PositionIconNameDialog } from "./PositionIconNameDialog";
 import { Input } from "@/components/ui/input";
@@ -13,6 +14,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 
 interface PositionSheetProps {
   icons: PositionIcon[];
+  arrows?: Arrow[];
   selectedLine: number | null;
   onUpdateIcon: (id: string, x: number, y: number, shouldPropagate?: boolean) => void;
   onAddIcon: (type: PositionIcon["type"]) => void;
@@ -20,7 +22,7 @@ interface PositionSheetProps {
   onRemoveMultipleIcons?: (ids: string[]) => void;
   onNameIcon: (id: string, name: string) => void;
   onRestoreLineState?: (lineIndex: number, icons: PositionIcon[]) => void;
-  lineHistories: { [lineIndex: number]: { history: PositionIcon[][], index: number } };
+  lineHistories: { [lineIndex: number]: { iconHistory: PositionIcon[][], arrowHistory: Arrow[][], index: number } };
   onUndoLine?: (lineIndex: number) => void;
   onRedoLine?: (lineIndex: number) => void;
   showGrid?: boolean;
@@ -35,17 +37,26 @@ interface PositionSheetProps {
   onPrevLine?: () => void;
   onIconDragStart?: () => void;
   onIconDragEnd?: () => void;
-  onIconDrop?: (event: { active: any, delta: { x: number; y: number }, zoomLevel: number }) => void;
+  onIconDrop?: (event: { active: Active, delta: { x: number; y: number }, zoomLevel: number }) => void;
   onZoomChange?: (zoomLevel: number) => void;
+  // Arrow-related functions
+  onAddArrow?: (arrow: Omit<Arrow, 'id'>) => void;
+  onUpdateArrow?: (id: string, arrow: Partial<Arrow>) => void;
+  onRemoveArrow?: (id: string) => void;
+  onRemoveMultipleArrows?: (ids: string[]) => void;
+  onSelectArrow?: (id: string) => void;
+  onSelectMultipleArrows?: (ids: string[]) => void;
   segmentName?: string;
   onUpdateSegmentName?: (name: string) => void;
   pdfIcons?: PositionIcon[]; // Override icons for PDF generation
-  pdfSegmentName?: string; // ----- ADD THIS LINE -----
+  pdfArrows?: Arrow[]; // Override arrows for PDF generation
+  pdfSegmentName?: string;
   zoomLevel?: number; // Override zoom level for PDF generation
 }
 
 export const PositionSheet = ({
   icons,
+  arrows = [],
   selectedLine,
   onUpdateIcon,
   onAddIcon,
@@ -70,9 +81,17 @@ export const PositionSheet = ({
   onIconDragEnd,
   onIconDrop,
   onZoomChange,
+  // Arrow-related props
+  onAddArrow,
+  onUpdateArrow,
+  onRemoveArrow,
+  onRemoveMultipleArrows,
+  onSelectArrow,
+  onSelectMultipleArrows,
   segmentName,
   onUpdateSegmentName,
   pdfIcons,
+  pdfArrows,
   pdfSegmentName, // ----- ADD THIS LINE -----
   zoomLevel: propZoomLevel,
 }: PositionSheetProps) => {
@@ -84,6 +103,9 @@ export const PositionSheet = ({
   const [selectionStart, setSelectionStart] = useState<{ x: number; y: number } | null>(null);
   const [selectionEnd, setSelectionEnd] = useState<{ x: number; y: number } | null>(null);
   const [isDraggingSelection, setIsDraggingSelection] = useState(false);
+  const [isArrowDrawingMode, setIsArrowDrawingMode] = useState(false);
+  const [arrowDrawingStart, setArrowDrawingStart] = useState<{ x: number; y: number } | null>(null);
+  const [arrowDrawingEnd, setArrowDrawingEnd] = useState<{ x: number; y: number } | null>(null);
   const [zoomLevel, setZoomLevel] = useState(0.55); // Default zoom level (55%)
   const [isPinching, setIsPinching] = useState(false);
   const [initialPinchDistance, setInitialPinchDistance] = useState(0);
@@ -122,6 +144,10 @@ export const PositionSheet = ({
       return newZoomLevel;
     });
   }, [onZoomChange]);
+
+  const handleArrowToolClick = useCallback(() => {
+    setIsArrowDrawingMode(prev => !prev);
+  }, []);
 
   // Pinch gesture handlers
   const getTouchDistance = useCallback((touches: React.TouchList) => {
@@ -242,9 +268,36 @@ export const PositionSheet = ({
   const handleSelectionMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement;
     const isIcon = target.closest('[data-position-icon]');
+    const isArrow = target.closest('[data-arrow]');
 
-    // Only start selection if clicking on empty space (not on an icon)
-    if (!isIcon && (e.target === e.currentTarget || target.closest('.sheet-background'))) {
+    // If in arrow drawing mode, start drawing arrow instead of regular selection
+    if (isArrowDrawingMode) {
+      const coords = getZoomedCoordinates(e.clientX, e.clientY);
+
+      if (!arrowDrawingStart) {
+        // First click - set start point
+        setArrowDrawingStart(coords);
+        setArrowDrawingEnd(coords); // Initialize end to start position
+      } else {
+        // Second click - create the arrow
+        if (onAddArrow && selectedLine !== null) {
+          const newArrow: Omit<Arrow, 'id'> = {
+            start: { ...arrowDrawingStart },
+            end: { ...coords },
+            lineIndex: selectedLine,
+          };
+          onAddArrow(newArrow);
+        }
+        // Reset arrow drawing state and exit arrow drawing mode
+        setArrowDrawingStart(null);
+        setArrowDrawingEnd(null);
+        setIsArrowDrawingMode(false);
+      }
+      return; // Early return to prevent regular selection
+    }
+
+    // Only start selection if clicking on empty space (not on an icon or arrow) and not dragging
+    if (!isIcon && !isArrow && !isDraggingIcon && (e.target === e.currentTarget || target.closest('.sheet-background'))) {
       const coords = getZoomedCoordinates(e.clientX, e.clientY);
       setSelectionStart(coords);
       setSelectionEnd(null);
@@ -253,25 +306,80 @@ export const PositionSheet = ({
   };
 
   const handleSelectionMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Update arrow preview if drawing arrow
+    if (isArrowDrawingMode && arrowDrawingStart) {
+      const coords = getZoomedCoordinates(e.clientX, e.clientY);
+      setArrowDrawingEnd(coords);
+    }
     // Only update selection rectangle if we're in selection mode (not dragging an icon)
-    if (selectionStart && isDraggingSelection) {
+    else if (selectionStart && isDraggingSelection) {
       const coords = getZoomedCoordinates(e.clientX, e.clientY);
       setSelectionEnd(coords);
     }
   };
 
+  // Helper function to check if an arrow intersects with a rectangle
+  const doesArrowIntersectRectangle = (arrow: Arrow, rect: { minX: number; maxX: number; minY: number; maxY: number }, zoomLevel: number): boolean => {
+    // Calculate the arrow's visual bounding box (same as ArrowComponent)
+    const angle = Math.atan2(arrow.end.y - arrow.start.y, arrow.end.x - arrow.start.x);
+    const arrowheadLength = 15;
+
+    // Calculate arrowhead extents (using the rotated angles)
+    const angle1 = angle + Math.PI - (25 * Math.PI) / 180; // 180° - 25°
+    const angle2 = angle + Math.PI + (25 * Math.PI) / 180; // 180° + 25°
+
+    const arrowhead1X = arrow.end.x + arrowheadLength * Math.cos(angle1);
+    const arrowhead1Y = arrow.end.y + arrowheadLength * Math.sin(angle1);
+    const arrowhead2X = arrow.end.x + arrowheadLength * Math.cos(angle2);
+    const arrowhead2Y = arrow.end.y + arrowheadLength * Math.sin(angle2);
+
+    // Include arrowheads in bounding box
+    const allX = [arrow.start.x, arrow.end.x, arrowhead1X, arrowhead2X];
+    const allY = [arrow.start.y, arrow.end.y, arrowhead1Y, arrowhead2Y];
+
+    const arrowMinX = Math.min(...allX);
+    const arrowMaxX = Math.max(...allX);
+    const arrowMinY = Math.min(...allY);
+    const arrowMaxY = Math.max(...allY);
+
+    // Add padding for stroke width (8px max stroke + some buffer)
+    const padding = 10;
+    const arrowLeft = arrowMinX - padding;
+    const arrowTop = arrowMinY - padding;
+    const arrowRight = arrowMaxX + padding;
+    const arrowBottom = arrowMaxY + padding;
+
+    // Check if the arrow bounding box intersects with the selection rectangle
+    // Both are in the same unzoomed coordinate system
+    return !(arrowRight < rect.minX || arrowLeft > rect.maxX || arrowBottom < rect.minY || arrowTop > rect.maxY);
+  };
+
   const handleSelectionMouseUp = () => {
+    // Handle arrow drawing completion if needed
+    if (isArrowDrawingMode && !arrowDrawingStart) {
+      // If we were in arrow drawing mode but didn't start drawing, exit arrow mode
+      setIsArrowDrawingMode(false);
+    }
+    
     if (selectionStart && selectionEnd && isDraggingSelection) {
       const minX = Math.min(selectionStart.x, selectionEnd.x);
       const maxX = Math.max(selectionStart.x, selectionEnd.x);
       const minY = Math.min(selectionStart.y, selectionEnd.y);
       const maxY = Math.max(selectionStart.y, selectionEnd.y);
 
-      const selectedIds = lineIcons.filter(icon =>
+      // Select icons that are within the rectangle
+      const selectedIconIds = lineIcons.filter(icon =>
         icon.x >= minX && icon.x <= maxX && icon.y >= minY && icon.y <= maxY
       ).map(icon => icon.id);
 
-      onSelectMultiple?.(selectedIds);
+      // Select arrows that intersect with the rectangle
+      const selectedArrowIds = lineArrows.filter(arrow =>
+        doesArrowIntersectRectangle(arrow, { minX, maxX, minY, maxY }, effectiveZoomLevel)
+      ).map(arrow => arrow.id);
+
+      // Call the appropriate selection callbacks
+      onSelectMultiple?.(selectedIconIds);
+      onSelectMultipleArrows?.(selectedArrowIds);
     }
     setSelectionStart(null);
     setSelectionEnd(null);
@@ -312,11 +420,100 @@ export const PositionSheet = ({
     setClickTimer(timer);
   };
 
+  // Helper function to check if a point is close to a line segment (arrow)
+  const isPointNearArrow = (point: { x: number; y: number }, arrow: Arrow, tolerance: number = 10): boolean => {
+    const { start, end } = arrow;
+    
+    // Calculate distance from point to line segment
+    // Using the formula for distance from point to line segment
+    const A = point.x - start.x;
+    const B = point.y - start.y;
+    const C = end.x - start.x;
+    const D = end.y - start.y;
+
+    const dot = A * C + B * D;
+    const lenSq = C * C + D * D;
+    
+    if (lenSq === 0) return Math.sqrt(A * A + B * B) < tolerance;
+
+    let param = dot / lenSq;
+
+    // Keep param within [0, 1] to stay within the segment
+    param = Math.max(0, Math.min(1, param));
+
+    const xx = start.x + param * C;
+    const yy = start.y + param * D;
+
+    const dx = point.x - xx;
+    const dy = point.y - yy;
+
+    return Math.sqrt(dx * dx + dy * dy) < tolerance;
+  };
+
+  // ----- MODIFY THESE LINES -----
+  const isPdfRender = pdfIcons !== undefined;
+  const lineIcons = isPdfRender ? pdfIcons : icons.filter((i) => i.lineIndex === selectedLine);
+  const lineArrows = isPdfRender ? (pdfArrows || []) : arrows.filter((a) => a.lineIndex === selectedLine);
+  const currentSegmentName = isPdfRender ? (pdfSegmentName || "") : (segmentName || "");
+  // ----- END OF MODIFICATION -----
+
+  // Handle keyboard events for arrow deletion
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Check if delete or backspace key was pressed
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedLine !== null) {
+        // Delete selected position icons
+        const selectedIcons = lineIcons.filter(icon => icon.selected);
+        if (selectedIcons.length > 0) {
+          const selectedIds = selectedIcons.map(icon => icon.id);
+          // Use the bulk delete function if available
+          if (onRemoveMultipleIcons) {
+            onRemoveMultipleIcons(selectedIds);
+          } else {
+            // Fallback to individual deletions
+            selectedIds.forEach(id => onRemoveIcon(id));
+          }
+        }
+
+        // Delete selected arrows
+        const selectedArrows = lineArrows.filter(arrow => arrow.selected);
+        if (selectedArrows.length > 0) {
+          const selectedArrowIds = selectedArrows.map(arrow => arrow.id);
+          // Use the bulk delete function if available
+          if (onRemoveMultipleArrows) {
+            onRemoveMultipleArrows(selectedArrowIds);
+          } else {
+            // Fallback to individual deletions
+            selectedArrowIds.forEach(id => onRemoveArrow?.(id));
+          }
+        }
+      }
+    };
+
+    // Add event listener when component mounts
+    window.addEventListener('keydown', handleKeyDown);
+
+    // Cleanup event listener when component unmounts
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [lineIcons, lineArrows, selectedLine, onRemoveMultipleIcons, onRemoveMultipleArrows, onRemoveIcon, onRemoveArrow]);
+
   const handleSheetClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement;
     const isIcon = target.closest('[data-position-icon]');
     const isGridLine = target.closest('line'); // SVG grid lines
     const isMatLine = target.closest('.border-l'); // Mat division lines
+
+    // Check if clicking on an arrow
+    const clickCoords = getZoomedCoordinates(e.clientX, e.clientY);
+    const clickedArrow = lineArrows.find(arrow => isPointNearArrow(clickCoords, arrow));
+    
+    // If clicking on an arrow
+    if (clickedArrow && !isIcon && !isGridLine && !isMatLine) {
+      onSelectArrow?.(clickedArrow.id);
+      return; // Exit early to avoid deselecting
+    }
 
     // If clicking on empty space (not on an icon, grid line, or mat line), deselect all
     // But only if we didn't just finish creating a selection rectangle
@@ -329,6 +526,13 @@ export const PositionSheet = ({
             onUpdateIcon(icon.id, icon.x, icon.y, false);
           }
         });
+
+        // Also deselect all arrows
+        lineArrows.forEach(arrow => {
+          if (arrow.selected) {
+            onUpdateArrow?.(arrow.id, { ...arrow, selected: false });
+          }
+        });
       }
     }
   };
@@ -338,12 +542,6 @@ export const PositionSheet = ({
       onNameIcon(selectedIconId, name);
     }
   };
-
-  // ----- MODIFY THESE LINES -----
-  const isPdfRender = pdfIcons !== undefined;
-  const lineIcons = isPdfRender ? pdfIcons : icons.filter((i) => i.lineIndex === selectedLine);
-  const currentSegmentName = isPdfRender ? (pdfSegmentName || "") : (segmentName || "");
-  // ----- END OF MODIFICATION -----
 
   if (selectedLine === null && !isPdfRender) { // Keep showing sheet for PDF render
     return (
@@ -357,6 +555,8 @@ export const PositionSheet = ({
 
   const selectedIcon = icons.find((i) => i.id === selectedIconId);
   const selectedIconsCount = lineIcons.filter(i => i.selected).length;
+  const selectedArrowsCount = lineArrows.filter(a => a.selected).length;
+  const totalSelectedCount = selectedIconsCount + selectedArrowsCount;
   const isMultiDrag = selectedIconsCount > 1 && dragOffset !== null;
 
 return (
@@ -407,24 +607,39 @@ return (
               disabled={
                 selectedLine === null ||
                 !lineHistories[selectedLine] ||
-                lineHistories[selectedLine].index >= lineHistories[selectedLine].history.length - 1
+                lineHistories[selectedLine].index >= lineHistories[selectedLine].iconHistory.length - 1
               }
             >
               <Redo className="h-3 w-3" />
             </Button>
-            {selectedIconsCount > 0 && (
+            {totalSelectedCount > 0 && (
               <Button
                 size="sm"
                 variant="destructive"
                 className="h-6 px-1.5 text-xs"
                 onClick={() => {
-                  const selectedIds = lineIcons.filter(i => i.selected).map(i => i.id);
-                  // Use the bulk delete function if available
-                  if (onRemoveMultipleIcons) {
-                    onRemoveMultipleIcons(selectedIds);
-                  } else {
-                    // Fallback to individual deletions
-                    selectedIds.forEach(id => onRemoveIcon(id));
+                  // Delete selected position icons
+                  const selectedIconIds = lineIcons.filter(i => i.selected).map(i => i.id);
+                  if (selectedIconIds.length > 0) {
+                    // Use the bulk delete function if available
+                    if (onRemoveMultipleIcons) {
+                      onRemoveMultipleIcons(selectedIconIds);
+                    } else {
+                      // Fallback to individual deletions
+                      selectedIconIds.forEach(id => onRemoveIcon(id));
+                    }
+                  }
+                  
+                  // Delete selected arrows
+                  const selectedArrowIds = lineArrows.filter(a => a.selected).map(a => a.id);
+                  if (selectedArrowIds.length > 0) {
+                    // Use the bulk delete function if available
+                    if (onRemoveMultipleArrows) {
+                      onRemoveMultipleArrows(selectedArrowIds);
+                    } else {
+                      // Fallback to individual deletions
+                      selectedArrowIds.forEach(id => onRemoveArrow?.(id));
+                    }
                   }
                 }}
               >
@@ -439,6 +654,15 @@ return (
       <div className="flex-1 flex overflow-hidden">
         {/* Zoom controls sidebar */}
         <div className="flex flex-col items-center justify-center p-2 border-r border-border bg-muted/20" style={{ width: '30px' }}>
+          <Button
+            size="sm"
+            variant={isArrowDrawingMode ? "default" : "ghost"}
+            className="h-6 w-6 p-0 mb-1"
+            onClick={handleArrowToolClick}
+            title="Arrow tool"
+          >
+            <ArrowRight className="h-3 w-3" />
+          </Button>
           <Button
             size="sm"
             variant="ghost"
@@ -557,7 +781,8 @@ return (
                 flexShrink: 0,
                 transform: `scale(${effectiveZoomLevel})`,
                 transformOrigin: 'top left', // Scale from the top-left corner
-                transition: 'transform 0.1s ease-out'
+                transition: 'transform 0.1s ease-out',
+                cursor: isArrowDrawingMode ? 'crosshair' : 'default'
               }}
               onMouseDown={handleSelectionMouseDown}
               onMouseMove={handleSelectionMouseMove}
@@ -619,6 +844,70 @@ return (
                   }}
                 />
               )}
+
+              {/* Temporary arrow preview - only show when drawing an arrow */}
+              {isArrowDrawingMode && arrowDrawingStart && arrowDrawingEnd && (
+                <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 8 }}>
+                  <line
+                    x1={arrowDrawingStart.x}
+                    y1={arrowDrawingStart.y}
+                    x2={arrowDrawingEnd.x}
+                    y2={arrowDrawingEnd.y}
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeOpacity="0.7"
+                  />
+                  {/* Arrowhead - pointing in the direction from start to end */}
+                  {(() => {
+                    // Calculate angle for arrowhead
+                    const angle = Math.atan2(
+                      arrowDrawingEnd.y - arrowDrawingStart.y,
+                      arrowDrawingEnd.x - arrowDrawingStart.x
+                    ) * 180 / Math.PI;
+                    
+                    // Calculate endpoint with small offset for arrowhead placement
+                    const endX = arrowDrawingEnd.x - 10 * Math.cos((angle * Math.PI) / 180);
+                    const endY = arrowDrawingEnd.y - 10 * Math.sin((angle * Math.PI) / 180);
+                    
+                    return (
+                      <>
+                        {/* Arrowhead line 1 */}
+                        <line
+                          x1={endX}
+                          y1={endY}
+                          x2={arrowDrawingEnd.x}
+                          y2={arrowDrawingEnd.y}
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeOpacity="0.7"
+                          transform={`rotate(${angle - 25}, ${endX}, ${endY})`}
+                        />
+                        {/* Arrowhead line 2 */}
+                        <line
+                          x1={endX}
+                          y1={endY}
+                          x2={arrowDrawingEnd.x}
+                          y2={arrowDrawingEnd.y}
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeOpacity="0.7"
+                          transform={`rotate(${angle + 25}, ${endX}, ${endY})`}
+                        />
+                      </>
+                    );
+                  })()}
+                </svg>
+              )}
+
+              {/* Arrows */}
+              {lineArrows.map((arrow) => (
+                <ArrowComponent
+                  key={arrow.id}
+                  arrow={arrow}
+                  onSelectArrow={onSelectArrow}
+                  zoomLevel={zoomLevel}
+                />
+              ))}
 
               {/* Position icons */}
               {lineIcons.map((icon) => (
@@ -739,6 +1028,60 @@ return (
                 style={{ left: `${(i / 9) * 640}%`, zIndex: 1, height: '500%' }}
               />
             ))}
+
+            {/* Mini arrows */}
+            <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 6, width:'640%', height: '500%' }}>
+              {lineArrows.map((arrow) => {
+                // Calculate angle for arrowhead
+                const angle = Math.atan2(arrow.end.y - arrow.start.y, arrow.end.x - arrow.start.x);
+                const arrowheadLength = 4; // Smaller for preview
+
+                // Calculate arrowhead points
+                const angle1 = angle + Math.PI - (25 * Math.PI) / 180;
+                const angle2 = angle + Math.PI + (25 * Math.PI) / 180;
+
+                const arrowhead1X = arrow.end.x + arrowheadLength * Math.cos(angle1);
+                const arrowhead1Y = arrow.end.y + arrowheadLength * Math.sin(angle1);
+                const arrowhead2X = arrow.end.x + arrowheadLength * Math.cos(angle2);
+                const arrowhead2Y = arrow.end.y + arrowheadLength * Math.sin(angle2);
+
+                return (
+                  <g key={`preview-arrow-${arrow.id}`}>
+                    {/* Arrow line */}
+                    <line
+                      x1={arrow.start.x}
+                      y1={arrow.start.y}
+                      x2={arrow.end.x}
+                      y2={arrow.end.y}
+                      stroke={arrow.selected ? "blue" : "currentColor"}
+                      strokeWidth={arrow.selected ? "2" : "1.5"}
+                      strokeOpacity="0.8"
+                    />
+                    {/* Arrowhead lines */}
+                    <line
+                      x1={arrow.end.x}
+                      y1={arrow.end.y}
+                      x2={arrowhead1X}
+                      y2={arrowhead1Y}
+                      stroke={arrow.selected ? "blue" : "currentColor"}
+                      strokeWidth={arrow.selected ? "2" : "1.5"}
+                      strokeOpacity="0.8"
+                      strokeLinecap="round"
+                    />
+                    <line
+                      x1={arrow.end.x}
+                      y1={arrow.end.y}
+                      x2={arrowhead2X}
+                      y2={arrowhead2Y}
+                      stroke={arrow.selected ? "blue" : "currentColor"}
+                      strokeWidth={arrow.selected ? "2" : "1.5"}
+                      strokeOpacity="0.8"
+                      strokeLinecap="round"
+                    />
+                  </g>
+                );
+              })}
+            </svg>
 
             {/* Mini position icons - exclude dragged icon from static rendering */}
             {lineIcons.filter(icon => icon.id !== draggedIconId).map((icon) => (

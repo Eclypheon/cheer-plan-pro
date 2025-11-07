@@ -2,9 +2,12 @@ import React from "react";
 import { PositionSheet } from "./PositionSheet";
 import type { PositionIcon } from "@/types/routine";
 
+import type { Arrow } from "@/types/routine";
+
 interface PdfRendererProps {
   configurations: {
     icons: PositionIcon[];
+    arrows: Arrow[];
     lineIndex: number;
   }[];
   segmentNames: Record<number, string>;
@@ -43,6 +46,7 @@ export const PdfRenderer = ({
         <PositionSheet
           // --- Props to satisfy TypeScript ---
           icons={config.icons} // Pass the icons for this sheet
+          arrows={config.arrows} // Pass the arrows for this sheet
           selectedLine={config.lineIndex}
           onUpdateIcon={() => {}} // Stub function
           onAddIcon={() => {}} // Stub function
@@ -52,8 +56,17 @@ export const PdfRenderer = ({
           
           // --- Props for PDF rendering ---
           pdfIcons={config.icons} // This prop overrides live state
+          pdfArrows={config.arrows} // This prop overrides live arrows
           pdfSegmentName={segmentNames[config.lineIndex] || ""}
           zoomLevel={zoomLevel}
+          
+          // --- Arrow-related props (stubs for PDF rendering) ---
+          onAddArrow={() => {}}
+          onUpdateArrow={() => {}}
+          onRemoveArrow={() => {}}
+          onRemoveMultipleArrows={() => {}}
+          onSelectArrow={undefined}
+          onSelectMultipleArrows={undefined}
           
           // --- Explicitly pass undefined/defaults for optional props ---
           onRemoveMultipleIcons={undefined}

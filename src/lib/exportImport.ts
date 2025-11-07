@@ -8,6 +8,7 @@ export interface ExportedData {
     [category: string]: {
       placedSkills: any[];
       positionIcons: any[];
+      arrows: any[];
       notes: Record<number, string>;
       segmentNames: Record<number, string>;
     };
@@ -19,6 +20,7 @@ export const exportCurrentSlot = (
   slotName: string,
   placedSkills: any[],
   positionIcons: any[],
+  arrows: any[],
   config: any,
   notes: Record<number, string>,
   segmentNames: Record<number, string>
@@ -37,6 +39,7 @@ export const exportCurrentSlot = (
         categories[category] = {
           placedSkills: parsed.placedSkills || [],
           positionIcons: parsed.positionIcons || [],
+          arrows: parsed.arrows || [], // Handle backwards compatibility
           notes: parsed.notes || {},
           segmentNames: parsed.segmentNames || {},
         };
@@ -128,6 +131,10 @@ export const validateImportedData = (data: ExportedData): { isValid: boolean; er
 
     if (!Array.isArray(category.positionIcons)) {
       errors.push(`category '${categoryName}': positionIcons must be an array`);
+    }
+
+    if (!Array.isArray(category.arrows)) {
+      errors.push(`category '${categoryName}': arrows must be an array`);
     }
 
     if (category.notes && typeof category.notes !== "object") {
