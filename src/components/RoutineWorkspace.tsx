@@ -618,13 +618,13 @@ export const RoutineWorkspace = ({
       return [trashCollision];
     }
 
-    // 2. When dragging position icons, prioritize the position sheet grid
-    if (args.active.data?.current?.type === "position-icon") {
+    // 2. When dragging position icons OR arrows, prioritize the position sheet grid
+    if (args.active.data?.current?.type === "position-icon" || args.active.data?.current?.type === "arrow") {
       const positionSheetGridCollision = rectCollisions.find(
         (collision) => collision.id === "position-sheet-grid",
       );
 
-      // If dragging a position icon over the position sheet grid, prioritize it
+      // If dragging a position icon or arrow over the position sheet grid, prioritize it
       if (positionSheetGridCollision) {
         return [positionSheetGridCollision];
       }
@@ -1064,7 +1064,7 @@ export const RoutineWorkspace = ({
       const selectedArrows = arrows.filter(
         (a) => a.selected && a.lineIndex === selectedLine
       );
-      
+
       if (
         selectedArrows.length > 1 &&
         selectedArrows.some((a) => a.id === active.id)
@@ -1074,12 +1074,12 @@ export const RoutineWorkspace = ({
           // Calculate new positions based on delta, scaling by zoom level
           const scaledDeltaX = delta.x * (1 / currentZoomLevel);
           const scaledDeltaY = delta.y * (1 / currentZoomLevel);
-          
+
           const newStartX = Math.max(0, Math.min(800, selectedArrow.start.x + scaledDeltaX));
           const newStartY = Math.max(0, Math.min(600, selectedArrow.start.y + scaledDeltaY));
           const newEndX = Math.max(0, Math.min(800, selectedArrow.end.x + scaledDeltaX));
           const newEndY = Math.max(0, Math.min(600, selectedArrow.end.y + scaledDeltaY));
-          
+
           handleUpdateArrow(selectedArrow.id, {
             start: { x: newStartX, y: newStartY },
             end: { x: newEndX, y: newEndY }
@@ -1089,12 +1089,12 @@ export const RoutineWorkspace = ({
         // Single arrow drag - scale delta by zoom level to account for visual scaling
         const scaledDeltaX = delta.x * (1 / currentZoomLevel);
         const scaledDeltaY = delta.y * (1 / currentZoomLevel);
-        
+
         const newStartX = Math.max(0, Math.min(800, arrow.start.x + scaledDeltaX));
         const newStartY = Math.max(0, Math.min(600, arrow.start.y + scaledDeltaY));
         const newEndX = Math.max(0, Math.min(800, arrow.end.x + scaledDeltaX));
         const newEndY = Math.max(0, Math.min(600, arrow.end.y + scaledDeltaY));
-        
+
         handleUpdateArrow(arrow.id, {
           start: { x: newStartX, y: newStartY },
           end: { x: newEndX, y: newEndY }
