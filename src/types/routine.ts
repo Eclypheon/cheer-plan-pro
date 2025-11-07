@@ -54,6 +54,14 @@ export interface PositionIcon {
   selected?: boolean;
 }
 
+export interface Arrow {
+  id: string;
+  start: { x: number; y: number };
+  end: { x: number; y: number };
+  lineIndex: number;
+  selected?: boolean;
+}
+
 export interface KeyboardSettings {
   nextLine: string;
   prevLine: string;
@@ -77,6 +85,7 @@ export interface RoutineConfig {
 export interface CategoryStateData {
   placedSkills: PlacedSkill[];
   positionIcons: PositionIcon[];
+  arrows: Arrow[];
   notes: Record<number, string>;
   segmentNames?: Record<number, string>;
   timestamp: number;
@@ -85,6 +94,7 @@ export interface CategoryStateData {
 export interface SaveStateData {
   placedSkills: PlacedSkill[];
   positionIcons: PositionIcon[];
+  arrows: Arrow[];
   config: RoutineConfig;
   notes: Record<number, string>;
   segmentNames?: Record<number, string>;
