@@ -68,17 +68,17 @@ export const RoutineHeader = ({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setShowConfigModal(true)}
-              title="Routine Configuration"
+              onClick={() => setShowAboutModal(true)}
             >
-              <SettingsIcon className="h-4 w-4" />
+              <Info className="h-4 w-4" />
             </Button>
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setShowAboutModal(true)}
+              onClick={() => setShowConfigModal(true)}
+              title="Routine Configuration"
             >
-              <Info className="h-4 w-4" />
+              <SettingsIcon className="h-4 w-4" />
             </Button>
             <Button variant="destructive" size="sm" onClick={handleReset}>
               <RotateCcw className="h-4 w-4" />
