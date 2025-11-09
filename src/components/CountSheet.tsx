@@ -368,7 +368,7 @@ export const CountSheet = ({
         {isFirstCountOfSkill.map((sp, skillIndex) => {
           const cellsToSpan = Math.min(sp.endCount - sp.startCount + 1, 9 - count);
           const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-            id: `placed-${sp.placedSkill.id}`,
+            id: `placed-${sp.placedSkill.id}-${sp.lineIndex}-${sp.startCount}`,
             data: { type: "placed-skill", placedSkill: sp.placedSkill },
           });
 

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, DragMoveEvent, CollisionDetection, rectIntersection, closestCenter, DragOverEvent, useSensor, useSensors, PointerSensor } from "@dnd-kit/core";
+import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, DragMoveEvent, CollisionDetection, rectIntersection, closestCenter, DragOverEvent, useSensor, useSensors, PointerSensor, type Modifier } from "@dnd-kit/core";
+import { snapCenterToCursor } from "@dnd-kit/modifiers";
 import type { PlacedSkill, RoutineConfig, Skill, PositionIcon, Arrow, CategoryStateData, SaveStateData } from "@/types/routine";
 import { useSkills } from "@/hooks/useSkills";
 import { useRoutineConfig } from "@/hooks/useRoutineConfig";
@@ -162,6 +163,9 @@ export const RoutineWorkspace = ({
 }: RoutineWorkspaceProps) => {
   const isMobile = useIsMobile();
 
+  // State to store the dynamic cell width
+  const [cellWidth, setCellWidth] = useState<number>(80); // Default to 80px
+
   // Touch event prevention during drag operations
   const touchEventListenersRef = useRef<{
     touchmove?: (e: TouchEvent) => void;
@@ -252,6 +256,33 @@ export const RoutineWorkspace = ({
   const [skillsPanelCollapsed, setSkillsPanelCollapsed] = useState(false);
   const [previousSkillsSize, setPreviousSkillsSize] = useState(15);
 
+  // Measure the actual cell width dynamically
+  useEffect(() => {
+    const measureCellWidth = () => {
+      // Find a cell element to measure
+      const cellElement = document.querySelector('[data-cell]');
+      if (cellElement) {
+        const rect = cellElement.getBoundingClientRect();
+        setCellWidth(rect.width);
+      }
+    };
+
+    // Measure initially
+    measureCellWidth();
+
+    // Re-measure when window resizes
+    const handleResize = () => measureCellWidth();
+    window.addEventListener('resize', handleResize);
+
+    // Also measure after a short delay to ensure DOM is fully rendered
+    const timeoutId = setTimeout(measureCellWidth, 100);
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      clearTimeout(timeoutId);
+    };
+  }, [panelSizes]); // Re-measure when panel layout changes
+
   // Handle panel layout changes
   const handlePanelLayout = useCallback((sizes: number[]) => {
     setPanelSizes(sizes);
@@ -291,6 +322,17 @@ export const RoutineWorkspace = ({
           },
     }),
   );
+
+  // Custom modifier that only applies snapCenterToCursor for new skills from the skills library
+  const conditionalSnapCenterToCursor: Modifier = (args) => {
+    // Only apply snapCenterToCursor when dragging a NEW skill from the skills library
+    // (not when dragging already placed skills)
+    if (draggedSkill && !isDraggingPlacedSkill) {
+      return snapCenterToCursor(args);
+    }
+    // Return the original transform for other drag operations
+    return args.transform;
+  };
 
 
 
@@ -1691,6 +1733,7 @@ export const RoutineWorkspace = ({
       onDragMove={handleDragMove}
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
+      modifiers={[conditionalSnapCenterToCursor]}
       autoScroll={false}
     >
       {/* Chevron button for toggling skills panel - positioned at top level */}
@@ -1991,8 +2034,18 @@ export const RoutineWorkspace = ({
 
       <DragOverlay className="z-[3000]">
         {draggedSkill ? (
-          <div className={isDraggingPlacedSkill ? "" : ""}>
-            <SkillCard skill={draggedSkill} showDescription={false} />
+          <div
+            className={isDraggingPlacedSkill ? "" : ""}
+            style={
+              !isDraggingPlacedSkill
+                ? { width: `${cellWidth}px`, maxWidth: `${cellWidth}px` }
+                : undefined
+            }
+          >
+            <SkillCard
+              skill={draggedSkill}
+              showDescription={false}
+            />
           </div>
         ) : null}
       </DragOverlay>
