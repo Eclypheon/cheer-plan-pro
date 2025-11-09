@@ -150,7 +150,7 @@ export const defaultSkills: Skill[] = [
   },
   {
     id: "mount-19",
-    name: "Purdue/Ground Up",
+    name: "Purdue/ Ground Up",
     category: "mounts",
     level: "premier",
     counts: 5,
@@ -206,7 +206,7 @@ export const defaultSkills: Skill[] = [
   },
   {
     id: "mount-26",
-    name: "Cartwheel up",
+    name: "Cart up",
     category: "mounts",
     level: "premier",
     counts: 5,
@@ -272,15 +272,15 @@ export const defaultSkills: Skill[] = [
   },
   {
     id: "dismount-4",
-    name: "Corkscrew",
+    name: "Cork",
     category: "dismounts",
     level: "premier",
     counts: 3,
-    description: ""
+    description: "Corkscrew down"
   },
   {
     id: "dismount-5",
-    name: "Side Cartwheel",
+    name: "Side Cart",
     category: "dismounts",
     level: "premier",
     counts: 3,
@@ -288,7 +288,7 @@ export const defaultSkills: Skill[] = [
   },
   {
     id: "dismount-6",
-    name: "Front Cartwheel",
+    name: "Front Cart",
     category: "dismounts",
     level: "premier",
     counts: 3,
@@ -538,7 +538,7 @@ export const defaultSkills: Skill[] = [
   },
   {
     id: "onhand-25",
-    name: "Arabesque",
+    name: "Arabesq",
     category: "on-hands",
     level: "premier",
     counts: 1,
@@ -1098,7 +1098,7 @@ export const defaultSkills: Skill[] = [
   },
   {
     id: "transition-3",
-    name: "Cartwheel",
+    name: "Cart",
     category: "transitions",
     level: "premier",
     counts: 5,
