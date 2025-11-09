@@ -29,11 +29,11 @@ declare global {
 export const RoutineBuilder = () => {
   const { theme } = useTheme();
   const isMobile = useIsMobile();
-  const { skills, exportToCSV, addCustomSkill, deleteSkill, updateSkillCounts, resetToDefault } =
-    useSkills();
   const { config, updateLength, updateCategory, updateLevel, updateBpm, updateConfig } = useRoutineConfig();
 
   const [placedSkills, setPlacedSkills] = useState<PlacedSkill[]>([]);
+  const { skills, exportToCSV, addCustomSkill, deleteSkill, updateSkillCounts, resetToDefault } =
+    useSkills(placedSkills);
   const [positionIcons, setPositionIcons] = useState<PositionIcon[]>([]);
   const [arrows, setArrows] = useState<Arrow[]>([]);
   const [notes, setNotes] = useState<Record<number, string>>({});

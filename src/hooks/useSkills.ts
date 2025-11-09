@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
-import type { Skill, SkillCategory, SkillLevel } from "@/types/routine";
+import type { Skill, SkillCategory, SkillLevel, PlacedSkill } from "@/types/routine";
 import { defaultSkills } from "@/data/skillsData";
 
-export const useSkills = () => {
+export const useSkills = (placedSkills?: PlacedSkill[]) => {
   const [skills, setSkills] = useState<Skill[]>(() => {
     // Load skills from localStorage on initialization
     const savedSkills = localStorage.getItem('skillsLibrary');
@@ -21,6 +21,40 @@ export const useSkills = () => {
   useEffect(() => {
     localStorage.setItem('skillsLibrary', JSON.stringify(skills));
   }, [skills]);
+
+  // Ensure all skills referenced in placedSkills exist in the skills array
+  useEffect(() => {
+    if (!placedSkills) return;
+
+    const skillIdsInPlacedSkills = new Set(placedSkills.map(ps => ps.skillId));
+    const missingSkillIds = Array.from(skillIdsInPlacedSkills).filter(
+      skillId => !skills.some(s => s.id === skillId)
+    );
+
+    if (missingSkillIds.length > 0) {
+      const skillsToAdd: Skill[] = [];
+
+      for (const skillId of missingSkillIds) {
+        // First try to find the skill in defaultSkills
+        const defaultSkill = defaultSkills.find(s => s.id === skillId);
+        if (defaultSkill) {
+          skillsToAdd.push(defaultSkill);
+        } else {
+          // If not found in defaultSkills, create a placeholder skill
+          skillsToAdd.push({
+            id: skillId,
+            name: `Unknown Skill (${skillId})`,
+            category: "mounts",
+            level: "premier",
+            counts: 1,
+            description: "Auto-generated placeholder skill",
+          });
+        }
+      }
+
+      setSkills(prev => [...prev, ...skillsToAdd]);
+    }
+  }, [placedSkills, skills]);
 
   const addCustomSkill = (skillData: {
     name: string;
