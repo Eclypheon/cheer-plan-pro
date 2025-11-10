@@ -283,6 +283,35 @@ export const CountSheet = ({
   // Check if we're currently dragging (passed from parent)
   const isDraggingAnySkill = draggedSkill !== null || isResizing;
 
+  // Keyboard shortcut for play/pause (p key)
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Skip if user is typing in an input field
+      const activeElement = document.activeElement;
+      if (
+        activeElement &&
+        (activeElement.tagName === "INPUT" ||
+          activeElement.tagName === "TEXTAREA" ||
+          (activeElement as HTMLElement).contentEditable === "true")
+      ) {
+        return;
+      }
+
+      if (e.key === " " && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        // If music is playing, pause it; otherwise, play it
+        if (musicState.isPlaying) {
+          pause();
+        } else {
+          handlePlay();
+        }
+        e.preventDefault();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [musicState.isPlaying, musicState.currentTime, musicState.file, selectedLine, bpm]);
+
   // Prevent default touch behavior when starting to drag placed skills
   React.useEffect(() => {
     const handleTouchStart = (e: TouchEvent) => {
