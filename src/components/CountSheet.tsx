@@ -188,6 +188,18 @@ export const CountSheet = ({
   const [showBpmSyncDialog, setShowBpmSyncDialog] = useState(false);
   const [pendingBpm, setPendingBpm] = useState<number | null>(null);
 
+  // Enhanced play handler that respects selected line
+  const handlePlay = () => {
+    // If there's a selected line, seek to its start before playing
+    if (selectedLine !== null && musicState.file) {
+      const startingBeat = selectedLine * 8;
+      const timePosition = startingBeat * (60 / bpm);
+      setCurrentTime(timePosition);
+    }
+    // Then start playing
+    play();
+  };
+
   // Music handlers
   const handleMusicUpload = async (file: File) => {
     try {
@@ -647,13 +659,30 @@ const handleClick = (e: React.MouseEvent) => {
     );
   };
 
+  // Enhanced line click handler that seeks music to line start (but doesn't auto-play)
+  const handleLineClick = (lineIndex: number) => {
+    // Call original line selection handler
+    onLineClick(lineIndex);
+
+    // If music is loaded, seek to the beginning of this line (but don't auto-play)
+    if (musicState.file) {
+      // Each line has 8 beats, so calculate the starting beat for this line
+      const startingBeat = lineIndex * 8;
+      // Convert beat to time: beat * (60 seconds / bpm)
+      const timePosition = startingBeat * (60 / bpm);
+
+      // Seek to the position (user can then click play to start)
+      setCurrentTime(timePosition);
+    }
+  };
+
   const CountLine = ({ lineIndex }: { lineIndex: number }) => {
     const isSelected = selectedLine === lineIndex;
 
     return (
       <tr
         data-line={lineIndex}
-        onClick={() => onLineClick(lineIndex)}
+        onClick={() => handleLineClick(lineIndex)}
         className={`cursor-pointer transition-colors ${
           isSelected ? "bg-accent/30" : "hover:bg-accent/20"
         }`}
@@ -673,7 +702,7 @@ const handleClick = (e: React.MouseEvent) => {
 
     return (
       <tr
-        onClick={() => onLineClick(lineIndex)}
+        onClick={() => handleLineClick(lineIndex)}
         className={`cursor-pointer transition-colors ${
           isSelected ? "bg-accent/30" : "hover:bg-accent/20"
         }`}
@@ -682,7 +711,7 @@ const handleClick = (e: React.MouseEvent) => {
   lineIndex={lineIndex}
   isEditing={editingNoteLine === lineIndex}
   onSetEditingNoteLine={setEditingNoteLine}
-  onLineClick={onLineClick}
+  onLineClick={handleLineClick}
   notes={notes}
   onUpdateNote={onUpdateNote}
 />
@@ -700,7 +729,7 @@ const handleClick = (e: React.MouseEvent) => {
               <MusicControls
                 musicState={musicState}
                 onUpload={handleMusicUpload}
-                onPlay={play}
+                onPlay={handlePlay}
                 onPause={pause}
                 onStop={stop}
               />
