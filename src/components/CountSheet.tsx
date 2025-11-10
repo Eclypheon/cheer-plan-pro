@@ -298,11 +298,16 @@ export const CountSheet = ({
       }
 
       if (e.key === " " && !e.ctrlKey && !e.altKey && !e.metaKey) {
-        // If music is playing, pause it; otherwise, play it
-        if (musicState.isPlaying) {
-          pause();
+        if (e.shiftKey) {
+          // Shift + Space: Stop music (works for both playing and paused states)
+          handleStop();
         } else {
-          handlePlay();
+          // Space: Toggle play/pause
+          if (musicState.isPlaying) {
+            pause();
+          } else {
+            handlePlay();
+          }
         }
         e.preventDefault();
       }
