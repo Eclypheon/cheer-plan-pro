@@ -7,6 +7,7 @@ interface MusicProgressIndicatorProps {
   bpm: number;
   totalLines: number;
   onLineSelect?: (lineIndex: number) => void;
+  onCurrentCellChange?: (lineIndex: number, count: number) => void;
 }
 
 export const MusicProgressIndicator = ({
@@ -15,9 +16,11 @@ export const MusicProgressIndicator = ({
   bpm,
   totalLines,
   onLineSelect,
+  onCurrentCellChange,
 }: MusicProgressIndicatorProps) => {
   const animationFrameRef = useRef<number | null>(null);
   const lastLineSelectedRef = useRef<number | null>(null);
+  const lastHighlightedCellRef = useRef<{ lineIndex: number; count: number } | null>(null);
   const indicatorRef = useRef<HTMLDivElement>(null);
   const beatMarkerRef = useRef<HTMLDivElement>(null);
   const beatNumberRef = useRef<HTMLDivElement>(null);
@@ -106,6 +109,10 @@ export const MusicProgressIndicator = ({
       if (indicatorRef.current) indicatorRef.current.style.display = 'none';
       if (beatMarkerRef.current) beatMarkerRef.current.style.display = 'none';
       if (beatNumberRef.current) beatNumberRef.current.style.display = 'none';
+      // Clear cell highlighting when music stops
+      if (onCurrentCellChange) {
+        onCurrentCellChange(-1, -1);
+      }
       return;
     }
 
@@ -130,7 +137,24 @@ export const MusicProgressIndicator = ({
         if (indicatorRef.current) indicatorRef.current.style.display = 'none';
         if (beatMarkerRef.current) beatMarkerRef.current.style.display = 'none';
         if (beatNumberRef.current) beatNumberRef.current.style.display = 'none';
+        // Clear cell highlight when out of bounds
+        if (onCurrentCellChange && lastHighlightedCellRef.current) {
+          onCurrentCellChange(-1, -1);
+          lastHighlightedCellRef.current = null;
+        }
         return;
+      }
+
+      // Notify parent of current cell change for highlighting
+      if (onCurrentCellChange) {
+        const currentCell = { lineIndex, count: countInLine };
+        // Only call if the cell actually changed
+        if (!lastHighlightedCellRef.current ||
+            lastHighlightedCellRef.current.lineIndex !== lineIndex ||
+            lastHighlightedCellRef.current.count !== countInLine) {
+          onCurrentCellChange(lineIndex, countInLine);
+          lastHighlightedCellRef.current = currentCell;
+        }
       }
 
       // Get pre-calculated position for this beat

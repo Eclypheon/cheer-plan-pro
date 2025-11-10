@@ -180,6 +180,7 @@ export const CountSheet = ({
   const [isResizingPanels, setIsResizingPanels] = React.useState(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
   const [editingNoteLine, setEditingNoteLine] = React.useState<number | null>(null);
+  const [highlightedCell, setHighlightedCell] = React.useState<{ lineIndex: number; count: number } | null>(null);
 
   // Music functionality
   const { musicState, loadMusicFile, play, pause, stop, setDetectedBpm, setSynced } = useAudioPlayer();
@@ -444,13 +445,14 @@ export const CountSheet = ({
       count < (hoverStartCount + skillSpan); // Is this cell within the skill's count?
 
     const isLineSelected = selectedLine === lineIndex;
+    const isCurrentBeat = highlightedCell && highlightedCell.lineIndex === lineIndex && highlightedCell.count === count;
 
     return (
       <td
         ref={setNodeRef}
         data-cell={`${lineIndex}-${count}`}
         className={`border border-border min-w-[80px] h-10 p-0.5 relative text-xs ${
-          isDropTarget ? "bg-accent" : isPartOfSkillSpan ? "bg-card" : isLineSelected ? "bg-accent/20 hover:bg-accent/40" : "bg-card hover:bg-accent/50"
+          isDropTarget ? "bg-accent" : isCurrentBeat ? "bg-accent" : isPartOfSkillSpan ? "bg-card" : isLineSelected ? "bg-accent/20 hover:bg-accent/40" : "bg-card hover:bg-accent/50"
         }`}
       >
         {isFirstCountOfSkill.map((sp, skillIndex) => {
@@ -727,6 +729,9 @@ const handleClick = (e: React.MouseEvent) => {
             bpm={bpm}
             totalLines={totalLines}
             onLineSelect={onLineClick}
+            onCurrentCellChange={(lineIndex, count) => {
+              setHighlightedCell(lineIndex === -1 && count === -1 ? null : { lineIndex, count });
+            }}
           />
         )}
 
