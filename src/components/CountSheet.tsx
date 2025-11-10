@@ -183,7 +183,7 @@ export const CountSheet = ({
   const [highlightedCell, setHighlightedCell] = React.useState<{ lineIndex: number; count: number } | null>(null);
 
   // Music functionality
-  const { musicState, loadMusicFile, play, pause, stop, setDetectedBpm, setSynced } = useAudioPlayer();
+  const { musicState, loadMusicFile, play, pause, stop, setCurrentTime, setDetectedBpm, setSynced } = useAudioPlayer();
   const { detectBpm } = useBpmDetection();
   const [showBpmSyncDialog, setShowBpmSyncDialog] = useState(false);
   const [pendingBpm, setPendingBpm] = useState<number | null>(null);
@@ -732,6 +732,7 @@ const handleClick = (e: React.MouseEvent) => {
             onCurrentCellChange={(lineIndex, count) => {
               setHighlightedCell(lineIndex === -1 && count === -1 ? null : { lineIndex, count });
             }}
+            onSetCurrentTime={setCurrentTime}
           />
         )}
 

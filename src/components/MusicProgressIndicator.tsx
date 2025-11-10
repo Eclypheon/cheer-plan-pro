@@ -8,6 +8,7 @@ interface MusicProgressIndicatorProps {
   totalLines: number;
   onLineSelect?: (lineIndex: number) => void;
   onCurrentCellChange?: (lineIndex: number, count: number) => void;
+  onSetCurrentTime?: (time: number) => void;
 }
 
 export const MusicProgressIndicator = ({
@@ -17,6 +18,7 @@ export const MusicProgressIndicator = ({
   totalLines,
   onLineSelect,
   onCurrentCellChange,
+  onSetCurrentTime,
 }: MusicProgressIndicatorProps) => {
   const animationFrameRef = useRef<number | null>(null);
   const lastLineSelectedRef = useRef<number | null>(null);
@@ -100,27 +102,48 @@ export const MusicProgressIndicator = ({
 
   // Simple metronome-style progress indicator - moves every 60/bpm seconds regardless of music
   useEffect(() => {
-    if (!musicState.file || !musicState.isPlaying) {
+    if (!musicState.file) {
       if (animationFrameRef.current) {
         clearInterval(animationFrameRef.current);
         animationFrameRef.current = null;
       }
-      // Hide indicators when not playing
+      // Hide indicators when no music file
       if (indicatorRef.current) indicatorRef.current.style.display = 'none';
       if (beatMarkerRef.current) beatMarkerRef.current.style.display = 'none';
       if (beatNumberRef.current) beatNumberRef.current.style.display = 'none';
-      // Clear cell highlighting when music stops
+      // Clear cell highlighting when no music
       if (onCurrentCellChange) {
         onCurrentCellChange(-1, -1);
       }
       return;
     }
 
+    // If not playing, check if it's paused (currentTime > 0) or stopped (currentTime = 0)
+    if (!musicState.isPlaying) {
+      if (animationFrameRef.current) {
+        clearInterval(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+
+      // If stopped (currentTime is 0), hide indicators and clear highlighting
+      if (musicState.currentTime === 0) {
+        if (indicatorRef.current) indicatorRef.current.style.display = 'none';
+        if (beatMarkerRef.current) beatMarkerRef.current.style.display = 'none';
+        if (beatNumberRef.current) beatNumberRef.current.style.display = 'none';
+        // Clear cell highlighting when music stops
+        if (onCurrentCellChange) {
+          onCurrentCellChange(-1, -1);
+        }
+      }
+      // If paused (currentTime > 0), keep indicators visible but don't update
+      return;
+    }
+
     // Calculate the exact interval between beats in milliseconds
     const beatInterval = (60 / bpm) * 1000; // milliseconds per beat
 
-    // Start beat counter from 0 when music starts playing
-    let currentBeat = 0;
+    // Start beat counter from the current music position, snapped to beat intervals
+    let currentBeat = Math.floor(musicState.currentTime / (60 / bpm));
 
     const updateProgress = () => {
       const lineIndex = Math.floor(currentBeat / 8);
@@ -195,12 +218,34 @@ export const MusicProgressIndicator = ({
     };
   }, [musicState.isPlaying, bpm, totalLines, onLineSelect]);
 
-  // Reset when music stops
+  // Handle pause snapping and reset when music stops
+  const wasPlayingRef = useRef(false);
+
   useEffect(() => {
-    if (!musicState.isPlaying) {
-      lastLineSelectedRef.current = null;
+    // Detect when music was paused (changed from playing to not playing)
+    if (wasPlayingRef.current && !musicState.isPlaying && musicState.currentTime > 0) {
+      // Music was just paused - snap to closest beat interval
+      const beatIntervalSeconds = 60 / bpm;
+      const snappedTime = Math.round(musicState.currentTime / beatIntervalSeconds) * beatIntervalSeconds;
+
+      // Only snap if the difference is significant (more than 0.1 seconds)
+      if (Math.abs(musicState.currentTime - snappedTime) > 0.1 && onSetCurrentTime) {
+        onSetCurrentTime(snappedTime);
+      }
     }
-  }, [musicState.isPlaying]);
+
+    // Update the ref for next render
+    wasPlayingRef.current = musicState.isPlaying;
+
+    // Handle stop/reset logic
+    if (!musicState.isPlaying) {
+      // If stopped (currentTime is 0), reset everything
+      if (musicState.currentTime === 0) {
+        lastLineSelectedRef.current = null;
+        lastHighlightedCellRef.current = null;
+      }
+    }
+  }, [musicState.isPlaying, musicState.currentTime, bpm, onSetCurrentTime]);
 
   // Don't render anything - we handle everything with direct DOM manipulation
   return (
