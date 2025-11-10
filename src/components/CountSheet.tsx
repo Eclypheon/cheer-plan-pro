@@ -216,25 +216,26 @@ export const CountSheet = ({
     play();
   };
 
-  // Enhanced stop handler that clears progress when paused
+  // Enhanced stop handler that clears progress when paused or playing
   const handleStop = () => {
-    // If music is paused (not playing but has currentTime > 0), clear progress and select first line
+    // Clear the red line, highlighted cell, and current beat display
+    setHighlightedCell(null);
+    setCurrentBeat(null);
+
+    // If music is paused (not playing but has currentTime > 0), also select first line
     if (!musicState.isPlaying && musicState.currentTime > 0) {
-      // Clear the red line and highlighted cell
-      setHighlightedCell(null);
-      setCurrentBeat(null);
       // Select the first line (line index 0)
       onLineClick(0);
-
-      // Also manually hide the progress indicators since the useEffect won't re-run
-      const indicator = document.querySelector('.absolute.top-0.w-0\\.5.bg-red-500') as HTMLElement;
-      const beatMarker = document.querySelector('.absolute.top-0.w-2.h-2.bg-red-500') as HTMLElement;
-      const beatNumber = document.querySelector('.absolute.top-1.left-1.bg-red-500') as HTMLElement;
-
-      if (indicator) indicator.style.display = 'none';
-      if (beatMarker) beatMarker.style.display = 'none';
-      if (beatNumber) beatNumber.style.display = 'none';
     }
+
+    // Also manually hide the progress indicators since the useEffect won't re-run
+    const indicator = document.querySelector('.absolute.top-0.w-0\\.5.bg-red-500') as HTMLElement;
+    const beatMarker = document.querySelector('.absolute.top-0.w-2.h-2.bg-red-500') as HTMLElement;
+    const beatNumber = document.querySelector('.absolute.top-1.left-1.bg-red-500') as HTMLElement;
+
+    if (indicator) indicator.style.display = 'none';
+    if (beatMarker) beatMarker.style.display = 'none';
+    if (beatNumber) beatNumber.style.display = 'none';
 
     // Always call the original stop function
     stop();
