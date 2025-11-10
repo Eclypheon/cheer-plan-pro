@@ -39,7 +39,9 @@ export const MusicProgressIndicator = ({
 
         if (targetCell) {
           const cellRect = targetCell.getBoundingClientRect();
-          const indicatorLeft = cellRect.left + (cellRect.width / 2);
+          // Calculate position based on actual cell width, not fixed 80px
+          const cellWidth = cellRect.width;
+          const indicatorLeft = cellRect.left + (cellWidth / 2);
           const relativeLeft = indicatorLeft - containerRect.left;
 
           positions.push({
@@ -57,6 +59,35 @@ export const MusicProgressIndicator = ({
   useEffect(() => {
     cellPositionsRef.current = calculateCellPositions();
   }, [totalLines]); // Recalculate when totalLines changes
+
+  // Also recalculate positions when window resizes or container changes
+  useEffect(() => {
+    const handleResize = () => {
+      cellPositionsRef.current = calculateCellPositions();
+    };
+
+    window.addEventListener('resize', handleResize);
+
+    // Also watch for DOM changes that might affect cell positions
+    const observer = new MutationObserver(() => {
+      cellPositionsRef.current = calculateCellPositions();
+    });
+
+    const countSheetContainer = document.getElementById('count-sheet-container');
+    if (countSheetContainer) {
+      observer.observe(countSheetContainer, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['style', 'class']
+      });
+    }
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      observer.disconnect();
+    };
+  }, [totalLines]);
 
   // Simple metronome-style progress indicator - moves every 60/bpm seconds regardless of music
   useEffect(() => {
