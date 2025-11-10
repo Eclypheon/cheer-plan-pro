@@ -58,7 +58,7 @@ export const MusicProgressIndicator = ({
     cellPositionsRef.current = calculateCellPositions();
   }, [totalLines]); // Recalculate when totalLines changes
 
-  // Calculate and update progress at fixed beat intervals (metronome style)
+  // Simple metronome-style progress indicator - moves every 60/bpm seconds regardless of music
   useEffect(() => {
     if (!musicState.file || !musicState.isPlaying) {
       if (animationFrameRef.current) {
@@ -75,8 +75,8 @@ export const MusicProgressIndicator = ({
     // Calculate the exact interval between beats in milliseconds
     const beatInterval = (60 / bpm) * 1000; // milliseconds per beat
 
-    // Initialize beat counter based on current music time
-    let currentBeat = Math.floor((musicState.currentTime * bpm) / 60);
+    // Start beat counter from 0 when music starts playing
+    let currentBeat = 0;
 
     const updateProgress = () => {
       const lineIndex = Math.floor(currentBeat / 8);
@@ -122,7 +122,7 @@ export const MusicProgressIndicator = ({
       currentBeat++;
     };
 
-    // Start the metronome-style updates at fixed intervals
+    // Start the metronome-style updates at perfect intervals
     updateProgress(); // Update immediately
     animationFrameRef.current = window.setInterval(updateProgress, beatInterval);
 
@@ -132,7 +132,7 @@ export const MusicProgressIndicator = ({
         animationFrameRef.current = null;
       }
     };
-  }, [musicState.isPlaying, musicState.currentTime, bpm, totalLines, onLineSelect]);
+  }, [musicState.isPlaying, bpm, totalLines, onLineSelect]);
 
   // Reset when music stops
   useEffect(() => {
