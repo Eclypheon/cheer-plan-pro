@@ -1,8 +1,13 @@
-import React from "react";
+import React, { useState } from "react";
 import { useDroppable, useDraggable } from "@dnd-kit/core";
-import type { PlacedSkill, Skill, SkillCategory } from "@/types/routine";
+import type { PlacedSkill, Skill, SkillCategory, MusicState } from "@/types/routine";
 import { X, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { MusicControls } from "./MusicControls";
+import { MusicProgressIndicator } from "./MusicProgressIndicator";
+import { BpmSyncDialog } from "./BpmSyncDialog";
+import { useAudioPlayer } from "@/hooks/useAudioPlayer";
+import { useBpmDetection } from "@/hooks/useBpmDetection";
 
 interface CountSheetProps {
   routineLength: number;
@@ -24,6 +29,7 @@ interface CountSheetProps {
   isPdfRender?: boolean;
   onToggleSkillsPanel?: () => void;
   skillsPanelCollapsed?: boolean;
+  onBpmChange?: (newBpm: number) => void;
 }
 
 interface SkillPlacement {
@@ -167,15 +173,149 @@ export const CountSheet = ({
   isPdfRender = false,
   onToggleSkillsPanel,
   skillsPanelCollapsed = false,
+  onBpmChange,
 }: CountSheetProps) => {
   // State for resizable panels
   const [countSheetWidth, setCountSheetWidth] = React.useState(60); // percentage
   const [isResizingPanels, setIsResizingPanels] = React.useState(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
   const [editingNoteLine, setEditingNoteLine] = React.useState<number | null>(null);
+  const [highlightedCell, setHighlightedCell] = React.useState<{ lineIndex: number; count: number } | null>(null);
+  const [currentBeat, setCurrentBeat] = React.useState<{ lineIndex: number; count: number } | null>(null);
+
+  // Music functionality
+  const { musicState, loadMusicFile, play, pause, stop, setCurrentTime, setDetectedBpm, setSynced } = useAudioPlayer();
+  const { detectBpm } = useBpmDetection();
+  const [showBpmSyncDialog, setShowBpmSyncDialog] = useState(false);
+  const [pendingBpm, setPendingBpm] = useState<number | null>(null);
+
+  // Enhanced play handler that respects selected line but prioritizes paused position
+  const handlePlay = () => {
+    // If music is paused (has currentTime > 0), snap to beat interval and resume
+    if (musicState.currentTime > 0) {
+      // Snap to the closest beat interval before resuming
+      const beatIntervalSeconds = 60 / bpm;
+      const snappedTime = Math.round(musicState.currentTime / beatIntervalSeconds) * beatIntervalSeconds;
+
+      // Only snap if the difference is significant (more than 0.1 seconds)
+      if (Math.abs(musicState.currentTime - snappedTime) > 0.1) {
+        setCurrentTime(snappedTime);
+      }
+      play();
+      return;
+    }
+
+    // Otherwise, if there's a selected line, seek to its start before playing
+    if (selectedLine !== null && musicState.file) {
+      const startingBeat = selectedLine * 8;
+      const timePosition = startingBeat * (60 / bpm);
+      setCurrentTime(timePosition);
+    }
+
+    // Then start playing
+    play();
+  };
+
+  // Enhanced stop handler that clears progress when paused or playing
+  const handleStop = () => {
+    // Clear the red line, highlighted cell, and current beat display
+    setHighlightedCell(null);
+    setCurrentBeat(null);
+
+    // If music is paused (not playing but has currentTime > 0), also select first line
+    if (!musicState.isPlaying && musicState.currentTime > 0) {
+      // Select the first line (line index 0)
+      onLineClick(0);
+    }
+
+    // Also manually hide the progress indicators since the useEffect won't re-run
+    const indicator = document.querySelector('.absolute.top-0.w-0\\.5.bg-red-500') as HTMLElement;
+    const beatMarker = document.querySelector('.absolute.top-0.w-2.h-2.bg-red-500') as HTMLElement;
+    const beatNumber = document.querySelector('.absolute.top-1.left-1.bg-red-500') as HTMLElement;
+
+    if (indicator) indicator.style.display = 'none';
+    if (beatMarker) beatMarker.style.display = 'none';
+    if (beatNumber) beatNumber.style.display = 'none';
+
+    // Always call the original stop function
+    stop();
+  };
+
+  // Music handlers
+  const handleMusicUpload = async (file: File) => {
+    try {
+      // Detect BPM from the uploaded file
+      const detectedBpm = await detectBpm(file);
+
+      if (detectedBpm) {
+        // If detected BPM matches current BPM, automatically sync
+        if (detectedBpm === bpm) {
+          setDetectedBpm(detectedBpm);
+          setSynced(true);
+        } else {
+          // If different, show dialog to ask user
+          setPendingBpm(detectedBpm);
+          setShowBpmSyncDialog(true);
+        }
+      }
+
+      // Load the music file regardless of BPM detection
+      loadMusicFile(file, detectedBpm || undefined);
+    } catch (error) {
+      console.error('Error uploading music file:', error);
+      // Still load the file even if BPM detection fails
+      loadMusicFile(file);
+    }
+  };
+
+  const handleBpmSync = () => {
+    if (pendingBpm && onBpmChange) {
+      onBpmChange(pendingBpm);
+      setDetectedBpm(pendingBpm);
+      setSynced(true);
+    }
+  };
+
+  const handleBpmSkip = () => {
+    setSynced(false);
+  };
 
   // Check if we're currently dragging (passed from parent)
   const isDraggingAnySkill = draggedSkill !== null || isResizing;
+
+  // Keyboard shortcut for play/pause (p key)
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Skip if user is typing in an input field
+      const activeElement = document.activeElement;
+      if (
+        activeElement &&
+        (activeElement.tagName === "INPUT" ||
+          activeElement.tagName === "TEXTAREA" ||
+          (activeElement as HTMLElement).contentEditable === "true")
+      ) {
+        return;
+      }
+
+      if (e.key === " " && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        if (e.shiftKey) {
+          // Shift + Space: Stop music (works for both playing and paused states)
+          handleStop();
+        } else {
+          // Space: Toggle play/pause
+          if (musicState.isPlaying) {
+            pause();
+          } else {
+            handlePlay();
+          }
+        }
+        e.preventDefault();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [musicState.isPlaying, musicState.currentTime, musicState.file, selectedLine, bpm]);
 
   // Prevent default touch behavior when starting to drag placed skills
   React.useEffect(() => {
@@ -201,6 +341,49 @@ export const CountSheet = ({
       }
     };
   }, []);
+
+  // Auto-scroll to keep selected line in view during keyboard navigation
+  React.useEffect(() => {
+    if (selectedLine === null) return;
+
+    // Find the count sheet container (the scrollable div)
+    const countSheetContainer = document.getElementById('count-sheet-container') as HTMLElement;
+    if (!countSheetContainer) return;
+
+    // Find the specific line element for the selected line
+    const lineElement = document.querySelector(`[data-line="${selectedLine}"]`) as HTMLElement;
+    if (!lineElement) return;
+
+    const containerRect = countSheetContainer.getBoundingClientRect();
+    const lineRect = lineElement.getBoundingClientRect();
+
+    // Calculate if the line is outside the visible area
+    const isAboveViewport = lineRect.top < containerRect.top;
+    const isBelowViewport = lineRect.bottom > containerRect.bottom;
+
+    // If the line is outside the viewport, scroll to bring it into view
+    if (isAboveViewport || isBelowViewport) {
+      const currentScrollTop = countSheetContainer.scrollTop;
+
+      // Calculate how much to scroll to center the line vertically
+      let newScrollTop = currentScrollTop;
+      if (isAboveViewport) {
+        // Scroll up to show line at top of viewport (with small margin)
+        newScrollTop = currentScrollTop + (lineRect.top - containerRect.top) - 20;
+      } else if (isBelowViewport) {
+        // Scroll down to show line at bottom of viewport (with small margin)
+        newScrollTop = currentScrollTop + (lineRect.bottom - containerRect.bottom) + 20;
+      }
+
+      // Apply the scroll
+      if (newScrollTop !== currentScrollTop) {
+        countSheetContainer.scrollTo({
+          top: Math.max(0, newScrollTop),
+          behavior: "smooth",
+        });
+      }
+    }
+  }, [selectedLine]);
 
   // Handle panel resizing
   const handleMouseDown = React.useCallback((e: React.MouseEvent) => {
@@ -356,13 +539,14 @@ export const CountSheet = ({
       count < (hoverStartCount + skillSpan); // Is this cell within the skill's count?
 
     const isLineSelected = selectedLine === lineIndex;
+    const isCurrentBeat = highlightedCell && highlightedCell.lineIndex === lineIndex && highlightedCell.count === count;
 
     return (
       <td
         ref={setNodeRef}
         data-cell={`${lineIndex}-${count}`}
         className={`border border-border min-w-[80px] h-10 p-0.5 relative text-xs ${
-          isDropTarget ? "bg-accent" : isPartOfSkillSpan ? "bg-card" : isLineSelected ? "bg-accent/20 hover:bg-accent/40" : "bg-card hover:bg-accent/50"
+          isDropTarget ? "bg-accent" : isCurrentBeat ? "bg-accent" : isPartOfSkillSpan ? "bg-card" : isLineSelected ? "bg-accent/20 hover:bg-accent/40" : "bg-card hover:bg-accent/50"
         }`}
       >
         {isFirstCountOfSkill.map((sp, skillIndex) => {
@@ -557,12 +741,30 @@ const handleClick = (e: React.MouseEvent) => {
     );
   };
 
+  // Enhanced line click handler that seeks music to line start (but doesn't auto-play)
+  const handleLineClick = (lineIndex: number) => {
+    // Call original line selection handler
+    onLineClick(lineIndex);
+
+    // If music is loaded, seek to the beginning of this line (but don't auto-play)
+    if (musicState.file) {
+      // Each line has 8 beats, so calculate the starting beat for this line
+      const startingBeat = lineIndex * 8;
+      // Convert beat to time: beat * (60 seconds / bpm)
+      const timePosition = startingBeat * (60 / bpm);
+
+      // Seek to the position (user can then click play to start)
+      setCurrentTime(timePosition);
+    }
+  };
+
   const CountLine = ({ lineIndex }: { lineIndex: number }) => {
     const isSelected = selectedLine === lineIndex;
 
     return (
       <tr
-        onClick={() => onLineClick(lineIndex)}
+        data-line={lineIndex}
+        onClick={() => handleLineClick(lineIndex)}
         className={`cursor-pointer transition-colors ${
           isSelected ? "bg-accent/30" : "hover:bg-accent/20"
         }`}
@@ -582,7 +784,7 @@ const handleClick = (e: React.MouseEvent) => {
 
     return (
       <tr
-        onClick={() => onLineClick(lineIndex)}
+        onClick={() => handleLineClick(lineIndex)}
         className={`cursor-pointer transition-colors ${
           isSelected ? "bg-accent/30" : "hover:bg-accent/20"
         }`}
@@ -591,7 +793,7 @@ const handleClick = (e: React.MouseEvent) => {
   lineIndex={lineIndex}
   isEditing={editingNoteLine === lineIndex}
   onSetEditingNoteLine={setEditingNoteLine}
-  onLineClick={onLineClick}
+  onLineClick={handleLineClick}
   notes={notes}
   onUpdateNote={onUpdateNote}
 />
@@ -602,13 +804,55 @@ const handleClick = (e: React.MouseEvent) => {
   return (
     <div className="h-full flex flex-col bg-card relative z-10 overflow-hidden">
       <div className="p-1.5 border-b">
-        <h2 className="text-sm font-semibold">Count Sheet</h2>
-        <p className="text-xs text-muted-foreground">
-          {totalLines} lines @ {bpm} BPM
-        </p>
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold">Count Sheet</h2>
+          {currentBeat && (
+            <div className="flex flex-col items-center text-xs text-red-600 font-mono">
+              <div>Line {currentBeat.lineIndex + 1}</div>
+              <div>Count {currentBeat.count}</div>
+            </div>
+          )}
+          {!isPdfRender && (
+            <MusicControls
+              musicState={musicState}
+              onUpload={handleMusicUpload}
+              onPlay={handlePlay}
+              onPause={pause}
+              onStop={handleStop}
+            />
+          )}
+        </div>
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-muted-foreground">
+            {totalLines} lines @ {bpm} BPM{bpm === musicState.detectedBpm && musicState.detectedBpm ? ' (Synced)' : ''}
+          </p>
+          {musicState.file && (
+            <p className="text-xs text-muted-foreground truncate max-w-32">
+              {musicState.file.name}
+            </p>
+          )}
+        </div>
       </div>
 
       <div className="flex-1 overflow-auto relative" id="count-sheet-container">
+        {/* Music Progress Indicator */}
+        {!isPdfRender && (
+          <MusicProgressIndicator
+            musicState={musicState}
+            routineLength={routineLength}
+            bpm={bpm}
+            totalLines={totalLines}
+            onLineSelect={onLineClick}
+            onCurrentCellChange={(lineIndex, count) => {
+              setHighlightedCell(lineIndex === -1 && count === -1 ? null : { lineIndex, count });
+            }}
+            onSetCurrentTime={setCurrentTime}
+            onCurrentBeatChange={(lineIndex, count) => {
+              setCurrentBeat(lineIndex >= 0 && count >= 0 ? { lineIndex, count } : null);
+            }}
+          />
+        )}
+
         <div ref={containerRef} id="count-sheet-content-wrapper" className={`${!isPdfRender ? 'flex min-w-max relative' : 'flex w-1576px relative'}`}>
           {/* Count Sheet Table */}
           <div
@@ -668,6 +912,18 @@ const handleClick = (e: React.MouseEvent) => {
           </div>
         </div>
       </div>
+
+      {/* BPM Sync Dialog */}
+      {!isPdfRender && (
+        <BpmSyncDialog
+          isOpen={showBpmSyncDialog}
+          onOpenChange={setShowBpmSyncDialog}
+          detectedBpm={pendingBpm || 0}
+          currentRoutineBpm={bpm}
+          onSync={handleBpmSync}
+          onSkip={handleBpmSkip}
+        />
+      )}
     </div>
   );
 };

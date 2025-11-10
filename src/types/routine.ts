@@ -100,3 +100,19 @@ export interface SaveStateData {
   segmentNames?: Record<number, string>;
   timestamp: number;
 }
+
+export interface MusicFile {
+  file: File;
+  url: string;
+  name: string;
+  detectedBpm?: number;
+  duration: number;
+}
+
+export interface MusicState {
+  file: MusicFile | null;
+  isPlaying: boolean;
+  currentTime: number;
+  detectedBpm: number | null;
+  isSynced: boolean;
+}
