@@ -195,6 +195,9 @@ export const useKeyboardShortcuts = ({
                   : ps,
               ),
             );
+
+            // Update selected line to follow the skill
+            setSelectedLine(newLineIndex);
           }
           e.preventDefault();
         }
@@ -226,6 +229,9 @@ export const useKeyboardShortcuts = ({
                   : ps,
               ),
             );
+
+            // Update selected line to follow the skill
+            setSelectedLine(newLineIndex);
           }
           e.preventDefault();
         }

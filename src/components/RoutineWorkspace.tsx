@@ -1837,6 +1837,7 @@ export const RoutineWorkspace = ({
                   isPdfRender={isGeneratingPdf}
                   onToggleSkillsPanel={toggleSkillsPanel}
                   skillsPanelCollapsed={skillsPanelCollapsed}
+                  onBpmChange={(newBpm) => updateConfig({ bpm: newBpm })}
                 />
               </ResizablePanel>
 

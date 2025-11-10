@@ -154,6 +154,20 @@ const AboutModal = ({ open, onOpenChange }: AboutModalProps) => {
                   </div>
                 </div>
               </section>
+
+              <section>
+                <h2 className="text-2xl font-semibold mb-3">Music Control</h2>
+                <div className="space-y-3 text-muted-foreground">
+                  <div className="flex items-center gap-3">
+                    <kbd className="px-2 py-1 bg-muted rounded text-sm">Space</kbd>
+                    <span>Play/Pause music</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <kbd className="px-2 py-1 bg-muted rounded text-sm">Shift</kbd> + <kbd className="px-2 py-1 bg-muted rounded text-sm">Space</kbd>
+                    <span>Stop music</span>
+                  </div>
+                </div>
+              </section>
             </Card>
           ) : (
             <Card className="p-6 space-y-4">
