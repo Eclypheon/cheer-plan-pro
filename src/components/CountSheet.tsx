@@ -207,8 +207,15 @@ export const CountSheet = ({
       const detectedBpm = await detectBpm(file);
 
       if (detectedBpm) {
-        setPendingBpm(detectedBpm);
-        setShowBpmSyncDialog(true);
+        // If detected BPM matches current BPM, automatically sync
+        if (detectedBpm === bpm) {
+          setDetectedBpm(detectedBpm);
+          setSynced(true);
+        } else {
+          // If different, show dialog to ask user
+          setPendingBpm(detectedBpm);
+          setShowBpmSyncDialog(true);
+        }
       }
 
       // Load the music file regardless of BPM detection
@@ -723,27 +730,24 @@ const handleClick = (e: React.MouseEvent) => {
     <div className="h-full flex flex-col bg-card relative z-10 overflow-hidden">
       <div className="p-1.5 border-b">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <h2 className="text-sm font-semibold">Count Sheet</h2>
-            {!isPdfRender && (
-              <MusicControls
-                musicState={musicState}
-                onUpload={handleMusicUpload}
-                onPlay={handlePlay}
-                onPause={pause}
-                onStop={stop}
-              />
-            )}
-          </div>
+          <h2 className="text-sm font-semibold">Count Sheet</h2>
+          {!isPdfRender && (
+            <MusicControls
+              musicState={musicState}
+              onUpload={handleMusicUpload}
+              onPlay={handlePlay}
+              onPause={pause}
+              onStop={stop}
+            />
+          )}
         </div>
         <div className="flex items-center justify-between">
           <p className="text-xs text-muted-foreground">
-            {totalLines} lines @ {bpm} BPM
+            {totalLines} lines @ {bpm} BPM{bpm === musicState.detectedBpm && musicState.detectedBpm ? ' (Synced)' : ''}
           </p>
           {musicState.file && (
-            <p className="text-xs text-muted-foreground">
-              {musicState.detectedBpm ? `${musicState.detectedBpm} BPM detected` : 'BPM detection failed'}
-              {musicState.isSynced && ' • Synced'}
+            <p className="text-xs text-muted-foreground truncate max-w-32">
+              {musicState.file.name}
             </p>
           )}
         </div>
