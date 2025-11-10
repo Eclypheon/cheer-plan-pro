@@ -181,6 +181,7 @@ export const CountSheet = ({
   const containerRef = React.useRef<HTMLDivElement>(null);
   const [editingNoteLine, setEditingNoteLine] = React.useState<number | null>(null);
   const [highlightedCell, setHighlightedCell] = React.useState<{ lineIndex: number; count: number } | null>(null);
+  const [currentBeat, setCurrentBeat] = React.useState<{ lineIndex: number; count: number } | null>(null);
 
   // Music functionality
   const { musicState, loadMusicFile, play, pause, stop, setCurrentTime, setDetectedBpm, setSynced } = useAudioPlayer();
@@ -188,16 +189,55 @@ export const CountSheet = ({
   const [showBpmSyncDialog, setShowBpmSyncDialog] = useState(false);
   const [pendingBpm, setPendingBpm] = useState<number | null>(null);
 
-  // Enhanced play handler that respects selected line
+  // Enhanced play handler that respects selected line but prioritizes paused position
   const handlePlay = () => {
-    // If there's a selected line, seek to its start before playing
+    // If music is paused (has currentTime > 0), snap to beat interval and resume
+    if (musicState.currentTime > 0) {
+      // Snap to the closest beat interval before resuming
+      const beatIntervalSeconds = 60 / bpm;
+      const snappedTime = Math.round(musicState.currentTime / beatIntervalSeconds) * beatIntervalSeconds;
+
+      // Only snap if the difference is significant (more than 0.1 seconds)
+      if (Math.abs(musicState.currentTime - snappedTime) > 0.1) {
+        setCurrentTime(snappedTime);
+      }
+      play();
+      return;
+    }
+
+    // Otherwise, if there's a selected line, seek to its start before playing
     if (selectedLine !== null && musicState.file) {
       const startingBeat = selectedLine * 8;
       const timePosition = startingBeat * (60 / bpm);
       setCurrentTime(timePosition);
     }
+
     // Then start playing
     play();
+  };
+
+  // Enhanced stop handler that clears progress when paused
+  const handleStop = () => {
+    // If music is paused (not playing but has currentTime > 0), clear progress and select first line
+    if (!musicState.isPlaying && musicState.currentTime > 0) {
+      // Clear the red line and highlighted cell
+      setHighlightedCell(null);
+      setCurrentBeat(null);
+      // Select the first line (line index 0)
+      onLineClick(0);
+
+      // Also manually hide the progress indicators since the useEffect won't re-run
+      const indicator = document.querySelector('.absolute.top-0.w-0\\.5.bg-red-500') as HTMLElement;
+      const beatMarker = document.querySelector('.absolute.top-0.w-2.h-2.bg-red-500') as HTMLElement;
+      const beatNumber = document.querySelector('.absolute.top-1.left-1.bg-red-500') as HTMLElement;
+
+      if (indicator) indicator.style.display = 'none';
+      if (beatMarker) beatMarker.style.display = 'none';
+      if (beatNumber) beatNumber.style.display = 'none';
+    }
+
+    // Always call the original stop function
+    stop();
   };
 
   // Music handlers
@@ -731,13 +771,19 @@ const handleClick = (e: React.MouseEvent) => {
       <div className="p-1.5 border-b">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold">Count Sheet</h2>
+          {currentBeat && (
+            <div className="flex flex-col items-center text-xs text-red-600 font-mono">
+              <div>Line {currentBeat.lineIndex + 1}</div>
+              <div>Count {currentBeat.count}</div>
+            </div>
+          )}
           {!isPdfRender && (
             <MusicControls
               musicState={musicState}
               onUpload={handleMusicUpload}
               onPlay={handlePlay}
               onPause={pause}
-              onStop={stop}
+              onStop={handleStop}
             />
           )}
         </div>
@@ -766,6 +812,9 @@ const handleClick = (e: React.MouseEvent) => {
               setHighlightedCell(lineIndex === -1 && count === -1 ? null : { lineIndex, count });
             }}
             onSetCurrentTime={setCurrentTime}
+            onCurrentBeatChange={(lineIndex, count) => {
+              setCurrentBeat(lineIndex >= 0 && count >= 0 ? { lineIndex, count } : null);
+            }}
           />
         )}
 

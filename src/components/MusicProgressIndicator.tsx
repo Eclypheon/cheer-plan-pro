@@ -9,6 +9,7 @@ interface MusicProgressIndicatorProps {
   onLineSelect?: (lineIndex: number) => void;
   onCurrentCellChange?: (lineIndex: number, count: number) => void;
   onSetCurrentTime?: (time: number) => void;
+  onCurrentBeatChange?: (lineIndex: number, count: number) => void;
 }
 
 export const MusicProgressIndicator = ({
@@ -19,13 +20,14 @@ export const MusicProgressIndicator = ({
   onLineSelect,
   onCurrentCellChange,
   onSetCurrentTime,
+  onCurrentBeatChange,
 }: MusicProgressIndicatorProps) => {
   const animationFrameRef = useRef<number | null>(null);
   const lastLineSelectedRef = useRef<number | null>(null);
   const lastHighlightedCellRef = useRef<{ lineIndex: number; count: number } | null>(null);
   const indicatorRef = useRef<HTMLDivElement>(null);
   const beatMarkerRef = useRef<HTMLDivElement>(null);
-  const beatNumberRef = useRef<HTMLDivElement>(null);
+
   const cellPositionsRef = useRef<Array<{ left: number; count: number }>>([]);
 
   // Pre-calculate all cell positions and update indicator height
@@ -110,7 +112,6 @@ export const MusicProgressIndicator = ({
       // Hide indicators when no music file
       if (indicatorRef.current) indicatorRef.current.style.display = 'none';
       if (beatMarkerRef.current) beatMarkerRef.current.style.display = 'none';
-      if (beatNumberRef.current) beatNumberRef.current.style.display = 'none';
       // Clear cell highlighting when no music
       if (onCurrentCellChange) {
         onCurrentCellChange(-1, -1);
@@ -129,7 +130,6 @@ export const MusicProgressIndicator = ({
       if (musicState.currentTime === 0) {
         if (indicatorRef.current) indicatorRef.current.style.display = 'none';
         if (beatMarkerRef.current) beatMarkerRef.current.style.display = 'none';
-        if (beatNumberRef.current) beatNumberRef.current.style.display = 'none';
         // Clear cell highlighting when music stops
         if (onCurrentCellChange) {
           onCurrentCellChange(-1, -1);
@@ -159,7 +159,6 @@ export const MusicProgressIndicator = ({
       if (lineIndex >= totalLines) {
         if (indicatorRef.current) indicatorRef.current.style.display = 'none';
         if (beatMarkerRef.current) beatMarkerRef.current.style.display = 'none';
-        if (beatNumberRef.current) beatNumberRef.current.style.display = 'none';
         // Clear cell highlight when out of bounds
         if (onCurrentCellChange && lastHighlightedCellRef.current) {
           onCurrentCellChange(-1, -1);
@@ -180,6 +179,11 @@ export const MusicProgressIndicator = ({
         }
       }
 
+      // Notify parent of current beat change for header display
+      if (onCurrentBeatChange) {
+        onCurrentBeatChange(lineIndex, countInLine);
+      }
+
       // Get pre-calculated position for this beat
       const beatIndex = currentBeat % (totalLines * 8);
       const position = cellPositionsRef.current[beatIndex];
@@ -194,11 +198,6 @@ export const MusicProgressIndicator = ({
         if (beatMarkerRef.current) {
           beatMarkerRef.current.style.display = 'block';
           beatMarkerRef.current.style.left = `${position.left}px`;
-        }
-
-        if (beatNumberRef.current) {
-          beatNumberRef.current.style.display = 'block';
-          beatNumberRef.current.textContent = position.count.toString();
         }
       }
 
@@ -272,16 +271,7 @@ export const MusicProgressIndicator = ({
         }}
       />
 
-      {/* Current beat number display */}
-      <div
-        ref={beatNumberRef}
-        className="absolute top-1 left-1 bg-red-500 text-white text-xs px-1 py-0.5 rounded z-50 pointer-events-none font-mono"
-        style={{
-          display: 'none',
-          fontSize: '10px',
-          lineHeight: '1',
-        }}
-      />
+
     </>
   );
 };
