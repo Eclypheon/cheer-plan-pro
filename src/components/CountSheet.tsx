@@ -247,6 +247,49 @@ export const CountSheet = ({
     };
   }, []);
 
+  // Auto-scroll to keep selected line in view during keyboard navigation
+  React.useEffect(() => {
+    if (selectedLine === null) return;
+
+    // Find the count sheet container (the scrollable div)
+    const countSheetContainer = document.getElementById('count-sheet-container') as HTMLElement;
+    if (!countSheetContainer) return;
+
+    // Find the specific line element for the selected line
+    const lineElement = document.querySelector(`[data-line="${selectedLine}"]`) as HTMLElement;
+    if (!lineElement) return;
+
+    const containerRect = countSheetContainer.getBoundingClientRect();
+    const lineRect = lineElement.getBoundingClientRect();
+
+    // Calculate if the line is outside the visible area
+    const isAboveViewport = lineRect.top < containerRect.top;
+    const isBelowViewport = lineRect.bottom > containerRect.bottom;
+
+    // If the line is outside the viewport, scroll to bring it into view
+    if (isAboveViewport || isBelowViewport) {
+      const currentScrollTop = countSheetContainer.scrollTop;
+
+      // Calculate how much to scroll to center the line vertically
+      let newScrollTop = currentScrollTop;
+      if (isAboveViewport) {
+        // Scroll up to show line at top of viewport (with small margin)
+        newScrollTop = currentScrollTop + (lineRect.top - containerRect.top) - 20;
+      } else if (isBelowViewport) {
+        // Scroll down to show line at bottom of viewport (with small margin)
+        newScrollTop = currentScrollTop + (lineRect.bottom - containerRect.bottom) + 20;
+      }
+
+      // Apply the scroll
+      if (newScrollTop !== currentScrollTop) {
+        countSheetContainer.scrollTo({
+          top: Math.max(0, newScrollTop),
+          behavior: "smooth",
+        });
+      }
+    }
+  }, [selectedLine]);
+
   // Handle panel resizing
   const handleMouseDown = React.useCallback((e: React.MouseEvent) => {
     setIsResizingPanels(true);
