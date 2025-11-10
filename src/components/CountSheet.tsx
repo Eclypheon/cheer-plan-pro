@@ -1,8 +1,13 @@
-import React from "react";
+import React, { useState } from "react";
 import { useDroppable, useDraggable } from "@dnd-kit/core";
-import type { PlacedSkill, Skill, SkillCategory } from "@/types/routine";
+import type { PlacedSkill, Skill, SkillCategory, MusicState } from "@/types/routine";
 import { X, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { MusicControls } from "./MusicControls";
+import { MusicProgressIndicator } from "./MusicProgressIndicator";
+import { BpmSyncDialog } from "./BpmSyncDialog";
+import { useAudioPlayer } from "@/hooks/useAudioPlayer";
+import { useBpmDetection } from "@/hooks/useBpmDetection";
 
 interface CountSheetProps {
   routineLength: number;
@@ -24,6 +29,7 @@ interface CountSheetProps {
   isPdfRender?: boolean;
   onToggleSkillsPanel?: () => void;
   skillsPanelCollapsed?: boolean;
+  onBpmChange?: (newBpm: number) => void;
 }
 
 interface SkillPlacement {
@@ -167,12 +173,51 @@ export const CountSheet = ({
   isPdfRender = false,
   onToggleSkillsPanel,
   skillsPanelCollapsed = false,
+  onBpmChange,
 }: CountSheetProps) => {
   // State for resizable panels
   const [countSheetWidth, setCountSheetWidth] = React.useState(60); // percentage
   const [isResizingPanels, setIsResizingPanels] = React.useState(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
   const [editingNoteLine, setEditingNoteLine] = React.useState<number | null>(null);
+
+  // Music functionality
+  const { musicState, loadMusicFile, play, pause, stop, setDetectedBpm, setSynced } = useAudioPlayer();
+  const { detectBpm } = useBpmDetection();
+  const [showBpmSyncDialog, setShowBpmSyncDialog] = useState(false);
+  const [pendingBpm, setPendingBpm] = useState<number | null>(null);
+
+  // Music handlers
+  const handleMusicUpload = async (file: File) => {
+    try {
+      // Detect BPM from the uploaded file
+      const detectedBpm = await detectBpm(file);
+
+      if (detectedBpm) {
+        setPendingBpm(detectedBpm);
+        setShowBpmSyncDialog(true);
+      }
+
+      // Load the music file regardless of BPM detection
+      loadMusicFile(file, detectedBpm || undefined);
+    } catch (error) {
+      console.error('Error uploading music file:', error);
+      // Still load the file even if BPM detection fails
+      loadMusicFile(file);
+    }
+  };
+
+  const handleBpmSync = () => {
+    if (pendingBpm && onBpmChange) {
+      onBpmChange(pendingBpm);
+      setDetectedBpm(pendingBpm);
+      setSynced(true);
+    }
+  };
+
+  const handleBpmSkip = () => {
+    setSynced(false);
+  };
 
   // Check if we're currently dragging (passed from parent)
   const isDraggingAnySkill = draggedSkill !== null || isResizing;
@@ -562,6 +607,7 @@ const handleClick = (e: React.MouseEvent) => {
 
     return (
       <tr
+        data-line={lineIndex}
         onClick={() => onLineClick(lineIndex)}
         className={`cursor-pointer transition-colors ${
           isSelected ? "bg-accent/30" : "hover:bg-accent/20"
@@ -602,13 +648,45 @@ const handleClick = (e: React.MouseEvent) => {
   return (
     <div className="h-full flex flex-col bg-card relative z-10 overflow-hidden">
       <div className="p-1.5 border-b">
-        <h2 className="text-sm font-semibold">Count Sheet</h2>
-        <p className="text-xs text-muted-foreground">
-          {totalLines} lines @ {bpm} BPM
-        </p>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <h2 className="text-sm font-semibold">Count Sheet</h2>
+            {!isPdfRender && (
+              <MusicControls
+                musicState={musicState}
+                onUpload={handleMusicUpload}
+                onPlay={play}
+                onPause={pause}
+                onStop={stop}
+              />
+            )}
+          </div>
+        </div>
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-muted-foreground">
+            {totalLines} lines @ {bpm} BPM
+          </p>
+          {musicState.file && (
+            <p className="text-xs text-muted-foreground">
+              {musicState.detectedBpm ? `${musicState.detectedBpm} BPM detected` : 'BPM detection failed'}
+              {musicState.isSynced && ' • Synced'}
+            </p>
+          )}
+        </div>
       </div>
 
       <div className="flex-1 overflow-auto relative" id="count-sheet-container">
+        {/* Music Progress Indicator */}
+        {!isPdfRender && (
+          <MusicProgressIndicator
+            musicState={musicState}
+            routineLength={routineLength}
+            bpm={bpm}
+            totalLines={totalLines}
+            onLineSelect={onLineClick}
+          />
+        )}
+
         <div ref={containerRef} id="count-sheet-content-wrapper" className={`${!isPdfRender ? 'flex min-w-max relative' : 'flex w-1576px relative'}`}>
           {/* Count Sheet Table */}
           <div
@@ -668,6 +746,18 @@ const handleClick = (e: React.MouseEvent) => {
           </div>
         </div>
       </div>
+
+      {/* BPM Sync Dialog */}
+      {!isPdfRender && (
+        <BpmSyncDialog
+          isOpen={showBpmSyncDialog}
+          onOpenChange={setShowBpmSyncDialog}
+          detectedBpm={pendingBpm || 0}
+          currentRoutineBpm={bpm}
+          onSync={handleBpmSync}
+          onSkip={handleBpmSkip}
+        />
+      )}
     </div>
   );
 };
