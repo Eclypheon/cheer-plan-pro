@@ -23,7 +23,7 @@ export const MusicProgressIndicator = ({
   const beatNumberRef = useRef<HTMLDivElement>(null);
   const cellPositionsRef = useRef<Array<{ left: number; count: number }>>([]);
 
-  // Pre-calculate all cell positions to avoid DOM queries during playback
+  // Pre-calculate all cell positions and update indicator height
   const calculateCellPositions = () => {
     const positions: Array<{ left: number; count: number }> = [];
     const countSheetContainer = document.getElementById('count-sheet-container');
@@ -31,6 +31,12 @@ export const MusicProgressIndicator = ({
     if (!countSheetContainer) return positions;
 
     const containerRect = countSheetContainer.getBoundingClientRect();
+    const containerScrollHeight = countSheetContainer.scrollHeight;
+
+    // Update the indicator height to match the full scrollable height
+    if (indicatorRef.current) {
+      indicatorRef.current.style.height = `${containerScrollHeight}px`;
+    }
 
     for (let lineIndex = 0; lineIndex < totalLines; lineIndex++) {
       for (let count = 1; count <= 8; count++) {
@@ -178,7 +184,7 @@ export const MusicProgressIndicator = ({
       {/* Vertical progress line */}
       <div
         ref={indicatorRef}
-        className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-50 pointer-events-none"
+        className="absolute top-0 w-0.5 bg-red-500 z-50 pointer-events-none"
         style={{
           display: 'none',
           boxShadow: '0 0 4px rgba(239, 68, 68, 0.5)',
