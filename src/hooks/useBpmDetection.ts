@@ -8,8 +8,8 @@ export const useBpmDetection = () => {
       const reader = new FileReader();
 
       reader.onload = async (event) => {
+        const arrayBuffer = event.target?.result as ArrayBuffer;
         try {
-          const arrayBuffer = event.target?.result as ArrayBuffer;
           const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
 
           // Use the professional realtime-bpm-analyzer library
