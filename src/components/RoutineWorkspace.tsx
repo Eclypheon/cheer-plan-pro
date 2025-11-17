@@ -1794,6 +1794,7 @@ export const RoutineWorkspace = ({
                 <CountSheet
                   routineLength={config.length}
                   bpm={config.bpm}
+                  startCountOffset={config.startCountOffset}
                   placedSkills={placedSkills.filter(
                     (ps) => ps.id !== draggedPlacedSkillId,
                   )}
@@ -1987,6 +1988,7 @@ export const RoutineWorkspace = ({
             <CountSheet
               routineLength={config.length}
               bpm={config.bpm}
+              startCountOffset={config.startCountOffset}
               placedSkills={placedSkills}
               skills={skills}
               onRemoveSkill={handleRemoveSkill}

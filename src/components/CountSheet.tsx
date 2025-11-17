@@ -12,6 +12,7 @@ import { useBpmDetection } from "@/hooks/useBpmDetection";
 interface CountSheetProps {
   routineLength: number;
   bpm: number;
+  startCountOffset?: number;
   placedSkills: PlacedSkill[];
   skills: Skill[];
   onRemoveSkill: (id: string) => void;
@@ -156,6 +157,7 @@ const baseClasses = `w-3 h-3 rounded flex items-center justify-center text-gray-
 export const CountSheet = ({
   routineLength,
   bpm,
+  startCountOffset = 0,
   placedSkills,
   skills,
   onRemoveSkill,
@@ -430,7 +432,9 @@ export const CountSheet = ({
 
   // Calculate total lines needed
   const totalBeats = Math.ceil((routineLength * bpm) / 60);
-  const totalLines = Math.ceil(totalBeats / 8);
+  const baseTotalLines = Math.ceil(totalBeats / 8);
+  // Add an extra line if startCountOffset > 0 to accommodate the last line with greyed out cells
+  const totalLines = startCountOffset > 0 ? baseTotalLines + 1 : baseTotalLines;
 
   // Process skills and handle overflow to next lines
   const getSkillPlacements = (): SkillPlacement[] => {
@@ -521,9 +525,13 @@ export const CountSheet = ({
   };
 
   const CountCell = ({ lineIndex, count }: { lineIndex: number; count: number }) => {
+    // Check if this cell should be greyed out due to start count offset
+    const isGreyedOut = startCountOffset > 0 && lineIndex === 0 && count <= startCountOffset;
+
     const { setNodeRef, isOver } = useDroppable({
       id: `cell-${lineIndex}-${count}`,
       data: { lineIndex, count },
+      disabled: isGreyedOut, // Disable dropping on greyed out cells
     });
 
     const cellSkills = getSkillsInCell(lineIndex, count);
@@ -536,7 +544,8 @@ export const CountSheet = ({
       skillSpan > 0 && // Is a skill being dragged?
       lineIndex === hoverLineIndex && // Is this cell on the correct line?
       count >= hoverStartCount && // Is this cell at or after the start?
-      count < (hoverStartCount + skillSpan); // Is this cell within the skill's count?
+      count < (hoverStartCount + skillSpan) && // Is this cell within the skill's count?
+      !isGreyedOut; // Don't allow drop targets on greyed out cells
 
     const isLineSelected = selectedLine === lineIndex;
     const isCurrentBeat = highlightedCell && highlightedCell.lineIndex === lineIndex && highlightedCell.count === count;
@@ -546,7 +555,12 @@ export const CountSheet = ({
         ref={setNodeRef}
         data-cell={`${lineIndex}-${count}`}
         className={`border border-border min-w-[80px] h-10 p-0.5 relative text-xs ${
-          isDropTarget ? "bg-accent" : isCurrentBeat ? "bg-accent" : isPartOfSkillSpan ? "bg-card" : isLineSelected ? "bg-accent/20 hover:bg-accent/40" : "bg-card hover:bg-accent/50"
+          isGreyedOut ? "bg-muted/50 cursor-not-allowed" :
+          isDropTarget ? "bg-accent" :
+          isCurrentBeat ? "bg-accent" :
+          isPartOfSkillSpan ? "bg-card" :
+          isLineSelected ? "bg-accent/20 hover:bg-accent/40" :
+          "bg-card hover:bg-accent/50"
         }`}
       >
         {isFirstCountOfSkill.map((sp, skillIndex) => {
@@ -746,10 +760,16 @@ const handleClick = (e: React.MouseEvent) => {
     // Call original line selection handler
     onLineClick(lineIndex);
 
-    // If music is loaded, seek to the beginning of this line (but don't auto-play)
+    // If music is loaded, seek to the beginning of this line (but doesn't auto-play)
     if (musicState.file) {
       // Each line has 8 beats, so calculate the starting beat for this line
-      const startingBeat = lineIndex * 8;
+      let startingBeat = lineIndex * 8;
+
+      // If start count offset is enabled, adjust the starting beat to account for the music offset
+      if (startCountOffset > 0) {
+        startingBeat = Math.max(0, startingBeat - startCountOffset);
+      }
+
       // Convert beat to time: beat * (60 seconds / bpm)
       const timePosition = startingBeat * (60 / bpm);
 
@@ -842,6 +862,7 @@ const handleClick = (e: React.MouseEvent) => {
             routineLength={routineLength}
             bpm={bpm}
             totalLines={totalLines}
+            startCountOffset={startCountOffset}
             onLineSelect={onLineClick}
             onCurrentCellChange={(lineIndex, count) => {
               setHighlightedCell(lineIndex === -1 && count === -1 ? null : { lineIndex, count });

@@ -1,6 +1,7 @@
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { RoutineConfig } from "@/types/routine";
 
@@ -11,6 +12,7 @@ interface RoutineConfigModalProps {
   updateLength: (length: number) => void;
   updateBpm: (bpm: number) => void;
   updateCategory: (category: RoutineConfig["category"]) => void;
+  updateStartCountOffset: (offset: number) => void;
 }
 
 export const RoutineConfigModal = ({
@@ -20,6 +22,7 @@ export const RoutineConfigModal = ({
   updateLength,
   updateBpm,
   updateCategory,
+  updateStartCountOffset,
 }: RoutineConfigModalProps) => {
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -87,6 +90,22 @@ export const RoutineConfigModal = ({
                 <SelectItem value="team-24">Team (24)</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="startCount" className="text-right">
+              Start at 5th Count
+            </Label>
+            <div className="col-span-3 flex items-center space-x-2">
+              <Switch
+                id="startCount"
+                checked={config.startCountOffset === 4}
+                onCheckedChange={(checked) => updateStartCountOffset(checked ? 4 : 0)}
+              />
+              <Label htmlFor="startCount" className="text-sm text-muted-foreground">
+                {config.startCountOffset === 4 ? "Enabled" : "Disabled"}
+              </Label>
+            </div>
           </div>
         </div>
       </DialogContent>
