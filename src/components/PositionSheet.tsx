@@ -9,14 +9,14 @@ import { Plus, Undo, Redo, ToggleLeft, ToggleRight, Square, Circle, Triangle, X,
 import { PositionIcon as PositionIconComponent } from "./PositionIcon";
 import { PositionIconNameDialog } from "./PositionIconNameDialog";
 import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
+import { cn, POSITION_ICON_COLORS, getSkillCategoryColors } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 interface PositionSheetProps {
   icons: PositionIcon[];
   arrows?: Arrow[];
   selectedLine: number | null;
-  onUpdateIcon: (id: string, x: number, y: number, shouldPropagate?: boolean) => void;
+  onUpdateIcon: (id: string, x: number, y: number, shouldPropagate?: boolean, color?: string) => void;
   onAddIcon: (type: PositionIcon["type"]) => void;
   onRemoveIcon: (id: string) => void;
   onRemoveMultipleIcons?: (ids: string[]) => void;
@@ -559,6 +559,19 @@ export const PositionSheet = ({
   const totalSelectedCount = selectedIconsCount + selectedArrowsCount;
   const isMultiDrag = selectedIconsCount > 1 && dragOffset !== null;
 
+  // Handle color change for selected icons
+  const handleColorChange = (colorId: string) => {
+    const selectedIconIds = lineIcons.filter(i => i.selected).map(i => i.id);
+    selectedIconIds.forEach(iconId => {
+      const icon = icons.find(i => i.id === iconId);
+      if (icon) {
+        // Update the icon with new color - need to pass this up to parent
+        // For now, we'll need to add this prop to the component
+        onUpdateIcon?.(iconId, icon.x, icon.y, autoFollow, colorId);
+      }
+    });
+  };
+
 return (
   <>
     <Card className="h-full flex flex-col relative z-10" id="position-sheet">
@@ -581,6 +594,32 @@ return (
             </Button>
           </div>
           <div className="flex gap-1 items-center">
+            {/* Color picker for selected position icons */}
+            {selectedIconsCount > 0 && (
+              <div className="flex items-center gap-1 mr-2">
+                <span className="text-xs text-muted-foreground">Color:</span>
+                <div className="flex gap-0.5">
+                  {POSITION_ICON_COLORS.map((colorOption) => {
+                    const colorScheme = getSkillCategoryColors(colorOption.category);
+                    return (
+                      <button
+                        key={colorOption.id}
+                        onClick={() => handleColorChange(colorOption.id)}
+                        className={cn(
+                          "w-4 h-4 rounded border border-border hover:scale-110 transition-transform",
+                          colorScheme.icon,
+                          "flex items-center justify-center"
+                        )}
+                        title={colorOption.name}
+                      >
+                        <div className="w-2 h-2 rounded-full bg-current opacity-75" />
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             <span className="text-xs text-muted-foreground">Propagate Changes</span>
             <Button
               size="sm"
@@ -629,7 +668,7 @@ return (
                       selectedIconIds.forEach(id => onRemoveIcon(id));
                     }
                   }
-                  
+
                   // Delete selected arrows
                   const selectedArrowIds = lineArrows.filter(a => a.selected).map(a => a.id);
                   if (selectedArrowIds.length > 0) {

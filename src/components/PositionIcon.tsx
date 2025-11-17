@@ -1,6 +1,6 @@
 import { useDraggable } from "@dnd-kit/core";
 import { Circle, Square, X, Triangle } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, getSkillCategoryColors } from "@/lib/utils";
 import type { PositionIcon as PositionIconType } from "@/types/routine";
 
 interface PositionIconProps {
@@ -34,6 +34,9 @@ export const PositionIcon = ({ icon, onUpdate, onClick, onRemove, dragOffset, is
 
   const enhancedListeners = listeners;
 
+  // Get color styling based on icon's color property
+  const colorScheme = getSkillCategoryColors(icon.color || 'default');
+
   const style = transform
     ? {
         left: `${icon.x + transform.x * (1 / zoomLevel)}px`,
@@ -65,8 +68,8 @@ export const PositionIcon = ({ icon, onUpdate, onClick, onRemove, dragOffset, is
         "flex items-center justify-center",
         "transition-colors",
         icon.selected
-          ? "text-accent-foreground bg-accent rounded-full"
-          : "text-primary hover:text-primary/70",
+          ? colorScheme.icon + " bg-accent/20 rounded-full border-2 border-current"
+          : colorScheme.icon + " hover:opacity-70",
         isDragging && "opacity-50"
       )}
       data-dragging={isDragging ? "true" : "false"}
@@ -75,7 +78,7 @@ export const PositionIcon = ({ icon, onUpdate, onClick, onRemove, dragOffset, is
       <IconComponent type={icon.type} />
       {icon.name && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <span className="text-blue-900 dark:text-blue-100 text-base font-medium text-center leading-tight max-w-full px-1">
+          <span className={cn("text-base font-medium text-center leading-tight max-w-full px-1", colorScheme.text)}>
             {icon.name}
           </span>
         </div>
