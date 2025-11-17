@@ -22,11 +22,11 @@ export const useBpmDetection = () => {
 
             // Validate BPM is in reasonable range (60-200 BPM)
             if (bestCandidate.tempo >= 60 && bestCandidate.tempo <= 200) {
-              resolve(Math.round(bestCandidate.tempo));
+              resolve(bestCandidate.tempo);
             } else {
               // Try the next candidate if the best one is out of range
               const nextCandidate = sortedCandidates.find(c => c.tempo >= 60 && c.tempo <= 200);
-              resolve(nextCandidate ? Math.round(nextCandidate.tempo) : null);
+              resolve(nextCandidate ? nextCandidate.tempo : null);
             }
           } else {
             resolve(null);
@@ -93,7 +93,7 @@ function detectBpmFromBuffer(buffer: Float32Array, sampleRate: number): number |
   const bpm = 60 / secondsPerBeat;
 
   // Clamp to reasonable BPM range (60-200)
-  return Math.max(60, Math.min(200, Math.round(bpm)));
+  return Math.max(60, Math.min(200, bpm));
 }
 
 function downsampleBuffer(buffer: Float32Array, targetLength: number): Float32Array {
