@@ -358,6 +358,7 @@ export const RoutineWorkspace = ({
           x: Math.round(basePositions[i] * gridSize),
           y: Math.round(6 * gridSize), // Row 6
           lineIndex,
+          color: "mounts", // Bases are typically mounts
         });
       }
       for (let i = 0; i < 5; i++) {
@@ -367,6 +368,7 @@ export const RoutineWorkspace = ({
           x: Math.round(basePositions[i] * gridSize),
           y: Math.round(12 * gridSize), // Row 12
           lineIndex,
+          color: "mounts", // Bases are typically mounts
         });
       }
       // 2 Mid tiers evenly spaced between bases
@@ -378,6 +380,7 @@ export const RoutineWorkspace = ({
           x: Math.round(midPositions[i] * gridSize),
           y: Math.round(17 * gridSize), // Row 17
           lineIndex,
+          color: "pyramids", // Mids are typically pyramids
         });
       }
       // 4 Top flys evenly distributed like bases
@@ -389,6 +392,7 @@ export const RoutineWorkspace = ({
           x: Math.round(flyPositions[i] * gridSize),
           y: Math.round(22 * gridSize), // Row 22
           lineIndex,
+          color: "tumbling", // Flys are typically tumbling
         });
       }
     } else if (category === "team-24") {
@@ -402,6 +406,7 @@ export const RoutineWorkspace = ({
           x: Math.round(basePositions[i] * gridSize),
           y: Math.round(6 * gridSize), // Row 6
           lineIndex,
+          color: "mounts", // Bases are typically mounts
         });
       }
       for (let i = 0; i < 8; i++) {
@@ -411,6 +416,7 @@ export const RoutineWorkspace = ({
           x: Math.round(basePositions[i] * gridSize),
           y: Math.round(12 * gridSize), // Row 12
           lineIndex,
+          color: "mounts", // Bases are typically mounts
         });
       }
       // 4 Mid tiers evenly spaced between base groups
@@ -422,6 +428,7 @@ export const RoutineWorkspace = ({
           x: Math.round(midPositions[i] * gridSize),
           y: Math.round(17 * gridSize), // Row 17
           lineIndex,
+          color: "pyramids", // Mids are typically pyramids
         });
       }
       // 4 Top flys evenly distributed
@@ -433,6 +440,7 @@ export const RoutineWorkspace = ({
           x: Math.round(flyPositions[i] * gridSize),
           y: Math.round(22 * gridSize), // Row 22
           lineIndex,
+          color: "tumbling", // Flys are typically tumbling
         });
       }
     }
@@ -1174,6 +1182,7 @@ export const RoutineWorkspace = ({
             x: dropX,
             y: dropY,
             lineIndex: selectedLine || 0,
+            color: "default", // Default color for dropped icons
           };
           // Add the icon using the existing handler
           const tempIcons = [...positionIcons, newIcon];
@@ -1304,6 +1313,7 @@ export const RoutineWorkspace = ({
       x,
       y,
       lineIndex: selectedLine,
+      color: "default", // Default color for manually added icons
     };
     setPositionIcons((prev) => {
       const newIcons = [...prev, newIcon];
@@ -1317,6 +1327,7 @@ export const RoutineWorkspace = ({
     x: number,
     y: number,
     shouldPropagate: boolean = false,
+    color?: import("@/lib/utils").PositionIconColor,
   ) => {
     const icon = positionIcons.find((i) => i.id === id);
     if (!icon) return;
@@ -1327,14 +1338,14 @@ export const RoutineWorkspace = ({
 
     setPositionIcons((prev) => {
       const updated = prev.map((i) =>
-        i.id === id ? { ...i, x: snappedX, y: snappedY } : i,
+        i.id === id ? { ...i, x: snappedX, y: snappedY, ...(color !== undefined ? { color } : {}) } : i,
       );
 
       if (shouldPropagate && autoFollow) {
         const currentLine = icon.lineIndex;
         const totalLines = Math.ceil(((config.length * config.bpm) / 60 / 8));
 
-        // Get all icons at current line with their new positions
+        // Get all icons at current line with their new positions and colors
         const currentLineIcons = updated.filter(
           (i) => i.lineIndex === currentLine,
         );
@@ -1698,7 +1709,7 @@ export const RoutineWorkspace = ({
           );
 
           if (matchingIconIndex !== -1) {
-            result[matchingIconIndex] = { ...result[matchingIconIndex], name };
+            result[matchingIconIndex] = { ...result[matchingIconIndex], name, color: namedIcon.color };
           }
         }
 

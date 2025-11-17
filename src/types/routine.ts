@@ -52,6 +52,7 @@ export interface PositionIcon {
   lineIndex: number;
   name?: string;
   selected?: boolean;
+  color?: import("@/lib/utils").PositionIconColor;
 }
 
 export interface Arrow {
