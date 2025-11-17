@@ -80,6 +80,7 @@ export interface RoutineConfig {
   category: RoutineCategory;
   level: SkillLevel;
   bpm: number;
+  startCountOffset: number; // 0 = start at 1st count, 4 = start at 5th count
 }
 
 export interface CategoryStateData {
