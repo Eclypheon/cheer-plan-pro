@@ -105,11 +105,11 @@ export const MusicProgressIndicator = ({
     };
   }, [totalLines]);
 
-  // Simple metronome-style progress indicator - moves every 60/bpm seconds regardless of music
+  // Precise beat synchronization using requestAnimationFrame and elapsed time tracking
   useEffect(() => {
     if (!musicState.file) {
       if (animationFrameRef.current) {
-        clearInterval(animationFrameRef.current);
+        cancelAnimationFrame(animationFrameRef.current);
         animationFrameRef.current = null;
       }
       // Hide indicators when no music file
@@ -125,7 +125,7 @@ export const MusicProgressIndicator = ({
     // If not playing, check if it's paused (currentTime > 0) or stopped (currentTime = 0)
     if (!musicState.isPlaying) {
       if (animationFrameRef.current) {
-        clearInterval(animationFrameRef.current);
+        cancelAnimationFrame(animationFrameRef.current);
         animationFrameRef.current = null;
       }
 
@@ -142,16 +142,22 @@ export const MusicProgressIndicator = ({
       return;
     }
 
-    // Calculate the exact interval between beats in milliseconds
-    const beatInterval = (60 / bpm) * 1000; // milliseconds per beat
-
-    // Start beat counter from the current music position, snapped to beat intervals
-    let currentBeat = Math.floor(musicState.currentTime / (60 / bpm));
-
     // Apply offset whenever the setting is enabled
     startedWithOffsetRef.current = startCountOffset > 0;
 
-    const updateProgress = () => {
+    // Track start time for precise elapsed time calculation
+    let startTime = performance.now();
+    let lastBeatTime = startTime;
+
+    const updateProgress = (currentTime: number) => {
+      // Calculate elapsed time since we started tracking
+      const elapsedSeconds = (currentTime - startTime) / 1000;
+
+      // Calculate current beat based on elapsed time and BPM
+      // This gives us precise beat positioning without drift
+      const beatsPerSecond = bpm / 60;
+      const currentBeat = Math.floor(elapsedSeconds * beatsPerSecond);
+
       const adjustedBeat = currentBeat + (startedWithOffsetRef.current ? startCountOffset : 0);
       const lineIndex = Math.floor(adjustedBeat / 8);
       const countInLine = (adjustedBeat % 8) + 1; // 1-indexed (1-8)
@@ -208,17 +214,16 @@ export const MusicProgressIndicator = ({
         }
       }
 
-      // Increment beat counter for next interval
-      currentBeat++;
+      // Continue the animation loop
+      animationFrameRef.current = requestAnimationFrame(updateProgress);
     };
 
-    // Start the metronome-style updates at perfect intervals
-    updateProgress(); // Update immediately
-    animationFrameRef.current = window.setInterval(updateProgress, beatInterval);
+    // Start the precise beat tracking
+    animationFrameRef.current = requestAnimationFrame(updateProgress);
 
     return () => {
       if (animationFrameRef.current) {
-        clearInterval(animationFrameRef.current);
+        cancelAnimationFrame(animationFrameRef.current);
         animationFrameRef.current = null;
       }
     };
