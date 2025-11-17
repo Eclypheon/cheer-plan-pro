@@ -255,6 +255,17 @@ export const RoutineBuilder = () => {
     },
   });
 
+  // Handle start count offset changes - remove invalid skills
+  useEffect(() => {
+    if (config.startCountOffset > 0) {
+      // When switching to 5th count start, remove skills in counts 1-4 of line 1
+      setPlacedSkills(prev => prev.filter(skill =>
+        !(skill.lineIndex === 0 && skill.startCount <= 4)
+      ));
+    }
+    // When switching back to 1st count start, no action needed
+  }, [config.startCountOffset]);
+
   // Handle category changes - auto-save/load category states
   useEffect(() => {
     // Only handle category changes after initial load
@@ -1837,6 +1848,7 @@ export const RoutineBuilder = () => {
         updateLength={updateLength}
         updateBpm={updateBpm}
         updateCategory={updateCategory}
+        updateStartCountOffset={(offset) => updateConfig({ startCountOffset: offset })}
       />
     </div>
   );

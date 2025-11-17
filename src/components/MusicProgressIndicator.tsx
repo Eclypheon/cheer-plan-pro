@@ -6,6 +6,7 @@ interface MusicProgressIndicatorProps {
   routineLength: number;
   bpm: number;
   totalLines: number;
+  startCountOffset?: number;
   onLineSelect?: (lineIndex: number) => void;
   onCurrentCellChange?: (lineIndex: number, count: number) => void;
   onSetCurrentTime?: (time: number) => void;
@@ -17,6 +18,7 @@ export const MusicProgressIndicator = ({
   routineLength,
   bpm,
   totalLines,
+  startCountOffset = 0,
   onLineSelect,
   onCurrentCellChange,
   onSetCurrentTime,
@@ -27,6 +29,7 @@ export const MusicProgressIndicator = ({
   const lastHighlightedCellRef = useRef<{ lineIndex: number; count: number } | null>(null);
   const indicatorRef = useRef<HTMLDivElement>(null);
   const beatMarkerRef = useRef<HTMLDivElement>(null);
+  const startedWithOffsetRef = useRef<boolean>(false);
 
   const cellPositionsRef = useRef<Array<{ left: number; count: number }>>([]);
 
@@ -145,9 +148,13 @@ export const MusicProgressIndicator = ({
     // Start beat counter from the current music position, snapped to beat intervals
     let currentBeat = Math.floor(musicState.currentTime / (60 / bpm));
 
+    // Apply offset whenever the setting is enabled
+    startedWithOffsetRef.current = startCountOffset > 0;
+
     const updateProgress = () => {
-      const lineIndex = Math.floor(currentBeat / 8);
-      const countInLine = (currentBeat % 8) + 1; // 1-indexed (1-8)
+      const adjustedBeat = currentBeat + (startedWithOffsetRef.current ? startCountOffset : 0);
+      const lineIndex = Math.floor(adjustedBeat / 8);
+      const countInLine = (adjustedBeat % 8) + 1; // 1-indexed (1-8)
 
       // Auto-select current line if callback provided and line changed
       if (onLineSelect && lineIndex !== lastLineSelectedRef.current && lineIndex >= 0 && lineIndex < totalLines) {
@@ -185,7 +192,7 @@ export const MusicProgressIndicator = ({
       }
 
       // Get pre-calculated position for this beat
-      const beatIndex = currentBeat % (totalLines * 8);
+      const beatIndex = adjustedBeat % (totalLines * 8);
       const position = cellPositionsRef.current[beatIndex];
 
       if (position) {
@@ -215,7 +222,7 @@ export const MusicProgressIndicator = ({
         animationFrameRef.current = null;
       }
     };
-  }, [musicState.isPlaying, bpm, totalLines, onLineSelect]);
+  }, [musicState.isPlaying, bpm, totalLines, startCountOffset, onLineSelect]);
 
   // Handle pause snapping and reset when music stops
   const wasPlayingRef = useRef(false);
@@ -242,6 +249,7 @@ export const MusicProgressIndicator = ({
       if (musicState.currentTime === 0) {
         lastLineSelectedRef.current = null;
         lastHighlightedCellRef.current = null;
+        startedWithOffsetRef.current = false; // Reset offset tracking
       }
     }
   }, [musicState.isPlaying, musicState.currentTime, bpm, onSetCurrentTime]);
