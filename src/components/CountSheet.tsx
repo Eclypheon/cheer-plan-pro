@@ -224,11 +224,8 @@ export const CountSheet = ({
     setHighlightedCell(null);
     setCurrentBeat(null);
 
-    // If music is paused (not playing but has currentTime > 0), also select first line
-    if (!musicState.isPlaying && musicState.currentTime > 0) {
-      // Select the first line (line index 0)
-      onLineClick(0);
-    }
+    // Always select the first line when stop is pressed
+    onLineClick(0);
 
     // Also manually hide the progress indicators since the useEffect won't re-run
     const indicator = document.querySelector('.absolute.top-0.w-0\\.5.bg-red-500') as HTMLElement;

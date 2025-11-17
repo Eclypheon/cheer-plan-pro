@@ -7,7 +7,7 @@ export const useRoutineConfig = () => {
     category: "partner-stunts",
     level: "premier",
     bpm: 154,
-    startCountOffset: 0, // Default to start at 1st count
+    startCountOffset: 4, // Default to start at 5th count
   });
 
   const updateLength = (length: number) => {
