@@ -208,6 +208,11 @@ export const PositionSheet = ({
       }
     }
 
+    // If we're in selection mode, prevent all scrolling
+    if (isDraggingSelection) {
+      e.preventDefault();
+    }
+
     // Update preview position during icon dragging on mobile
     if (isMobile && isDraggingIcon && e.touches.length === 1 && draggedIconId && dragOffset) {
       const touch = e.touches[0];
@@ -223,7 +228,7 @@ export const PositionSheet = ({
 
       setPreviewPosition(screenPos);
     }
-  }, [isPinching, initialPinchDistance, initialZoomLevel, getTouchDistance, onZoomChange, isMobile, isDraggingIcon, draggedIconId, dragOffset, icons, effectiveZoomLevel]);
+  }, [isPinching, initialPinchDistance, initialZoomLevel, getTouchDistance, onZoomChange, isMobile, isDraggingIcon, draggedIconId, dragOffset, icons, effectiveZoomLevel, isDraggingSelection]);
 
   const handleTouchEnd = useCallback((e: React.TouchEvent) => {
     if (e.touches.length < 2) {
@@ -456,6 +461,101 @@ export const PositionSheet = ({
   const lineArrows = isPdfRender ? (pdfArrows || []) : arrows.filter((a) => a.lineIndex === selectedLine);
   const currentSegmentName = isPdfRender ? (pdfSegmentName || "") : (segmentName || "");
   // ----- END OF MODIFICATION -----
+
+  // Touch selection handlers
+  const handleSelectionTouchStart = useCallback((e: React.TouchEvent) => {
+    // Only handle single touch events (not multi-touch/pinch)
+    if (e.touches.length !== 1) {
+      return;
+    }
+
+    const touch = e.touches[0];
+    const target = touch.target as HTMLElement;
+    const isIcon = target.closest('[data-position-icon]');
+    const isArrow = target.closest('[data-arrow]');
+
+    // Only start selection if touching empty space (not on an icon or arrow) and not dragging
+    if (!isIcon && !isArrow && !isDraggingIcon && (target === e.currentTarget || target.closest('.sheet-background'))) {
+      e.preventDefault(); // Prevent default browser behavior (like context menu and scrolling)
+      const coords = getZoomedCoordinates(touch.clientX, touch.clientY);
+      setSelectionStart(coords);
+      setSelectionEnd(null);
+      setIsDraggingSelection(true);
+    }
+  }, [getZoomedCoordinates, isDraggingIcon]);
+
+  const handleSelectionTouchMove = useCallback((e: React.TouchEvent) => {
+    // Only handle single touch events
+    if (e.touches.length !== 1) {
+      return;
+    }
+
+    const touch = e.touches[0];
+    
+    // If we're in selection mode, prevent all scrolling and handle selection
+    if (isDraggingSelection) {
+      e.preventDefault(); // Prevent scroll while dragging selection
+      const coords = getZoomedCoordinates(touch.clientX, touch.clientY);
+      setSelectionEnd(coords);
+    }
+    // If we're not in selection mode but might start one, prevent default to avoid scrolling
+    else {
+      const target = touch.target as HTMLElement;
+      const isIcon = target.closest('[data-position-icon]');
+      const isArrow = target.closest('[data-arrow]');
+      
+      if (!isIcon && !isArrow && !isDraggingIcon && (target === e.currentTarget || target.closest('.sheet-background'))) {
+        e.preventDefault(); // Prevent scrolling when touching empty space
+      }
+    }
+  }, [isDraggingSelection, isDraggingIcon, getZoomedCoordinates]);
+
+  const handleSelectionTouchEnd = useCallback((e: React.TouchEvent) => {
+    // Only handle when we were in selection mode
+    if (selectionStart && selectionEnd && isDraggingSelection) {
+      e.preventDefault();
+      
+      const minX = Math.min(selectionStart.x, selectionEnd.x);
+      const maxX = Math.max(selectionStart.x, selectionEnd.x);
+      const minY = Math.min(selectionStart.y, selectionEnd.y);
+      const maxY = Math.max(selectionStart.y, selectionEnd.y);
+
+      // Select icons that are within the rectangle
+      const selectedIconIds = lineIcons.filter(icon =>
+        icon.x >= minX && icon.x <= maxX && icon.y >= minY && icon.y <= maxY
+      ).map(icon => icon.id);
+
+      // Select arrows that intersect with the rectangle
+      const selectedArrowIds = lineArrows.filter(arrow =>
+        doesArrowIntersectRectangle(arrow, { minX, maxX, minY, maxY }, effectiveZoomLevel)
+      ).map(arrow => arrow.id);
+
+      // Call the appropriate selection callbacks
+      onSelectMultiple?.(selectedIconIds);
+      onSelectMultipleArrows?.(selectedArrowIds);
+    }
+    
+    setSelectionStart(null);
+    setSelectionEnd(null);
+    setIsDraggingSelection(false);
+  }, [selectionStart, selectionEnd, isDraggingSelection, lineIcons, lineArrows, doesArrowIntersectRectangle, effectiveZoomLevel, onSelectMultiple, onSelectMultipleArrows]);
+
+  // Effect to handle body scroll prevention during touch selection
+  useEffect(() => {
+    if (isDraggingSelection) {
+      // Add class to prevent scrolling
+      document.body.classList.add('touch-selection-active');
+      // Store original overflow value to restore later
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      
+      return () => {
+        // Restore original overflow value
+        document.body.style.overflow = originalOverflow;
+        document.body.classList.remove('touch-selection-active');
+      };
+    }
+  }, [isDraggingSelection]);
 
   // Handle keyboard events for arrow deletion
   useEffect(() => {
@@ -743,9 +843,12 @@ return (
           id="position-sheet-container"
           ref={containerRef}
           className={cn(
-            "flex-1 p-1.5 flex flex-col overflow-auto",
+            "flex-1 p-1.5 flex flex-col overflow-auto touch-none",
             isOverflowingHorizontally ? "items-start" : "items-center"
           )}
+          style={{
+            touchAction: isDraggingSelection ? 'none' : 'auto',
+          }}
         >
           <div id="position-sheet-content-wrapper" className="flex flex-col items-center">
           {/* ----- START OF MODIFIED CODE ----- */}
@@ -827,9 +930,18 @@ return (
               onMouseMove={handleSelectionMouseMove}
               onMouseUp={handleSelectionMouseUp}
               onClick={handleSheetClick}
-              onTouchStart={handleTouchStart}
-              onTouchMove={handleTouchMove}
-              onTouchEnd={handleTouchEnd}
+              onTouchStart={(e) => {
+                handleTouchStart(e);
+                handleSelectionTouchStart(e);
+              }}
+              onTouchMove={(e) => {
+                handleTouchMove(e);
+                handleSelectionTouchMove(e);
+              }}
+              onTouchEnd={(e) => {
+                handleTouchEnd(e);
+                handleSelectionTouchEnd(e);
+              }}
             >
               {/* Grid overlay - 36x36 grid */}
               {(showGrid || isDraggingIcon) && (
