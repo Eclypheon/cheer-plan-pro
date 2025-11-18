@@ -567,6 +567,15 @@ export const CountSheet = ({
                 e.stopPropagation();
                 onSelectSkill?.(sp.placedSkill.id);
               }}
+              onTouchStart={(e) => {
+                e.stopPropagation();
+                // Select the line when the placed skill is touched
+                onLineClick(sp.lineIndex);
+              }}
+              onTouchEnd={(e) => {
+                e.stopPropagation();
+                onSelectSkill?.(sp.placedSkill.id);
+              }}
               className={`${colors.background} ${colors.border} border-2 rounded-md shadow-md absolute flex items-center cursor-grab active:cursor-grabbing z-[2000] text-sm transition-all duration-200 hover:shadow-lg overflow-visible group ${
                 isDragging ? "opacity-50 shadow-xl" : "opacity-100"
               } ${selectedSkillId === sp.placedSkill.id ? "ring-2 ring-accent ring-offset-1" : ""} ${containerClass}`}
