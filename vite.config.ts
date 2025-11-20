@@ -5,14 +5,47 @@ import path from "path";
 
 // https://vitejs.dev/config/
 export default defineConfig(() => ({
-  server: {
+    server: {
     host: "::",
     port: 8080,
     proxy: {
-      '/api/urlshorten': {
+      '/api/urlshorten/isgd': {
         target: 'https://is.gd',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/urlshorten/, '/create.php')
+        rewrite: (path) => {
+          // Extract query parameters and reconstruct the path properly
+          const [basePath, queryString] = path.split('?');
+          const newPath = '/create.php' + (queryString ? '?' + queryString : '');
+          return newPath;
+        }
+      },
+      '/api/urlshorten/cleanuri': {
+        target: 'https://cleanuri.com',
+        changeOrigin: true,
+        rewrite: (path) => {
+          const [basePath, queryString] = path.split('?');
+          const newPath = '/api/v1/shorten' + (queryString ? '?' + queryString : '');
+          return newPath;
+        }
+      },
+      '/api/urlshorten/shrtcode': {
+        target: 'https://api.shrtco.de',
+        changeOrigin: true,
+        rewrite: (path) => {
+          const [basePath, queryString] = path.split('?');
+          const newPath = '/v2/shorten' + (queryString ? '?' + queryString : '');
+          return newPath;
+        }
+      },
+      '/api/urlshorten/tinyurl': {
+        target: 'https://tinyurl.com',
+        changeOrigin: true,
+        rewrite: (path) => {
+          // TinyURL API endpoint for creating short URLs
+          const [basePath, queryString] = path.split('?');
+          const newPath = '/api-create.php' + (queryString ? '?' + queryString : '');
+          return newPath;
+        }
       }
     }
   },
