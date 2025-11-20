@@ -191,24 +191,23 @@ export const createShareableUrl = async (data: SharedRoutineData): Promise<strin
   return fullUrl;
 };
 
-// Function to shorten URL using is.gd via proxy
+// Function to shorten URL using is.gd via Vercel API proxy
 async function shortenUrl(longUrl: string): Promise<string | null> {
   console.log(`Starting URL shortening process for URL: ${longUrl.substring(0, 100)}...`);
   console.log(`URL length: ${longUrl.length} characters`);
 
   try {
-    console.log(`Shortening URL using is.gd proxy API...`);
+    // Try is.gd first using the Vercel API proxy
+    console.log(`Attempting is.gd API call via Vercel proxy...`);
     const proxyUrl = `/api/urlshorten/isgd?format=simple&url=${encodeURIComponent(longUrl)}`;
-    console.log(`Making GET request to proxy: ${proxyUrl}`);
-
+    
     const response = await fetch(proxyUrl);
-    console.log(`Proxy response status: ${response.status}`);
-
+    console.log(`is.gd proxy response status: ${response.status}`);
+    
     if (response.ok) {
       const responseText = await response.text();
       console.log(`is.gd proxy response text:`, responseText);
-
-      // The API returns plain text which is the shortened URL
+      
       if (responseText && responseText.trim().startsWith('http')) {
         const shortUrl = responseText.trim();
         console.log(`Successfully shortened URL using is.gd proxy: ${shortUrl}`);
@@ -224,7 +223,46 @@ async function shortenUrl(longUrl: string): Promise<string | null> {
     console.warn(`Failed to shorten URL using is.gd proxy:`, error);
   }
 
-  console.log(`URL shortening failed. Returning null.`);
+ // If is.gd fails, try alternative services
+  try {
+    // Try cleanuri as backup
+    console.log(`Attempting cleanuri API call...`);
+    const cleanUriResponse = await fetch('https://cleanuri.com/api/v1/shorten', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ url: longUrl })
+    });
+
+    if (cleanUriResponse.ok) {
+      const cleanUriData = await cleanUriResponse.json();
+      if (cleanUriData.result_url) {
+        console.log(`Successfully shortened URL using cleanuri: ${cleanUriData.result_url}`);
+        return cleanUriData.result_url;
+      }
+    }
+  } catch (error) {
+    console.warn(`Failed to shorten URL using cleanuri:`, error);
+  }
+
+  // Try shrtco.de as another backup
+  try {
+    console.log(`Attempting shrtco.de API call...`);
+    const shrtcoResponse = await fetch(`https://api.shrtco.de/v2/shorten?url=${encodeURIComponent(longUrl)}`);
+    
+    if (shrtcoResponse.ok) {
+      const shrtcoData = await shrtcoResponse.json();
+      if (shrtcoData.result && shrtcoData.result.short_link) {
+        console.log(`Successfully shortened URL using shrtco.de: ${shrtcoData.result.short_link}`);
+        return shrtcoData.result.short_link;
+      }
+    }
+  } catch (error) {
+    console.warn(`Failed to shorten URL using shrtco.de:`, error);
+  }
+
+  console.log(`All URL shortening services failed. Returning null.`);
   return null;
 }
 
@@ -326,7 +364,7 @@ function optimizeDataStructure(data: SharedRoutineData): OptimizedSharedData {
   const positions = Array.from(positionsMap.values());
 
   // Group position icons by their configuration to identify repetitions across lines
-  // Configuration includes position, type, name, and color
+ // Configuration includes position, type, name, and color
  const configToIcons = new Map<string, { icon: PositionIcon, lines: number[] }>();
   
   data.positionIcons.forEach(icon => {
@@ -529,7 +567,7 @@ function deoptimizeDataStructure(optimizedData: OptimizedSharedData): SharedRout
     }
   }
 
-  // Sort position icons by original order to maintain consistency
+ // Sort position icons by original order to maintain consistency
  reconstructedPositionIcons.sort((a, b) => a.lineIndex - b.lineIndex);
 
   // Reconstruct arrows with actual coordinates using the shared positions array
