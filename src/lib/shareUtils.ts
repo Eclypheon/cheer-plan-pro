@@ -160,15 +160,15 @@ export const createShareableUrl = async (data: SharedRoutineData): Promise<strin
   // Log detailed information about the URL
   console.log(`URL Analysis:`, {
     length: fullUrl.length,
-    threshold: 2000, // Lowered threshold for testing
-    shouldAttemptShortening: fullUrl.length > 2000,
+    threshold: 100, // Lowered threshold for testing
+    shouldAttemptShortening: fullUrl.length > 100,
     encodedDataLength: encodedData.length,
     originalUrl: window.location.href,
     hasEncodedData: !!encodedData
   });
 
   // If URL is still too long, try to shorten it using external services
-  if (fullUrl.length > 2000) { // Lowered threshold for testing and debugging
+  if (fullUrl.length > 100) { // Lowered threshold for testing and debugging
     console.log(`Attempting URL shortening for ${fullUrl.length} character URL...`);
     try {
       const shortenedUrl = await shortenUrl(fullUrl);
@@ -197,7 +197,7 @@ async function shortenUrl(longUrl: string): Promise<string | null> {
   console.log(`URL length: ${longUrl.length} characters`);
   
   const services = [
-    { name: 'is.gd', url: '/api/urlshorten/isgd', params: { format: 'json', url: encodeURIComponent(longUrl) } },
+    { name: 'is.gd', url: '/api/urlshorten/isgd', params: { format: 'simple', url: encodeURIComponent(longUrl) } },
     { name: 'cleanuri', url: '/api/urlshorten/cleanuri', params: { url: longUrl } },
     { name: 'shrtco.de', url: '/api/urlshorten/shrtcode', params: { url: longUrl } },
     { name: 'tinyurl', url: '/api/urlshorten/tinyurl', params: { url: encodeURIComponent(longUrl) } },
@@ -214,15 +214,20 @@ async function shortenUrl(longUrl: string): Promise<string | null> {
 
       if (service.name === 'is.gd') {
         // is.gd uses GET request with query parameters via proxy
-        // Use the already encoded URL parameter
+        // Use format=simple for plain text response
         const params = new URLSearchParams(service.params as Record<string, string>);
         const requestUrl = `${service.url}?${params}`;
         console.log(`Making GET request to proxy: ${requestUrl}`);
         response = await fetch(requestUrl);
         console.log(`is.gd proxy response status: ${response.status}`);
-        const result = await response.json();
-        console.log(`is.gd proxy response:`, result);
-        shortUrl = result.shorturl;
+        
+        // is.gd with format=simple returns plain text, not JSON
+        const responseText = await response.text();
+        console.log(`is.gd proxy response text:`, responseText);
+        
+        if (responseText && responseText.trim().startsWith('http')) {
+          shortUrl = responseText.trim();
+        }
       } else if (service.name === 'cleanuri') {
         // cleanuri uses POST request with form data via proxy
         console.log(`Making POST request to proxy: ${service.url}`);
