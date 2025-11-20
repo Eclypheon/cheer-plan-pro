@@ -17,6 +17,22 @@ export default defineConfig(() => ({
           const [basePath, queryString] = path.split('?');
           const newPath = '/create.php' + (queryString ? '?' + queryString : '');
           return newPath;
+        },
+        configure: (proxy, _options) => {
+          // Add headers to make the request look more like a regular browser request
+          proxy.on('proxyReq', (proxyReq, req, res) => {
+            proxyReq.setHeader('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
+            proxyReq.setHeader('Accept', 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8');
+            proxyReq.setHeader('Accept-Language', 'en-US,en;q=0.5');
+            proxyReq.setHeader('Accept-Encoding', 'gzip, deflate');
+            proxyReq.setHeader('Connection', 'keep-alive');
+            proxyReq.setHeader('Upgrade-Insecure-Requests', '1');
+            proxyReq.setHeader('Cache-Control', 'max-age=0');
+            // Remove potentially suspicious headers
+            proxyReq.removeHeader('x-forwarded-for');
+            proxyReq.removeHeader('x-forwarded-proto');
+            proxyReq.removeHeader('x-forwarded-host');
+          });
         }
       },
       '/api/urlshorten/cleanuri': {
