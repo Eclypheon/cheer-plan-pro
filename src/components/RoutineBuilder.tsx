@@ -8,6 +8,7 @@ import { usePdfExport } from "@/hooks/usePdfExport";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { exportCurrentSlot, importSlotData, validateImportedData, type ExportedData } from "@/lib/exportImport";
+import { getSharedRoutineFromUrl, SharedRoutineData } from "@/lib/shareUtils";
 import AboutModal from "./AboutModal";
 import { RoutineHeader } from "./RoutineHeader";
 import { RoutineWorkspace } from "./RoutineWorkspace";
@@ -106,7 +107,10 @@ export const RoutineBuilder = () => {
     moveDown: "ArrowDown",
   };
 
-  // Load saved state on component mount - auto-load State 1 if available
+  // Add state to detect shared URL access
+  const [isSharedUrl, setIsSharedUrl] = useState(false);
+
+  // Load saved state on component mount - check URL first, then localStorage
   useEffect(() => {
     // Load save names
     const savedNames = localStorage.getItem("save-names");
@@ -119,29 +123,68 @@ export const RoutineBuilder = () => {
       }
     }
 
-    const state1Key = "save-state-1";
-    const savedState1 = localStorage.getItem(state1Key);
-    if (savedState1) {
-      try {
-        const data: SaveStateData = JSON.parse(savedState1);
-        setPlacedSkills(data.placedSkills);
-        setPositionIcons(data.positionIcons);
-        setNotes(data.notes || {});
-        setSegmentNames(data.segmentNames || {});
-        updateConfig(data.config);
-        setCurrentSaveState(data);
-        setLoadedSaveStateSlot(1);
-        // Store the initially loaded category so we know when user manually changes it
-        initialLoadedCategoryRef.current = data.config.category;
-      } catch (e) {
-        console.error("Failed to load State 1:", e);
-      }
+    // First, check if there's a shared routine in the URL
+    const sharedData = getSharedRoutineFromUrl();
+    if (sharedData) {
+      // Load from shared routine - collapse panels
+      setPlacedSkills(sharedData.skills || []);
+      setPositionIcons(sharedData.positionIcons || []); // Load shared position icons
+      setArrows(sharedData.arrows || []); // Load shared arrows
+      setNotes(sharedData.notes || {});
+      setSegmentNames(sharedData.segments || {});
+      updateConfig({
+        bpm: sharedData.config.bpm,
+        length: sharedData.config.length,
+        category: sharedData.config.category,
+        level: sharedData.config.level,
+        startCountOffset: 0, // Default for shared routines
+      });
+      setCurrentSaveState({
+        placedSkills: sharedData.skills || [],
+        positionIcons: sharedData.positionIcons || [],
+        arrows: sharedData.arrows || [],
+        config: {
+          bpm: sharedData.config.bpm,
+          length: sharedData.config.length,
+          category: sharedData.config.category,
+          level: sharedData.config.level,
+          startCountOffset: 0,
+        },
+        notes: sharedData.notes || {},
+        segmentNames: sharedData.segments || {},
+        timestamp: Date.now(),
+      });
+      setLoadedSaveStateSlot(1); // Use slot 1 for shared view
+      initialLoadedCategoryRef.current = sharedData.category;
+      setHasLoadedState(true);
+      setIsSharedUrl(true);
     } else {
-      // No State 1 exists - start fresh but default to State 1
-      setLoadedSaveStateSlot(1);
+      // Fall back to localStorage
+      const state1Key = "save-state-1";
+      const savedState1 = localStorage.getItem(state1Key);
+      if (savedState1) {
+        try {
+          const data: SaveStateData = JSON.parse(savedState1);
+          setPlacedSkills(data.placedSkills);
+          setPositionIcons(data.positionIcons);
+          setArrows(data.arrows || []);
+          setNotes(data.notes || {});
+          setSegmentNames(data.segmentNames || {});
+          updateConfig(data.config);
+          setCurrentSaveState(data);
+          setLoadedSaveStateSlot(1);
+          // Store the initially loaded category so we know when user manually changes it
+          initialLoadedCategoryRef.current = data.config.category;
+        } catch (e) {
+          console.error("Failed to load State 1:", e);
+        }
+      } else {
+        // No State 1 exists - start fresh but default to State 1
+        setLoadedSaveStateSlot(1);
+      }
+      // Mark that we've attempted to load saved state
+      setHasLoadedState(true);
     }
-    // Mark that we've attempted to load saved state
-    setHasLoadedState(true);
   }, []);
 
   // Manage PDF blob URL creation and cleanup
@@ -267,9 +310,10 @@ export const RoutineBuilder = () => {
   }, [config.startCountOffset]);
 
   // Handle category changes - auto-save/load category states
+  // Skip for shared URLs since they have their own data
   useEffect(() => {
     // Only handle category changes after initial load
-    if (!hasLoadedState) return;
+    if (!hasLoadedState || isSharedUrl) return;
 
     // Save current category state before switching (only for user-initiated changes)
     if (
@@ -331,8 +375,9 @@ export const RoutineBuilder = () => {
   }, [config.category, config.length, config.bpm, hasLoadedState]);
 
   // Auto-save to current slot whenever state changes
+  // Skip for shared URLs since they are read-only views
   useEffect(() => {
-    if (loadedSaveStateSlot) {
+    if (loadedSaveStateSlot && !isSharedUrl) {
       const key = `save-state-${loadedSaveStateSlot}`;
       const data: SaveStateData = {
         placedSkills: [...placedSkills],
@@ -360,6 +405,7 @@ export const RoutineBuilder = () => {
     hasLoadedState,
     notes,
     segmentNames,
+    isSharedUrl, // Add this dependency to ensure effect runs when isSharedUrl changes
   ]);
 
   // Auto-scroll to keep selected skill in view after keyboard movement
@@ -1757,10 +1803,12 @@ export const RoutineBuilder = () => {
         setRenameInput={setRenameInput}
         placedSkills={placedSkills}
         positionIcons={positionIcons}
+        arrows={arrows}
         notes={notes}
         segmentNames={segmentNames}
         onExportData={handleExportData}
         onImportData={handleImportData}
+        isSharedUrl={isSharedUrl}
       />
       </div>
 
@@ -1819,6 +1867,7 @@ export const RoutineBuilder = () => {
         handleExportPDF={handleExportPDF}
         isGeneratingPdf={isGeneratingPdf}
         resetToDefault={resetToDefault}
+        initialSkillsPanelCollapsed={isSharedUrl}
       />
 
       <PdfPreviewDialog

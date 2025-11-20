@@ -31,7 +31,7 @@ interface RoutineWorkspaceProps {
   lineHistories: {
     [saveStateSlot: number]: {
       [category: string]: {
-        [lineIndex: number]: { 
+        [lineIndex: number]: {
           iconHistory: PositionIcon[][];
           arrowHistory: Arrow[][];
           index: number;
@@ -42,7 +42,7 @@ interface RoutineWorkspaceProps {
   setLineHistories: React.Dispatch<React.SetStateAction<{
     [saveStateSlot: number]: {
       [category: string]: {
-        [lineIndex: number]: { 
+        [lineIndex: number]: {
           iconHistory: PositionIcon[][];
           arrowHistory: Arrow[][];
           index: number;
@@ -103,6 +103,7 @@ interface RoutineWorkspaceProps {
   handleExportPDF: () => void;
   isGeneratingPdf: boolean;
   resetToDefault: () => void;
+  initialSkillsPanelCollapsed?: boolean;
 }
 
 export const RoutineWorkspace = ({
@@ -160,6 +161,7 @@ export const RoutineWorkspace = ({
   handleExportPDF,
   isGeneratingPdf,
   resetToDefault,
+  initialSkillsPanelCollapsed,
 }: RoutineWorkspaceProps) => {
   const isMobile = useIsMobile();
 
@@ -252,9 +254,21 @@ export const RoutineWorkspace = ({
   }, [isMobile, draggedSkill, isDraggingPlacedSkill, isDraggingIcon, isResizing]);
 
   // State for panel sizes and toggle
-  const [panelSizes, setPanelSizes] = useState([30, 70]); // [skillsPanel, mainPanel]
-  const [skillsPanelCollapsed, setSkillsPanelCollapsed] = useState(false);
+  const initialCollapsed = initialSkillsPanelCollapsed || false;
+  const [panelSizes, setPanelSizes] = useState(initialCollapsed ? [1, 99] : [30, 70]);
+  const [skillsPanelCollapsed, setSkillsPanelCollapsed] = useState(initialCollapsed);
   const [previousSkillsSize, setPreviousSkillsSize] = useState(15);
+
+  // Ensure panel is collapsed when loaded from shared URL
+  useEffect(() => {
+    if (initialSkillsPanelCollapsed) {
+      setPanelSizes([1, 99]);
+      setSkillsPanelCollapsed(true);
+    } else {
+      setPanelSizes([30, 70]);
+      setSkillsPanelCollapsed(false);
+    }
+  }, [initialSkillsPanelCollapsed]);
 
   // Measure the actual cell width dynamically
   useEffect(() => {
