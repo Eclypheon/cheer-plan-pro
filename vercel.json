@@ -1,0 +1,12 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/urlshorten/isgd",
+      "destination": "https://is.gd/create.php"
+    },
+    {
+      "source": "/api/urlshorten/isgd(.*)",
+      "destination": "https://is.gd/create.php"
+    }
+  ]
+}

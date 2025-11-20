@@ -191,78 +191,39 @@ export const createShareableUrl = async (data: SharedRoutineData): Promise<strin
   return fullUrl;
 };
 
-// Function to shorten URL using is.gd via Vercel API proxy
+// Function to shorten URL using is.gd via Vercel rewrite proxy
 async function shortenUrl(longUrl: string): Promise<string | null> {
   console.log(`Starting URL shortening process for URL: ${longUrl.substring(0, 100)}...`);
   console.log(`URL length: ${longUrl.length} characters`);
 
   try {
-    // Try is.gd first using the Vercel API proxy
-    console.log(`Attempting is.gd API call via Vercel proxy...`);
+    // Try is.gd using Vercel rewrite proxy
+    console.log(`Attempting is.gd API call via Vercel rewrite...`);
     const proxyUrl = `/api/urlshorten/isgd?format=simple&url=${encodeURIComponent(longUrl)}`;
     
     const response = await fetch(proxyUrl);
-    console.log(`is.gd proxy response status: ${response.status}`);
+    console.log(`Vercel rewrite proxy response status: ${response.status}`);
     
     if (response.ok) {
       const responseText = await response.text();
-      console.log(`is.gd proxy response text:`, responseText);
+      console.log(`is.gd response via Vercel rewrite:`, responseText);
       
       if (responseText && responseText.trim().startsWith('http')) {
         const shortUrl = responseText.trim();
-        console.log(`Successfully shortened URL using is.gd proxy: ${shortUrl}`);
+        console.log(`Successfully shortened URL using is.gd: ${shortUrl}`);
         console.log(`Shortened from ${longUrl.length} to ${shortUrl.length} characters`);
         return shortUrl;
       } else {
-        console.warn(`Invalid response from is.gd proxy: ${responseText}`);
+        console.warn(`Invalid response from is.gd: ${responseText}`);
       }
     } else {
-      console.warn(`is.gd proxy request failed with status: ${response.status}`);
+      console.warn(`Vercel rewrite proxy request failed with status: ${response.status}`);
     }
   } catch (error) {
-    console.warn(`Failed to shorten URL using is.gd proxy:`, error);
+    console.warn(`Failed to shorten URL using is.gd:`, error);
   }
 
- // If is.gd fails, try alternative services
-  try {
-    // Try cleanuri as backup
-    console.log(`Attempting cleanuri API call...`);
-    const cleanUriResponse = await fetch('https://cleanuri.com/api/v1/shorten', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ url: longUrl })
-    });
-
-    if (cleanUriResponse.ok) {
-      const cleanUriData = await cleanUriResponse.json();
-      if (cleanUriData.result_url) {
-        console.log(`Successfully shortened URL using cleanuri: ${cleanUriData.result_url}`);
-        return cleanUriData.result_url;
-      }
-    }
-  } catch (error) {
-    console.warn(`Failed to shorten URL using cleanuri:`, error);
-  }
-
-  // Try shrtco.de as another backup
-  try {
-    console.log(`Attempting shrtco.de API call...`);
-    const shrtcoResponse = await fetch(`https://api.shrtco.de/v2/shorten?url=${encodeURIComponent(longUrl)}`);
-    
-    if (shrtcoResponse.ok) {
-      const shrtcoData = await shrtcoResponse.json();
-      if (shrtcoData.result && shrtcoData.result.short_link) {
-        console.log(`Successfully shortened URL using shrtco.de: ${shrtcoData.result.short_link}`);
-        return shrtcoData.result.short_link;
-      }
-    }
-  } catch (error) {
-    console.warn(`Failed to shorten URL using shrtco.de:`, error);
-  }
-
-  console.log(`All URL shortening services failed. Returning null.`);
+ console.log(`URL shortening failed. Returning null.`);
   return null;
 }
 
