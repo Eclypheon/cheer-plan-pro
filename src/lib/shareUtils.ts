@@ -191,19 +191,44 @@ export const createShareableUrl = async (data: SharedRoutineData): Promise<strin
   return fullUrl;
 };
 
-// Function to shorten URL using external services with fallback via proxy
+// Function to shorten URL using external services with fallback
 async function shortenUrl(longUrl: string): Promise<string | null> {
   console.log(`Starting URL shortening process for URL: ${longUrl.substring(0, 100)}...`);
   console.log(`URL length: ${longUrl.length} characters`);
   
-  const services = [
-    { name: 'is.gd', url: '/api/urlshorten/isgd', params: { format: 'simple', url: encodeURIComponent(longUrl) } },
+  // Try is.gd first with direct API call (no proxy needed)
+  try {
+    console.log(`Attempting to shorten URL using is.gd direct API...`);
+    const isgdUrl = `https://is.gd/create.php?format=simple&url=${encodeURIComponent(longUrl)}`;
+    console.log(`Making GET request to: ${isgdUrl}`);
+    
+    const response = await fetch(isgdUrl);
+    console.log(`is.gd response status: ${response.status}`);
+    
+    if (response.ok) {
+      const responseText = await response.text();
+      console.log(`is.gd response text:`, responseText);
+      
+      if (responseText && responseText.trim().startsWith('http')) {
+        const shortUrl = responseText.trim();
+        console.log(`Successfully shortened URL using is.gd direct API: ${shortUrl}`);
+        console.log(`Shortened from ${longUrl.length} to ${shortUrl.length} characters`);
+        console.log(`Reduction: ${longUrl.length - shortUrl.length} characters (${((1 - shortUrl.length / longUrl.length) * 100).toFixed(1)}%)`);
+        return shortUrl;
+      }
+    }
+  } catch (error) {
+    console.warn(`Failed to shorten URL using is.gd direct API:`, error);
+  }
+  
+  // If is.gd fails, try other services via proxy
+  const proxyServices = [
     { name: 'cleanuri', url: '/api/urlshorten/cleanuri', params: { url: longUrl } },
     { name: 'shrtco.de', url: '/api/urlshorten/shrtcode', params: { url: longUrl } },
     { name: 'tinyurl', url: '/api/urlshorten/tinyurl', params: { url: encodeURIComponent(longUrl) } },
   ];
 
-  for (const service of services) {
+  for (const service of proxyServices) {
     console.log(`Attempting to shorten URL using ${service.name} via proxy...`);
     console.log(`Proxy URL: ${service.url}`);
     console.log(`Service params:`, service.params);
@@ -212,23 +237,7 @@ async function shortenUrl(longUrl: string): Promise<string | null> {
       let response: Response;
       let shortUrl: string | undefined;
 
-      if (service.name === 'is.gd') {
-        // is.gd uses GET request with query parameters via proxy
-        // Use format=simple for plain text response
-        const params = new URLSearchParams(service.params as Record<string, string>);
-        const requestUrl = `${service.url}?${params}`;
-        console.log(`Making GET request to proxy: ${requestUrl}`);
-        response = await fetch(requestUrl);
-        console.log(`is.gd proxy response status: ${response.status}`);
-        
-        // is.gd with format=simple returns plain text, not JSON
-        const responseText = await response.text();
-        console.log(`is.gd proxy response text:`, responseText);
-        
-        if (responseText && responseText.trim().startsWith('http')) {
-          shortUrl = responseText.trim();
-        }
-      } else if (service.name === 'cleanuri') {
+      if (service.name === 'cleanuri') {
         // cleanuri uses POST request with form data via proxy
         console.log(`Making POST request to proxy: ${service.url}`);
         response = await fetch(service.url, {
@@ -294,7 +303,7 @@ async function shortenUrl(longUrl: string): Promise<string | null> {
     }
   }
 
-  console.log(`All URL shortening services via proxy failed. Returning null.`);
+  console.log(`All URL shortening services failed. Returning null.`);
   return null; // All services failed
 }
 
