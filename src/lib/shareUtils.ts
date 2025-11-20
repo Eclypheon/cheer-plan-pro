@@ -191,120 +191,41 @@ export const createShareableUrl = async (data: SharedRoutineData): Promise<strin
   return fullUrl;
 };
 
-// Function to shorten URL using external services with fallback
+// Function to shorten URL using is.gd direct API
 async function shortenUrl(longUrl: string): Promise<string | null> {
   console.log(`Starting URL shortening process for URL: ${longUrl.substring(0, 100)}...`);
   console.log(`URL length: ${longUrl.length} characters`);
-  
-  // Try is.gd first with direct API call (no proxy needed)
+
   try {
-    console.log(`Attempting to shorten URL using is.gd direct API...`);
+    console.log(`Shortening URL using is.gd direct API...`);
     const isgdUrl = `https://is.gd/create.php?format=simple&url=${encodeURIComponent(longUrl)}`;
     console.log(`Making GET request to: ${isgdUrl}`);
-    
+
     const response = await fetch(isgdUrl);
     console.log(`is.gd response status: ${response.status}`);
-    
+
     if (response.ok) {
       const responseText = await response.text();
       console.log(`is.gd response text:`, responseText);
-      
+
+      // The API returns plain text which is the shortened URL
       if (responseText && responseText.trim().startsWith('http')) {
         const shortUrl = responseText.trim();
-        console.log(`Successfully shortened URL using is.gd direct API: ${shortUrl}`);
+        console.log(`Successfully shortened URL using is.gd: ${shortUrl}`);
         console.log(`Shortened from ${longUrl.length} to ${shortUrl.length} characters`);
-        console.log(`Reduction: ${longUrl.length - shortUrl.length} characters (${((1 - shortUrl.length / longUrl.length) * 100).toFixed(1)}%)`);
-        return shortUrl;
-      }
-    }
-  } catch (error) {
-    console.warn(`Failed to shorten URL using is.gd direct API:`, error);
-  }
-  
-  // If is.gd fails, try other services via proxy
-  const proxyServices = [
-    { name: 'cleanuri', url: '/api/urlshorten/cleanuri', params: { url: longUrl } },
-    { name: 'shrtco.de', url: '/api/urlshorten/shrtcode', params: { url: longUrl } },
-    { name: 'tinyurl', url: '/api/urlshorten/tinyurl', params: { url: encodeURIComponent(longUrl) } },
-  ];
-
-  for (const service of proxyServices) {
-    console.log(`Attempting to shorten URL using ${service.name} via proxy...`);
-    console.log(`Proxy URL: ${service.url}`);
-    console.log(`Service params:`, service.params);
-    
-    try {
-      let response: Response;
-      let shortUrl: string | undefined;
-
-      if (service.name === 'cleanuri') {
-        // cleanuri uses POST request with form data via proxy
-        console.log(`Making POST request to proxy: ${service.url}`);
-        response = await fetch(service.url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-          body: new URLSearchParams(service.params as Record<string, string>)
-        });
-        console.log(`cleanuri proxy response status: ${response.status}`);
-        const result = await response.json();
-        console.log(`cleanuri proxy response:`, result);
-        shortUrl = result.result_url;
-      } else if (service.name === 'shrtco.de') {
-        // shrtco.de uses GET request with query parameters via proxy
-        const params = new URLSearchParams(service.params as Record<string, string>);
-        const requestUrl = `${service.url}?${params}`;
-        console.log(`Making GET request to proxy: ${requestUrl}`);
-        response = await fetch(requestUrl);
-        console.log(`shrtco.de proxy response status: ${response.status}`);
-        const result = await response.json();
-        console.log(`shrtco.de proxy response:`, result);
-        shortUrl = result.result?.short_link;
-      } else if (service.name === 'tinyurl') {
-        // TinyURL uses GET request with query parameters via proxy
-        const params = new URLSearchParams(service.params as Record<string, string>);
-        const requestUrl = `${service.url}?${params}`;
-        console.log(`Making GET request to proxy: ${requestUrl}`);
-        response = await fetch(requestUrl);
-        console.log(`tinyurl proxy response status: ${response.status}`);
-        
-        // TinyURL might return plain text or JSON, so handle both
-        const responseText = await response.text();
-        console.log(`tinyurl proxy response text:`, responseText);
-        
-        // Check if response is JSON first, otherwise treat as plain text
-        try {
-          const result = JSON.parse(responseText);
-          shortUrl = result.shorturl || result.tinyurl || result.result;
-        } catch {
-          // If not JSON, assume it's the shortened URL directly
-          if (responseText && responseText.trim().startsWith('http')) {
-            shortUrl = responseText.trim();
-          }
-        }
-      }
-
-      console.log(`Service ${service.name} - response.ok: ${response.ok}, shortUrl: ${shortUrl}`);
-      
-      if (response.ok && shortUrl) {
-        console.log(`Successfully shortened URL using ${service.name} via proxy: ${shortUrl}`);
-        console.log(`Shortened from ${longUrl.length} to ${shortUrl.length} characters`);
-        console.log(`Reduction: ${longUrl.length - shortUrl.length} characters (${((1 - shortUrl.length / longUrl.length) * 100).toFixed(1)}%)`);
         return shortUrl;
       } else {
-        console.warn(`Service ${service.name} returned status ${response.status} or no short URL`);
-        console.warn(`Response was OK: ${response.ok}, Short URL: ${shortUrl}`);
+        console.warn(`Invalid response from is.gd: ${responseText}`);
       }
-    } catch (error) {
-      console.warn(`Failed to shorten URL using ${service.name} via proxy:`, error);
-      console.warn(`Error details:`, error instanceof Error ? { message: error.message, stack: error.stack } : error);
-      continue; // Try next service
+    } else {
+      console.warn(`is.gd request failed with status: ${response.status}`);
     }
+  } catch (error) {
+    console.warn(`Failed to shorten URL using is.gd:`, error);
   }
 
-  console.log(`All URL shortening services failed. Returning null.`);
-  return null; // All services failed
+  console.log(`URL shortening failed. Returning null.`);
+  return null;
 }
 
 // Test function to verify optimization works
