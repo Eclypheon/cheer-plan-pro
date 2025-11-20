@@ -8,6 +8,13 @@ export default defineConfig(() => ({
   server: {
     host: "::",
     port: 8080,
+    proxy: {
+      '/api/urlshorten': {
+        target: 'https://is.gd',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/urlshorten/, '/create.php')
+      }
+    }
   },
   plugins: [
     react(),
