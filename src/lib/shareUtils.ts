@@ -191,37 +191,37 @@ export const createShareableUrl = async (data: SharedRoutineData): Promise<strin
   return fullUrl;
 };
 
-// Function to shorten URL using is.gd direct API
+// Function to shorten URL using is.gd via proxy
 async function shortenUrl(longUrl: string): Promise<string | null> {
   console.log(`Starting URL shortening process for URL: ${longUrl.substring(0, 100)}...`);
   console.log(`URL length: ${longUrl.length} characters`);
 
   try {
-    console.log(`Shortening URL using is.gd direct API...`);
-    const isgdUrl = `https://is.gd/create.php?format=simple&url=${encodeURIComponent(longUrl)}`;
-    console.log(`Making GET request to: ${isgdUrl}`);
+    console.log(`Shortening URL using is.gd proxy API...`);
+    const proxyUrl = `/api/urlshorten/isgd?format=simple&url=${encodeURIComponent(longUrl)}`;
+    console.log(`Making GET request to proxy: ${proxyUrl}`);
 
-    const response = await fetch(isgdUrl);
-    console.log(`is.gd response status: ${response.status}`);
+    const response = await fetch(proxyUrl);
+    console.log(`Proxy response status: ${response.status}`);
 
     if (response.ok) {
       const responseText = await response.text();
-      console.log(`is.gd response text:`, responseText);
+      console.log(`is.gd proxy response text:`, responseText);
 
       // The API returns plain text which is the shortened URL
       if (responseText && responseText.trim().startsWith('http')) {
         const shortUrl = responseText.trim();
-        console.log(`Successfully shortened URL using is.gd: ${shortUrl}`);
+        console.log(`Successfully shortened URL using is.gd proxy: ${shortUrl}`);
         console.log(`Shortened from ${longUrl.length} to ${shortUrl.length} characters`);
         return shortUrl;
       } else {
-        console.warn(`Invalid response from is.gd: ${responseText}`);
+        console.warn(`Invalid response from is.gd proxy: ${responseText}`);
       }
     } else {
-      console.warn(`is.gd request failed with status: ${response.status}`);
+      console.warn(`is.gd proxy request failed with status: ${response.status}`);
     }
   } catch (error) {
-    console.warn(`Failed to shorten URL using is.gd:`, error);
+    console.warn(`Failed to shorten URL using is.gd proxy:`, error);
   }
 
   console.log(`URL shortening failed. Returning null.`);
