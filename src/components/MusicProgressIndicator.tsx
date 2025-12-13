@@ -105,8 +105,8 @@ export const MusicProgressIndicator = ({
     };
   }, [totalLines]);
 
-  // Precise beat synchronization using requestAnimationFrame and elapsed time tracking
-  useEffect(() => {
+  // Beat synchronization using fixed intervals based solely on BPM with line selection support
+ useEffect(() => {
     if (!musicState.file) {
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
@@ -145,80 +145,94 @@ export const MusicProgressIndicator = ({
     // Apply offset whenever the setting is enabled
     startedWithOffsetRef.current = startCountOffset > 0;
 
-    // Track start time for precise elapsed time calculation
-    let startTime = performance.now();
-    let lastBeatTime = startTime;
+    // Calculate beat interval based solely on BPM (independent of music state)
+    const beatInterval = (60 / bpm) * 1000; // Convert to milliseconds
+    let currentBeatIndex = 0;
+    
+    // Calculate start time to align with the selected line if available
+    let startTime = Date.now();
+    
+    // If we have a current time, calculate where we should start based on line selection
+    // This allows the red line to start from the selected line when music begins
+    if (musicState.currentTime > 0) {
+      const elapsedBeats = Math.floor(musicState.currentTime * (bpm / 60));
+      currentBeatIndex = elapsedBeats;
+      startTime = Date.now() - (musicState.currentTime * 1000);
+    }
 
-    const updateProgress = (currentTime: number) => {
-      // Calculate elapsed time since we started tracking
-      const elapsedSeconds = (currentTime - startTime) / 1000;
+    const updateProgress = () => {
+      // Calculate which beat we should be on based solely on elapsed time and BPM
+      const elapsedMs = Date.now() - startTime;
+      const elapsedSeconds = elapsedMs / 1000;
+      const targetBeatIndex = Math.floor(elapsedSeconds * (bpm / 60));
 
-      // Calculate current beat based on elapsed time and BPM
-      // This gives us precise beat positioning without drift
-      const beatsPerSecond = bpm / 60;
-      const currentBeat = Math.floor(elapsedSeconds * beatsPerSecond);
+      // Only update if we've reached the next beat
+      if (targetBeatIndex >= currentBeatIndex) {
+        const adjustedBeat = targetBeatIndex + (startedWithOffsetRef.current ? startCountOffset : 0);
+        const lineIndex = Math.floor(adjustedBeat / 8);
+        const countInLine = (adjustedBeat % 8) + 1; // 1-indexed (1-8)
 
-      const adjustedBeat = currentBeat + (startedWithOffsetRef.current ? startCountOffset : 0);
-      const lineIndex = Math.floor(adjustedBeat / 8);
-      const countInLine = (adjustedBeat % 8) + 1; // 1-indexed (1-8)
-
-      // Auto-select current line if callback provided and line changed
-      if (onLineSelect && lineIndex !== lastLineSelectedRef.current && lineIndex >= 0 && lineIndex < totalLines) {
-        onLineSelect(lineIndex);
-        lastLineSelectedRef.current = lineIndex;
-      }
-
-      // Only show indicator if we're within the routine bounds
-      if (lineIndex >= totalLines) {
-        if (indicatorRef.current) indicatorRef.current.style.display = 'none';
-        if (beatMarkerRef.current) beatMarkerRef.current.style.display = 'none';
-        // Clear cell highlight when out of bounds
-        if (onCurrentCellChange && lastHighlightedCellRef.current) {
-          onCurrentCellChange(-1, -1);
-          lastHighlightedCellRef.current = null;
-        }
-        return;
-      }
-
-      // Notify parent of current cell change for highlighting
-      if (onCurrentCellChange) {
-        const currentCell = { lineIndex, count: countInLine };
-        // Only call if the cell actually changed
-        if (!lastHighlightedCellRef.current ||
-            lastHighlightedCellRef.current.lineIndex !== lineIndex ||
-            lastHighlightedCellRef.current.count !== countInLine) {
-          onCurrentCellChange(lineIndex, countInLine);
-          lastHighlightedCellRef.current = currentCell;
-        }
-      }
-
-      // Notify parent of current beat change for header display
-      if (onCurrentBeatChange) {
-        onCurrentBeatChange(lineIndex, countInLine);
-      }
-
-      // Get pre-calculated position for this beat
-      const beatIndex = adjustedBeat % (totalLines * 8);
-      const position = cellPositionsRef.current[beatIndex];
-
-      if (position) {
-        // Update indicator positions directly in DOM using pre-calculated positions
-        if (indicatorRef.current) {
-          indicatorRef.current.style.display = 'block';
-          indicatorRef.current.style.left = `${position.left}px`;
+        // Auto-select current line if callback provided and line changed
+        if (onLineSelect && lineIndex !== lastLineSelectedRef.current && lineIndex >= 0 && lineIndex < totalLines) {
+          onLineSelect(lineIndex);
+          lastLineSelectedRef.current = lineIndex;
         }
 
-        if (beatMarkerRef.current) {
-          beatMarkerRef.current.style.display = 'block';
-          beatMarkerRef.current.style.left = `${position.left}px`;
+        // Only show indicator if we're within the routine bounds
+        if (lineIndex >= totalLines) {
+          if (indicatorRef.current) indicatorRef.current.style.display = 'none';
+          if (beatMarkerRef.current) beatMarkerRef.current.style.display = 'none';
+          // Clear cell highlight when out of bounds
+          if (onCurrentCellChange && lastHighlightedCellRef.current) {
+            onCurrentCellChange(-1, -1);
+            lastHighlightedCellRef.current = null;
+          }
+          return;
         }
+
+        // Notify parent of current cell change for highlighting
+        if (onCurrentCellChange) {
+          const currentCell = { lineIndex, count: countInLine };
+          // Only call if the cell actually changed
+          if (!lastHighlightedCellRef.current ||
+              lastHighlightedCellRef.current.lineIndex !== lineIndex ||
+              lastHighlightedCellRef.current.count !== countInLine) {
+            onCurrentCellChange(lineIndex, countInLine);
+            lastHighlightedCellRef.current = currentCell;
+          }
+        }
+
+        // Notify parent of current beat change for header display
+        if (onCurrentBeatChange) {
+          onCurrentBeatChange(lineIndex, countInLine);
+        }
+
+        // Get pre-calculated position for this beat
+        const beatIndex = adjustedBeat % (totalLines * 8);
+        const position = cellPositionsRef.current[beatIndex];
+
+        if (position) {
+          // Update indicator positions directly in DOM using pre-calculated positions
+          if (indicatorRef.current) {
+            indicatorRef.current.style.display = 'block';
+            indicatorRef.current.style.left = `${position.left}px`;
+          }
+
+          if (beatMarkerRef.current) {
+            beatMarkerRef.current.style.display = 'block';
+            beatMarkerRef.current.style.left = `${position.left}px`;
+          }
+        }
+
+        // Update current beat index
+        currentBeatIndex = targetBeatIndex + 1;
       }
 
       // Continue the animation loop
       animationFrameRef.current = requestAnimationFrame(updateProgress);
     };
 
-    // Start the precise beat tracking
+    // Start the fixed interval beat tracking
     animationFrameRef.current = requestAnimationFrame(updateProgress);
 
     return () => {
