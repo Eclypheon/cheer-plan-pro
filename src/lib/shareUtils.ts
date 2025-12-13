@@ -191,111 +191,40 @@ export const createShareableUrl = async (data: SharedRoutineData): Promise<strin
   return fullUrl;
 };
 
-// Function to shorten URL using external services with fallback via proxy
+// Function to shorten URL using is.gd via Vercel rewrite proxy
 async function shortenUrl(longUrl: string): Promise<string | null> {
   console.log(`Starting URL shortening process for URL: ${longUrl.substring(0, 100)}...`);
   console.log(`URL length: ${longUrl.length} characters`);
-  
-  const services = [
-    { name: 'is.gd', url: '/api/urlshorten/isgd', params: { format: 'simple', url: encodeURIComponent(longUrl) } },
-    { name: 'cleanuri', url: '/api/urlshorten/cleanuri', params: { url: longUrl } },
-    { name: 'shrtco.de', url: '/api/urlshorten/shrtcode', params: { url: longUrl } },
-    { name: 'tinyurl', url: '/api/urlshorten/tinyurl', params: { url: encodeURIComponent(longUrl) } },
-  ];
 
-  for (const service of services) {
-    console.log(`Attempting to shorten URL using ${service.name} via proxy...`);
-    console.log(`Proxy URL: ${service.url}`);
-    console.log(`Service params:`, service.params);
+  try {
+    // Try is.gd using Vercel rewrite proxy
+    console.log(`Attempting is.gd API call via Vercel rewrite...`);
+    const proxyUrl = `/api/urlshorten/isgd?format=simple&url=${encodeURIComponent(longUrl)}`;
     
-    try {
-      let response: Response;
-      let shortUrl: string | undefined;
-
-      if (service.name === 'is.gd') {
-        // is.gd uses GET request with query parameters via proxy
-        // Use format=simple for plain text response
-        const params = new URLSearchParams(service.params as Record<string, string>);
-        const requestUrl = `${service.url}?${params}`;
-        console.log(`Making GET request to proxy: ${requestUrl}`);
-        response = await fetch(requestUrl);
-        console.log(`is.gd proxy response status: ${response.status}`);
-        
-        // is.gd with format=simple returns plain text, not JSON
-        const responseText = await response.text();
-        console.log(`is.gd proxy response text:`, responseText);
-        
-        if (responseText && responseText.trim().startsWith('http')) {
-          shortUrl = responseText.trim();
-        }
-      } else if (service.name === 'cleanuri') {
-        // cleanuri uses POST request with form data via proxy
-        console.log(`Making POST request to proxy: ${service.url}`);
-        response = await fetch(service.url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-          body: new URLSearchParams(service.params as Record<string, string>)
-        });
-        console.log(`cleanuri proxy response status: ${response.status}`);
-        const result = await response.json();
-        console.log(`cleanuri proxy response:`, result);
-        shortUrl = result.result_url;
-      } else if (service.name === 'shrtco.de') {
-        // shrtco.de uses GET request with query parameters via proxy
-        const params = new URLSearchParams(service.params as Record<string, string>);
-        const requestUrl = `${service.url}?${params}`;
-        console.log(`Making GET request to proxy: ${requestUrl}`);
-        response = await fetch(requestUrl);
-        console.log(`shrtco.de proxy response status: ${response.status}`);
-        const result = await response.json();
-        console.log(`shrtco.de proxy response:`, result);
-        shortUrl = result.result?.short_link;
-      } else if (service.name === 'tinyurl') {
-        // TinyURL uses GET request with query parameters via proxy
-        const params = new URLSearchParams(service.params as Record<string, string>);
-        const requestUrl = `${service.url}?${params}`;
-        console.log(`Making GET request to proxy: ${requestUrl}`);
-        response = await fetch(requestUrl);
-        console.log(`tinyurl proxy response status: ${response.status}`);
-        
-        // TinyURL might return plain text or JSON, so handle both
-        const responseText = await response.text();
-        console.log(`tinyurl proxy response text:`, responseText);
-        
-        // Check if response is JSON first, otherwise treat as plain text
-        try {
-          const result = JSON.parse(responseText);
-          shortUrl = result.shorturl || result.tinyurl || result.result;
-        } catch {
-          // If not JSON, assume it's the shortened URL directly
-          if (responseText && responseText.trim().startsWith('http')) {
-            shortUrl = responseText.trim();
-          }
-        }
-      }
-
-      console.log(`Service ${service.name} - response.ok: ${response.ok}, shortUrl: ${shortUrl}`);
+    const response = await fetch(proxyUrl);
+    console.log(`Vercel rewrite proxy response status: ${response.status}`);
+    
+    if (response.ok) {
+      const responseText = await response.text();
+      console.log(`is.gd response via Vercel rewrite:`, responseText);
       
-      if (response.ok && shortUrl) {
-        console.log(`Successfully shortened URL using ${service.name} via proxy: ${shortUrl}`);
+      if (responseText && responseText.trim().startsWith('http')) {
+        const shortUrl = responseText.trim();
+        console.log(`Successfully shortened URL using is.gd: ${shortUrl}`);
         console.log(`Shortened from ${longUrl.length} to ${shortUrl.length} characters`);
-        console.log(`Reduction: ${longUrl.length - shortUrl.length} characters (${((1 - shortUrl.length / longUrl.length) * 100).toFixed(1)}%)`);
         return shortUrl;
       } else {
-        console.warn(`Service ${service.name} returned status ${response.status} or no short URL`);
-        console.warn(`Response was OK: ${response.ok}, Short URL: ${shortUrl}`);
+        console.warn(`Invalid response from is.gd: ${responseText}`);
       }
-    } catch (error) {
-      console.warn(`Failed to shorten URL using ${service.name} via proxy:`, error);
-      console.warn(`Error details:`, error instanceof Error ? { message: error.message, stack: error.stack } : error);
-      continue; // Try next service
+    } else {
+      console.warn(`Vercel rewrite proxy request failed with status: ${response.status}`);
     }
+  } catch (error) {
+    console.warn(`Failed to shorten URL using is.gd:`, error);
   }
 
-  console.log(`All URL shortening services via proxy failed. Returning null.`);
-  return null; // All services failed
+ console.log(`URL shortening failed. Returning null.`);
+  return null;
 }
 
 // Test function to verify optimization works
@@ -396,7 +325,7 @@ function optimizeDataStructure(data: SharedRoutineData): OptimizedSharedData {
   const positions = Array.from(positionsMap.values());
 
   // Group position icons by their configuration to identify repetitions across lines
-  // Configuration includes position, type, name, and color
+ // Configuration includes position, type, name, and color
  const configToIcons = new Map<string, { icon: PositionIcon, lines: number[] }>();
   
   data.positionIcons.forEach(icon => {
@@ -599,7 +528,7 @@ function deoptimizeDataStructure(optimizedData: OptimizedSharedData): SharedRout
     }
   }
 
-  // Sort position icons by original order to maintain consistency
+ // Sort position icons by original order to maintain consistency
  reconstructedPositionIcons.sort((a, b) => a.lineIndex - b.lineIndex);
 
   // Reconstruct arrows with actual coordinates using the shared positions array
